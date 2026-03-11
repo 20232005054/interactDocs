@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 import re
 from db.session import get_db
-from db.models import Document, Chapter, OperationHistory, DocumentVersion
+from db.models import Document, Chapter, OperationHistory, DocumentVersion, Template
 from schemas.schemas import DocumentCreate, DocumentUpdate, ChapterUpdate, MetadataConfig, DocumentVersionCreate
 from core.response import success_response
 
@@ -15,10 +15,18 @@ router = APIRouter(prefix="/api/v1")
 # --- 元数据管理模块 ---
 
 @router.get("/metadata/generate")
-async def get_generate_metadata():
+async def get_generate_metadata(db: AsyncSession = Depends(get_db)):
     """
     获取生成方案的元数据配置
     """
+    # 从template表中获取所有不同的purpose值
+    result = await db.execute(select(Template.purpose).distinct())
+    purposes = [row[0] for row in result.all()]
+    
+    # 如果没有目的类型，使用默认值
+    if not purposes:
+        purposes = ["通用", "医疗器械临床申报", "药物临床试验", "学术研究", "其他"]
+    
     metadata = {
         "generateType": "scheme_gc",
         "title": "方案生成",
@@ -52,7 +60,7 @@ async def get_generate_metadata():
                 "field": "purpose",
                 "label": "使用目的",
                 "type": "select",
-                "options": ["通用","医疗器械临床申报", "药物临床试验", "学术研究", "其他"],
+                "options": purposes,
                 "required": True
             }
         ]

@@ -14,6 +14,7 @@ class DocumentService:
             abstract=doc_in.abstract,
             content=doc_in.content if doc_in.content else [],
             purpose=doc_in.purpose,
+            template_id=doc_in.template_id,
             status="draft"
         )
         
@@ -59,6 +60,8 @@ class DocumentService:
             update_data["content"] = doc_in.content
         if doc_in.purpose is not None:
             update_data["purpose"] = doc_in.purpose
+        if doc_in.template_id is not None:
+            update_data["template_id"] = doc_in.template_id
         if doc_in.status is not None:
             update_data["status"] = doc_in.status
         

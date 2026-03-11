@@ -275,14 +275,20 @@ class SummaryService:
         
         # 首先尝试从数据库获取摘要标题模板
         summary_types = []
-        from db.mappers.summary_title_template_mapper import SummaryTitleTemplateMapper
+        from services.template_service import TemplateService
         
         if document.purpose:
-            # 查询数据库中对应目的的摘要标题模板
-            template = await SummaryTitleTemplateMapper.get_template_by_purpose(db, document.purpose)
-            if template and template.title_templates:
+            # 查询数据库中对应目的的模板
+            templates = await TemplateService.list_templates(
+                db, 
+                purpose=document.purpose,
+                is_system=True,
+                is_active=True
+            )
+            if templates and len(templates) > 0:
                 # 使用数据库中的模板标题
-                summary_types = template.title_templates
+                template = templates[0]
+                summary_types = template.content.get('summary', {}).get('title_templates', [])
         
         # 如果没有找到数据库模板，使用AI生成标题
         if not summary_types:

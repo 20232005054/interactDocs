@@ -50,6 +50,7 @@ class DocumentBase(BaseModel):
     abstract: Optional[str] = Field(None, description="正文摘要")
     content: Optional[str] = Field(None, description="参考正文")
     purpose: Optional[str] = Field(None, description="使用目的")
+    template_id: Optional[UUID] = Field(None, description="模板ID")
 
 class DocumentCreate(DocumentBase):
     pass
@@ -59,6 +60,7 @@ class DocumentUpdate(BaseModel):
     abstract: Optional[str] = Field(None, description="正文摘要")
     content: Optional[str] = Field(None, description="参考正文")
     purpose: Optional[str] = Field(None, description="使用目的")
+    template_id: Optional[UUID] = Field(None, description="模板ID")
     status: Optional[str] = "draft"
 
 class DocumentVO(BaseModel):
@@ -67,6 +69,7 @@ class DocumentVO(BaseModel):
     abstract: Optional[str] = None
     content: Optional[str] = None
     purpose: Optional[str] = None
+    template_id: Optional[UUID] = None
     user_id: Optional[UUID] = None
     status: str
     created_at: datetime

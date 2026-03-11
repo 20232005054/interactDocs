@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Text, Integer, TIMESTAMP, ForeignKey, ARRAY
+from sqlalchemy import Column, String, Text, Integer, TIMESTAMP, ForeignKey, ARRAY, Boolean
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship, declarative_base
 from sqlalchemy.sql import func
@@ -20,6 +20,7 @@ class Document(Base):
     __tablename__ = "documents"
     document_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"))
+    template_id = Column(UUID(as_uuid=True), ForeignKey("templates.template_id"), nullable=True)
     title = Column(String(80), nullable=False)
     abstract = Column(Text, nullable=True)  # 正文摘要
     content = Column(JSONB, nullable=True)  # 参考正文
@@ -219,32 +220,19 @@ class DocumentKeywordHistory(Base):
     keyword = relationship("DocumentKeyword", back_populates="history")
 
 
-class PromptTemplate(Base):
-    __tablename__ = "prompt_templates"
+class Template(Base):
+    __tablename__ = "templates"
     template_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    task_type = Column(String(50), nullable=False)  # 任务类型：generate_paragraph, evaluate, summarize
-    purpose = Column(String(50), nullable=False)  # 适用目的：如 "申报"、"通用"
-    system_prompt = Column(Text, nullable=False)  # 系统角色设定
-    user_prompt_template = Column(Text, nullable=False)  # Jinja2 格式的用户提示词模板
+    group_id = Column(UUID(as_uuid=True), nullable=False)  # 逻辑分组ID，同一套模板的不同版本group_id相同
+    purpose = Column(String(50), nullable=False)  # 用途大类，用于第一级下拉
+    display_name = Column(String(100), nullable=False)  # 具体模板名，用于第二级下拉
+    content = Column(JSONB, nullable=False)  # 核心载体，包含提示词模板、结构模板、摘要模板
+    version = Column(Integer, nullable=False, default=1)  # 版本号
+    is_system = Column(Boolean, nullable=False, default=False)  # 是否为官方系统模板
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=True)  # 所属用户，系统模板此项为空
+    is_active = Column(Boolean, nullable=False, default=True)  # 是否为当前该组模板的生效/推荐版本
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
 
-
-class DocumentSchemaTemplate(Base):
-    __tablename__ = "document_schema_templates"
-    template_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    purpose = Column(String(50), nullable=False)  # 如 "医疗器械临床申报"
-    schema_json = Column(JSONB, nullable=False)  # 标准的多级目录结构JSON
-    description = Column(String(255), nullable=True)  # 模板描述
-    created_at = Column(TIMESTAMP, server_default=func.now())
-    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
-
-
-class SummaryTitleTemplate(Base):
-    __tablename__ = "summary_title_templates"
-    template_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    purpose = Column(String(50), nullable=False)  # 使用目的，如"医疗器械临床申报"、"药物临床试验"等
-    title_templates = Column(JSONB, nullable=False)  # 存储标题模板列表，格式：["标题1", "标题2", ...]
-    description = Column(String(255), nullable=True)  # 模板描述
-    created_at = Column(TIMESTAMP, server_default=func.now())
-    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+# 添加Document与Template的关系
+Document.template = relationship("Template", backref="documents")

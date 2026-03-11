@@ -6,351 +6,220 @@ from uuid import UUID
 from core.response import success_response
 from db.session import get_db
 from services.template_service import TemplateService
-from db.models import SummaryTitleTemplate
-from db.mappers.summary_title_template_mapper import SummaryTitleTemplateMapper
 
 router = APIRouter(prefix="/api/v1/templates", tags=["模板管理"])
 
-# 提示词模板管理
+# 模板管理通用接口
 
-@router.post("/prompt", summary="创建提示词模板")
-async def create_prompt_template(
-    task_type: str,
+@router.post("/", summary="创建模板")
+async def create_template(
     purpose: str,
-    system_prompt: str,
-    user_prompt_template: str,
+    display_name: str,
+    content: dict,
+    is_system: bool = False,
+    user_id: Optional[UUID] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """
-    创建提示词模板
+    创建模板
     """
-    new_template = await TemplateService.create_prompt_template(
-        db, task_type, purpose, system_prompt, user_prompt_template
+    new_template = await TemplateService.create_template(
+        db, purpose, display_name, content, is_system, user_id
     )
     return success_response(data={
         "template_id": new_template.template_id,
-        "task_type": new_template.task_type,
+        "group_id": new_template.group_id,
         "purpose": new_template.purpose,
-        "system_prompt": new_template.system_prompt,
-        "user_prompt_template": new_template.user_prompt_template,
+        "display_name": new_template.display_name,
+        "content": new_template.content,
+        "version": new_template.version,
+        "is_system": new_template.is_system,
+        "user_id": new_template.user_id,
+        "is_active": new_template.is_active,
         "created_at": new_template.created_at,
         "updated_at": new_template.updated_at
     })
 
-@router.get("/prompt/{template_id}", summary="获取提示词模板详情")
-async def get_prompt_template(
+@router.get("/{template_id}", summary="获取模板详情")
+async def get_template(
     template_id: UUID,
     db: AsyncSession = Depends(get_db)
 ):
     """
-    获取提示词模板详情
+    获取模板详情
     """
-    template = await TemplateService.get_prompt_template(db, template_id)
+    template = await TemplateService.get_template(db, template_id)
     if not template:
-        raise HTTPException(status_code=404, detail="提示词模板不存在")
+        raise HTTPException(status_code=404, detail="模板不存在")
     return success_response(data={
         "template_id": template.template_id,
-        "task_type": template.task_type,
+        "group_id": template.group_id,
+
         "purpose": template.purpose,
-        "system_prompt": template.system_prompt,
-        "user_prompt_template": template.user_prompt_template,
+        "display_name": template.display_name,
+        "content": template.content,
+        "version": template.version,
+        "is_system": template.is_system,
+        "user_id": template.user_id,
+        "is_active": template.is_active,
         "created_at": template.created_at,
         "updated_at": template.updated_at
     })
 
-@router.get("/prompt", summary="获取提示词模板列表")
-async def list_prompt_templates(
-    task_type: Optional[str] = None,
+@router.get("/", summary="获取模板列表")
+async def list_templates(
     purpose: Optional[str] = None,
+    is_system: Optional[bool] = None,
+    is_active: Optional[bool] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """
-    获取提示词模板列表
+    获取模板列表
     """
-    templates = await TemplateService.list_prompt_templates(db, task_type, purpose)
+    templates = await TemplateService.list_templates(db, purpose, is_system, is_active)
     items = []
     for template in templates:
         items.append({
             "template_id": template.template_id,
-            "task_type": template.task_type,
+            "group_id": template.group_id,
+    
             "purpose": template.purpose,
-            "system_prompt": template.system_prompt,
-            "user_prompt_template": template.user_prompt_template,
+            "display_name": template.display_name,
+            "content": template.content,
+            "version": template.version,
+            "is_system": template.is_system,
+            "user_id": template.user_id,
+            "is_active": template.is_active,
             "created_at": template.created_at,
             "updated_at": template.updated_at
         })
     return success_response(data={"items": items})
 
-@router.put("/prompt/{template_id}", summary="更新提示词模板")
-async def update_prompt_template(
+@router.put("/{template_id}", summary="更新模板")
+async def update_template(
     template_id: UUID,
-    task_type: Optional[str] = None,
     purpose: Optional[str] = None,
-    system_prompt: Optional[str] = None,
-    user_prompt_template: Optional[str] = None,
+    display_name: Optional[str] = None,
+    content: Optional[dict] = None,
+    is_system: Optional[bool] = None,
+    user_id: Optional[UUID] = None,
+    is_active: Optional[bool] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """
-    更新提示词模板
+    更新模板
     """
     update_data = {}
-    if task_type:
-        update_data["task_type"] = task_type
     if purpose:
         update_data["purpose"] = purpose
-    if system_prompt:
-        update_data["system_prompt"] = system_prompt
-    if user_prompt_template:
-        update_data["user_prompt_template"] = user_prompt_template
+    if display_name:
+        update_data["display_name"] = display_name
+    if content:
+        update_data["content"] = content
+    if is_system is not None:
+        update_data["is_system"] = is_system
+    if user_id:
+        update_data["user_id"] = user_id
+    if is_active is not None:
+        update_data["is_active"] = is_active
     
-    template = await TemplateService.update_prompt_template(db, template_id, **update_data)
+    template = await TemplateService.update_template(db, template_id, **update_data)
     if not template:
-        raise HTTPException(status_code=404, detail="提示词模板不存在")
+        raise HTTPException(status_code=404, detail="模板不存在")
     return success_response(data={
         "template_id": template.template_id,
-        "task_type": template.task_type,
+        "group_id": template.group_id,
+
         "purpose": template.purpose,
-        "system_prompt": template.system_prompt,
-        "user_prompt_template": template.user_prompt_template,
+        "display_name": template.display_name,
+        "content": template.content,
+        "version": template.version,
+        "is_system": template.is_system,
+        "user_id": template.user_id,
+        "is_active": template.is_active,
         "created_at": template.created_at,
         "updated_at": template.updated_at
     })
 
-@router.delete("/prompt/{template_id}", summary="删除提示词模板")
-async def delete_prompt_template(
+@router.delete("/{template_id}", summary="删除模板")
+async def delete_template(
     template_id: UUID,
     db: AsyncSession = Depends(get_db)
 ):
     """
-    删除提示词模板
+    删除模板
     """
-    success = await TemplateService.delete_prompt_template(db, template_id)
+    success = await TemplateService.delete_template(db, template_id)
     if not success:
-        raise HTTPException(status_code=404, detail="提示词模板不存在")
+        raise HTTPException(status_code=404, detail="模板不存在")
     return success_response(message="删除成功")
 
-# 文档结构模板管理
+# 模板发现与克隆接口
 
-@router.post("/schema", summary="创建文档结构模板")
-async def create_schema_template(
+@router.get("/purposes/list", summary="获取所有用途")
+async def list_purposes(
+    is_system: bool = True,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取所有不同的用途
+    """
+    purposes = await TemplateService.get_distinct_purposes(db, is_system)
+    return success_response(data={"purposes": purposes})
+
+@router.get("/by-purpose/{purpose}", summary="根据用途获取模板")
+async def get_templates_by_purpose(
     purpose: str,
-    schema_json: dict,
-    description: Optional[str] = None,
+    is_system: bool = True,
+    is_active: bool = True,
     db: AsyncSession = Depends(get_db)
 ):
     """
-    创建文档结构模板
+    根据用途获取模板列表
     """
-    new_template = await TemplateService.create_schema_template(
-        db, purpose, schema_json, description
-    )
-    return success_response(data={
-        "template_id": new_template.template_id,
-        "purpose": new_template.purpose,
-        "schema_json": new_template.schema_json,
-        "description": new_template.description,
-        "created_at": new_template.created_at,
-        "updated_at": new_template.updated_at
-    })
-
-@router.get("/schema/{template_id}", summary="获取文档结构模板详情")
-async def get_schema_template(
-    template_id: UUID,
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    获取文档结构模板详情
-    """
-    template = await TemplateService.get_schema_template(db, template_id)
-    if not template:
-        raise HTTPException(status_code=404, detail="文档结构模板不存在")
-    return success_response(data={
-        "template_id": template.template_id,
-        "purpose": template.purpose,
-        "schema_json": template.schema_json,
-        "description": template.description,
-        "created_at": template.created_at,
-        "updated_at": template.updated_at
-    })
-
-@router.get("/schema", summary="获取文档结构模板列表")
-async def list_schema_templates(
-    purpose: Optional[str] = None,
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    获取文档结构模板列表
-    """
-    templates = await TemplateService.list_schema_templates(db, purpose)
+    templates = await TemplateService.get_templates_by_purpose(db, purpose, is_system, is_active)
     items = []
     for template in templates:
         items.append({
             "template_id": template.template_id,
+            "group_id": template.group_id,
+    
             "purpose": template.purpose,
-            "schema_json": template.schema_json,
-            "description": template.description,
+            "display_name": template.display_name,
+            "content": template.content,
+            "version": template.version,
+            "is_system": template.is_system,
+            "user_id": template.user_id,
+            "is_active": template.is_active,
             "created_at": template.created_at,
             "updated_at": template.updated_at
         })
     return success_response(data={"items": items})
 
-@router.put("/schema/{template_id}", summary="更新文档结构模板")
-async def update_schema_template(
+@router.post("/clone/{template_id}", summary="克隆模板")
+async def clone_template(
     template_id: UUID,
-    purpose: Optional[str] = None,
-    schema_json: Optional[dict] = None,
-    description: Optional[str] = None,
+    user_id: UUID,
     db: AsyncSession = Depends(get_db)
 ):
     """
-    更新文档结构模板
+    克隆模板（从系统模板创建私有副本）
     """
-    update_data = {}
-    if purpose:
-        update_data["purpose"] = purpose
-    if schema_json:
-        update_data["schema_json"] = schema_json
-    if description:
-        update_data["description"] = description
-    
-    template = await TemplateService.update_schema_template(db, template_id, **update_data)
-    if not template:
-        raise HTTPException(status_code=404, detail="文档结构模板不存在")
+    cloned_template = await TemplateService.clone_template(db, template_id, user_id)
+    if not cloned_template:
+        raise HTTPException(status_code=404, detail="模板不存在")
     return success_response(data={
-        "template_id": template.template_id,
-        "purpose": template.purpose,
-        "schema_json": template.schema_json,
-        "description": template.description,
-        "created_at": template.created_at,
-        "updated_at": template.updated_at
+        "template_id": cloned_template.template_id,
+        "group_id": cloned_template.group_id,
+        "template_type": cloned_template.template_type,
+        "purpose": cloned_template.purpose,
+        "display_name": cloned_template.display_name,
+        "content": cloned_template.content,
+        "version": cloned_template.version,
+        "is_system": cloned_template.is_system,
+        "user_id": cloned_template.user_id,
+        "is_active": cloned_template.is_active,
+        "created_at": cloned_template.created_at,
+        "updated_at": cloned_template.updated_at
     })
 
-@router.delete("/schema/{template_id}", summary="删除文档结构模板")
-async def delete_schema_template(
-    template_id: UUID,
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    删除文档结构模板
-    """
-    success = await TemplateService.delete_schema_template(db, template_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="文档结构模板不存在")
-    return success_response(message="删除成功")
-
-# 摘要标题模板管理
-
-@router.post("/summary-titles", summary="创建摘要标题模板")
-async def create_summary_title_template(
-    purpose: str,
-    title_templates: list,
-    description: Optional[str] = None,
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    创建摘要标题模板
-    """
-    new_template = SummaryTitleTemplate(
-        purpose=purpose,
-        title_templates=title_templates,
-        description=description
-    )
-    await SummaryTitleTemplateMapper.create_template(db, new_template)
-    return success_response(data={
-        "template_id": new_template.template_id,
-        "purpose": new_template.purpose,
-        "title_templates": new_template.title_templates,
-        "description": new_template.description,
-        "created_at": new_template.created_at,
-        "updated_at": new_template.updated_at
-    })
-
-@router.get("/summary-titles/{template_id}", summary="获取摘要标题模板详情")
-async def get_summary_title_template(
-    template_id: UUID,
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    获取摘要标题模板详情
-    """
-    template = await SummaryTitleTemplateMapper.get_template_by_id(db, template_id)
-    if not template:
-        raise HTTPException(status_code=404, detail="摘要标题模板不存在")
-    return success_response(data={
-        "template_id": template.template_id,
-        "purpose": template.purpose,
-        "title_templates": template.title_templates,
-        "description": template.description,
-        "created_at": template.created_at,
-        "updated_at": template.updated_at
-    })
-
-@router.get("/summary-titles", summary="获取摘要标题模板列表")
-async def list_summary_title_templates(
-    purpose: Optional[str] = None,
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    获取摘要标题模板列表
-    """
-    if purpose:
-        template = await SummaryTitleTemplateMapper.get_template_by_purpose(db, purpose)
-        items = [template] if template else []
-    else:
-        items = await SummaryTitleTemplateMapper.get_all_templates(db)
-    
-    result = []
-    for template in items:
-        result.append({
-            "template_id": template.template_id,
-            "purpose": template.purpose,
-            "title_templates": template.title_templates,
-            "description": template.description,
-            "created_at": template.created_at,
-            "updated_at": template.updated_at
-        })
-    return success_response(data={"items": result})
-
-@router.put("/summary-titles/{template_id}", summary="更新摘要标题模板")
-async def update_summary_title_template(
-    template_id: UUID,
-    purpose: Optional[str] = None,
-    title_templates: Optional[list] = None,
-    description: Optional[str] = None,
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    更新摘要标题模板
-    """
-    update_data = {}
-    if purpose:
-        update_data["purpose"] = purpose
-    if title_templates:
-        update_data["title_templates"] = title_templates
-    if description:
-        update_data["description"] = description
-    
-    template = await SummaryTitleTemplateMapper.update_template(db, template_id, update_data)
-    if not template:
-        raise HTTPException(status_code=404, detail="摘要标题模板不存在")
-    return success_response(data={
-        "template_id": template.template_id,
-        "purpose": template.purpose,
-        "title_templates": template.title_templates,
-        "description": template.description,
-        "created_at": template.created_at,
-        "updated_at": template.updated_at
-    })
-
-@router.delete("/summary-titles/{template_id}", summary="删除摘要标题模板")
-async def delete_summary_title_template(
-    template_id: UUID,
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    删除摘要标题模板
-    """
-    success = await SummaryTitleTemplateMapper.delete_template(db, template_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="摘要标题模板不存在")
-    return success_response(message="删除成功")

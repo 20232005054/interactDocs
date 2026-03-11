@@ -11,6 +11,10 @@ export default function Home() {
   const [summaries, setSummaries] = useState<Array<{title: string, content: string}>>([{title: '', content: ''}]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // 模板相关状态
+  const [templatePurposes, setTemplatePurposes] = useState<string[]>([]);
+  const [templatesByPurpose, setTemplatesByPurpose] = useState<Record<string, any[]>>({});
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('');
 
   // 获取元数据
   useEffect(() => {
@@ -36,6 +40,9 @@ export default function Home() {
         setFormData(initialFormData);
         setKeywords([]);
         setKeywordInput('');
+        
+        // 获取模板用途
+        await fetchTemplatePurposes();
       } catch (err) {
         console.error('Error fetching metadata:', err);
         setError(`获取元数据失败，使用默认字段: ${err instanceof Error ? err.message : String(err)}`);
@@ -75,6 +82,9 @@ export default function Home() {
         setFormData(initialFormData);
         setKeywords([]);
         setKeywordInput('');
+        
+        // 获取模板用途
+        await fetchTemplatePurposes();
       } finally {
         setLoading(false);
       }
@@ -83,12 +93,58 @@ export default function Home() {
     fetchMetadata();
   }, []);
 
+  // 获取模板用途
+  const fetchTemplatePurposes = async () => {
+    try {
+      const response = await fetch('/api/v1/templates/purposes/list', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setTemplatePurposes(data.data.purposes || []);
+      }
+    } catch (error) {
+      console.error('Error fetching template purposes:', error);
+    }
+  };
+
+  // 根据用途获取模板
+  const fetchTemplatesByPurpose = async (purpose: string) => {
+    try {
+      const response = await fetch(`/api/v1/templates/by-purpose/${purpose}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setTemplatesByPurpose(prev => ({
+          ...prev,
+          [purpose]: data.data.items || []
+        }));
+        // 重置模板选择
+        setSelectedTemplate('');
+      }
+    } catch (error) {
+      console.error('Error fetching templates by purpose:', error);
+    }
+  };
+
   // 处理表单输入变化
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev: Record<string, string>) => ({
       ...prev,
       [field]: value
     }));
+    
+    // 当选择使用目的时，加载对应的模板列表
+    if (field === 'purpose' && value) {
+      fetchTemplatesByPurpose(value);
+    }
   };
 
   // 添加关键词
@@ -143,6 +199,11 @@ export default function Home() {
       // 添加参考正文（可选）
       if (formData.content) {
         requiredFields.content = formData.content;
+      }
+
+      // 添加模板ID（可选）
+      if (selectedTemplate) {
+        requiredFields.template_id = selectedTemplate;
       }
 
       const response = await fetch('/api/documents', {
@@ -324,6 +385,29 @@ export default function Home() {
                         placeholder="请输入其他使用目的"
                         style={{ minHeight: '40px', maxHeight: 'calc(100vh - 250px)', resize: 'none', overflow: 'auto' }}
                       />
+                    )}
+                    {/* 模板选择 */}
+                    {field.field === 'purpose' && formData[field.field] && templatesByPurpose[formData[field.field]] && (
+                      <div className="mt-4">
+                        <label 
+                          htmlFor="template" 
+                          className="block text-sm font-medium text-gray-700 mb-1"
+                        >
+                          选择模板
+                        </label>
+                        <select
+                          id="template"
+                          value={selectedTemplate || ''}
+                          onChange={(e) => setSelectedTemplate(e.target.value)}
+                          className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                          style={{ minHeight: '40px', resize: 'none' }}
+                        >
+                          <option value="">请选择模板</option>
+                          {templatesByPurpose[formData[field.field]].map((template: any, index: number) => (
+                            <option key={index} value={template.template_id}>{template.display_name}</option>
+                          ))}
+                        </select>
+                      </div>
                     )}
                   </div>
                 ) : null}

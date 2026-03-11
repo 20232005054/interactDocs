@@ -99,6 +99,10 @@ export default function DocumentEditor({ params }: { params: Promise<{ id: strin
   const [selectedKeywords, setSelectedKeywords] = useState<Array<{keyword_id: string, keyword: string}>>([]);
   const [selectedSummaries, setSelectedSummaries] = useState<Array<{summary_id: string, title: string, content: string}>>([]);
   const [purposeOptions, setPurposeOptions] = useState<string[]>([]);
+  // 模板相关状态
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [templatePurposes, setTemplatePurposes] = useState<string[]>([]);
+  const [templatesByPurpose, setTemplatesByPurpose] = useState<Record<string, any[]>>({});
   const leftSidebarRef = useRef<HTMLDivElement>(null);
   const rightSidebarRef = useRef<HTMLDivElement>(null);
   const tocRef = useRef<HTMLDivElement>(null);
@@ -222,6 +226,40 @@ export default function DocumentEditor({ params }: { params: Promise<{ id: strin
       }
     };
     fetchPurposeOptions();
+  }, []);
+
+  // 获取模板数据
+  useEffect(() => {
+    const fetchTemplateData = async () => {
+      try {
+        // 获取模板用途
+        const purposesResponse = await fetch('/api/v1/templates/purposes/list');
+        if (purposesResponse.ok) {
+          const purposesData = await purposesResponse.json();
+          setTemplatePurposes(purposesData.data.purposes || []);
+        }
+
+        // 获取所有模板
+        const templatesResponse = await fetch('/api/v1/templates');
+        if (templatesResponse.ok) {
+          const templatesData = await templatesResponse.json();
+          setTemplates(templatesData.data.items || []);
+
+          // 按用途分组模板
+          const templatesByPurposeMap: Record<string, any[]> = {};
+          templatesData.data.items.forEach((template: any) => {
+            if (!templatesByPurposeMap[template.purpose]) {
+              templatesByPurposeMap[template.purpose] = [];
+            }
+            templatesByPurposeMap[template.purpose].push(template);
+          });
+          setTemplatesByPurpose(templatesByPurposeMap);
+        }
+      } catch (error) {
+        console.error('获取模板数据失败:', error);
+      }
+    };
+    fetchTemplateData();
   }, []);
 
   // 处理调整大小的事件
@@ -2486,6 +2524,57 @@ export default function DocumentEditor({ params }: { params: Promise<{ id: strin
                       )}
                     </div>
                   )}
+                  
+                  {/* 模板类型 */}
+                  <div>
+                    <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                      <span>模板类型</span>
+                      <button 
+                        className="text-green-600 hover:text-green-800"
+                        onClick={() => {
+                          setEditingDocDetail('template');
+                          setDocDetailValue(document.template_id || '');
+                        }}
+                      >
+                        编辑
+                      </button>
+                    </div>
+                    {editingDocDetail === 'template' ? (
+                      <div className="flex space-x-2">
+                        <select
+                          value={docDetailValue}
+                          onChange={(e) => setDocDetailValue(e.target.value)}
+                          className="flex-1 px-2 py-1 text-xs text-gray-900 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-transparent"
+                        >
+                          <option value="">请选择</option>
+                          {templates.map((template, index) => (
+                            <option key={index} value={template.template_id}>{template.display_name}</option>
+                          ))}
+                        </select>
+                        <button 
+                          className="px-2 py-1 text-xs bg-green-500 text-white rounded-md hover:bg-green-600"
+                          onClick={() => updateDocumentInfo('template_id', docDetailValue)}
+                        >
+                          保存
+                        </button>
+                        <button 
+                          className="px-2 py-1 text-xs text-gray-600 hover:text-gray-800"
+                          onClick={() => {
+                            setEditingDocDetail(null);
+                            setDocDetailValue('');
+                          }}
+                        >
+                          取消
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-gray-800 bg-gray-50 p-2 rounded-md">
+                        {document.template_id ? (
+                          templates.find(t => t.template_id === document.template_id)?.display_name || '未知模板'
+                        ) : '未选择模板'}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

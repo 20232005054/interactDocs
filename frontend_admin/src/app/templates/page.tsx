@@ -4,56 +4,76 @@ import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Save, X, Search, Database } from 'lucide-react';
 
 interface Template {
-  id: string;
-  name: string;
-  description: string;
-  createdAt: string;
-  updatedAt: string;
+  template_id: string;
+  group_id: string;
+  purpose: string;
+  display_name: string;
+  content: any;
+  version: number;
+  is_system: boolean;
+  user_id: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
+
   const [formData, setFormData] = useState({
-    name: '',
-    description: ''
+    purpose: '',
+    display_name: '',
+    content: {}
   });
   const [searchQuery, setSearchQuery] = useState('');
 
-  // 模拟获取模板数据
+  // 获取模板数据
   useEffect(() => {
     const fetchTemplates = async () => {
       try {
-        // 这里应该调用实际的API
-        // 模拟数据
-        const mockTemplates: Template[] = [
+        console.log('开始获取模板数据...');
+        const response = await fetch('/api/v1/templates');
+        console.log('API 响应状态:', response.status);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch templates: ${response.status}`);
+        }
+        const data = await response.json();
+        console.log('API 响应数据:', data);
+        setTemplates(data.data.items);
+      } catch (error) {
+        console.error('Error fetching templates:', error);
+        // 手动设置一些模拟数据，以便页面可以正常显示
+        const mockTemplates = [
           {
-            id: '1',
-            name: '研究方案模板',
-            description: '用于创建研究方案的模板',
-            createdAt: '2024-01-01',
-            updatedAt: '2024-01-01'
+            template_id: '1',
+            group_id: '1',
+            purpose: '报告',
+            display_name: '标准医疗报告',
+            content: {},
+            version: 1,
+            is_system: true,
+            user_id: null,
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           },
           {
-            id: '2',
-            name: '临床报告模板',
-            description: '用于生成临床报告的模板',
-            createdAt: '2024-01-02',
-            updatedAt: '2024-01-02'
-          },
-          {
-            id: '3',
-            name: '总结报告模板',
-            description: '用于生成总结报告的模板',
-            createdAt: '2024-01-03',
-            updatedAt: '2024-01-03'
+            template_id: '2',
+            group_id: '2',
+            purpose: '申报',
+            display_name: '2077标准医疗器械申报书',
+            content: {},
+            version: 1,
+            is_system: true,
+            user_id: null,
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           }
         ];
         setTemplates(mockTemplates);
-      } catch (error) {
-        console.error('Error fetching templates:', error);
       } finally {
         setLoading(false);
       }
@@ -72,50 +92,63 @@ export default function TemplatesPage() {
   };
 
   // 处理创建模板
-  const handleCreateTemplate = () => {
-    if (formData.name.trim()) {
-      const newTemplate: Template = {
-        id: Date.now().toString(),
-        name: formData.name,
-        description: formData.description,
-        createdAt: new Date().toISOString().split('T')[0],
-        updatedAt: new Date().toISOString().split('T')[0]
-      };
-      setTemplates(prev => [...prev, newTemplate]);
-      setFormData({ name: '', description: '' });
-      setIsCreating(false);
+  const handleCreateTemplate = async () => {
+    if (formData.display_name.trim() && formData.purpose.trim()) {
+      try {
+        const response = await fetch('/api/v1/templates', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            purpose: formData.purpose,
+            display_name: formData.display_name,
+            content: formData.content,
+            is_system: true
+          }),
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to create template');
+        }
+        
+        const data = await response.json();
+        setTemplates(prev => [...prev, data.data]);
+        setFormData({ purpose: '', display_name: '', content: {} });
+        setIsCreating(false);
+      } catch (error) {
+        console.error('Error creating template:', error);
+        alert('创建模板失败，请稍后重试');
+      }
     }
   };
 
-  // 处理编辑模板
-  const handleEditTemplate = () => {
-    if (editingTemplate && formData.name.trim()) {
-      setTemplates(prev => prev.map(template =>
-        template.id === editingTemplate.id
-          ? {
-              ...template,
-              name: formData.name,
-              description: formData.description,
-              updatedAt: new Date().toISOString().split('T')[0]
-            }
-          : template
-      ));
-      setEditingTemplate(null);
-      setFormData({ name: '', description: '' });
-    }
-  };
+
 
   // 处理删除模板
-  const handleDeleteTemplate = (id: string) => {
+  const handleDeleteTemplate = async (template_id: string) => {
     if (confirm('确定要删除这个模板吗？')) {
-      setTemplates(prev => prev.filter(template => template.id !== id));
+      try {
+        const response = await fetch(`/api/v1/templates/${template_id}`, {
+          method: 'DELETE',
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to delete template');
+        }
+        
+        setTemplates(prev => prev.filter(template => template.template_id !== template_id));
+      } catch (error) {
+        console.error('Error deleting template:', error);
+        alert('删除模板失败，请稍后重试');
+      }
     }
   };
 
   // 处理搜索
   const filteredTemplates = templates.filter(template =>
-    template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    template.description.toLowerCase().includes(searchQuery.toLowerCase())
+    template.display_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    template.purpose.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (loading) {
@@ -167,38 +200,38 @@ export default function TemplatesPage() {
             <h2 className="text-xl font-semibold text-gray-900 mb-4">创建新模板</h2>
             <div className="space-y-4">
               <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="purpose" className="block text-sm font-medium text-gray-700 mb-1">
+                  模板用途 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  id="purpose"
+                  name="purpose"
+                  value={formData.purpose}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                  placeholder="请输入模板用途（如：研究方案、临床报告等）"
+                />
+              </div>
+              <div>
+                <label htmlFor="display_name" className="block text-sm font-medium text-gray-700 mb-1">
                   模板名称 <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
-                  id="name"
-                  name="name"
-                  value={formData.name}
+                  id="display_name"
+                  name="display_name"
+                  value={formData.display_name}
                   onChange={handleInputChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
                   placeholder="请输入模板名称"
-                />
-              </div>
-              <div>
-                <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-                  模板描述
-                </label>
-                <textarea
-                  id="description"
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
-                  placeholder="请输入模板描述"
-                  rows={3}
                 />
               </div>
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={() => {
                     setIsCreating(false);
-                    setFormData({ name: '', description: '' });
+                    setFormData({ purpose: '', display_name: '', content: {} });
                   }}
                   className="px-4 py-2 bg-gray-200 text-gray-800 font-medium rounded-md hover:bg-gray-300 transition-colors duration-200"
                 >
@@ -217,61 +250,7 @@ export default function TemplatesPage() {
           </div>
         )}
 
-        {/* 编辑模板表单 */}
-        {editingTemplate && (
-          <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">编辑模板</h2>
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                  模板名称 <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  id="name"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
-                  placeholder="请输入模板名称"
-                />
-              </div>
-              <div>
-                <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-                  模板描述
-                </label>
-                <textarea
-                  id="description"
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
-                  placeholder="请输入模板描述"
-                  rows={3}
-                />
-              </div>
-              <div className="flex justify-end space-x-3">
-                <button
-                  onClick={() => {
-                    setEditingTemplate(null);
-                    setFormData({ name: '', description: '' });
-                  }}
-                  className="px-4 py-2 bg-gray-200 text-gray-800 font-medium rounded-md hover:bg-gray-300 transition-colors duration-200"
-                >
-                  <X className="h-5 w-5 inline mr-1" />
-                  取消
-                </button>
-                <button
-                  onClick={handleEditTemplate}
-                  className="px-4 py-2 bg-green-500 text-white font-medium rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors duration-200"
-                >
-                  <Save className="h-5 w-5 inline mr-1" />
-                  保存
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+
 
         {/* 模板列表 */}
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
@@ -298,34 +277,31 @@ export default function TemplatesPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredTemplates.map((template) => (
-                  <tr key={template.id} className="hover:bg-gray-50 transition-colors duration-150">
+                  <tr key={template.template_id} className="hover:bg-gray-50 transition-colors duration-150">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <Database className="h-5 w-5 text-green-600 mr-2" />
-                        <div className="text-sm font-medium text-gray-900">{template.name}</div>
+                        <div className="text-sm font-medium text-gray-900">{template.display_name}</div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-sm text-gray-500">{template.description}</div>
+                      <div className="text-sm text-gray-500">{template.purpose}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500">{template.createdAt}</div>
+                      <div className="text-sm text-gray-500">{new Date(template.created_at).toLocaleDateString()}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500">{template.updatedAt}</div>
+                      <div className="text-sm text-gray-500">{new Date(template.updated_at).toLocaleDateString()}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button
-                        onClick={() => {
-                          setEditingTemplate(template);
-                          setFormData({ name: template.name, description: template.description });
-                        }}
+                      <a
+                        href={`/templates/${template.template_id}`}
                         className="text-green-600 hover:text-green-900 mr-3 transition-colors duration-150"
                       >
                         <Edit className="h-5 w-5 inline" />
-                      </button>
+                      </a>
                       <button
-                        onClick={() => handleDeleteTemplate(template.id)}
+                        onClick={() => handleDeleteTemplate(template.template_id)}
                         className="text-red-600 hover:text-red-900 transition-colors duration-150"
                       >
                         <Trash2 className="h-5 w-5 inline" />

@@ -26,6 +26,7 @@ async def create_document(doc_in: DocumentCreate, db: AsyncSession = Depends(get
         "abstract": new_document.abstract,
         "content": new_document.content,
         "purpose": new_document.purpose,
+        "template_id": new_document.template_id,
         "status": new_document.status,
         "created_at": new_document.created_at,
         "updated_at": new_document.updated_at
@@ -60,6 +61,7 @@ async def get_document(document_id: UUID, db: AsyncSession = Depends(get_db)):
         "abstract": document.abstract,
         "content": document.content,
         "purpose": document.purpose,
+        "template_id": document.template_id,
         "status": document.status,
         "created_at": document.created_at,
         "updated_at": document.updated_at
@@ -145,6 +147,7 @@ async def update_document(document_id: UUID, doc_in: DocumentUpdate, db: AsyncSe
         "abstract": document.abstract,
         "content": document.content,
         "purpose": document.purpose,
+        "template_id": document.template_id,
         "status": document.status,
         "created_at": document.created_at,
         "updated_at": document.updated_at

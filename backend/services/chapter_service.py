@@ -159,16 +159,22 @@ class ChapterService:
         for summary in summaries:
             summary_info += f"摘要标题：{summary.title}\n摘要内容：{summary.content}\n\n"
         
-        # 获取文档结构模板
+        # 获取文档模板
         from services.template_service import TemplateService
-        schema_templates = await TemplateService.list_schema_templates(db, document.purpose)
+        templates = await TemplateService.list_templates(
+            db, 
+            purpose=document.purpose,
+            is_system=True,
+            is_active=True
+        )
         
+        # 初始化sections列表
         sections = []
         
-        if schema_templates:
-            # 使用文档结构模板作为章节结构
-            template = schema_templates[0]
-            schema_json = template.schema_json
+        if templates:
+            # 使用模板的schema部分作为章节结构
+            template = templates[0]
+            schema_json = template.content.get('schema', {}).get('schema_json', [])
             
             # 导入AI服务
             from services.ai_service import call_qwen_stream
