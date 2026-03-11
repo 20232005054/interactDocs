@@ -52,7 +52,7 @@ async def get_generate_metadata():
                 "field": "purpose",
                 "label": "使用目的",
                 "type": "select",
-                "options": ["通用","申报", "临床", "总结", "其他"],
+                "options": ["通用","医疗器械临床申报", "药物临床试验", "学术研究", "其他"],
                 "required": True
             }
         ]

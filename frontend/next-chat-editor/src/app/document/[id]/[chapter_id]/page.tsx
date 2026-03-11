@@ -69,7 +69,7 @@ export default function ChapterEditor({ params }: { params: Promise<{ id: string
   const [chapterContent, setChapterContent] = useState<string | Block[]>('');
   const [aiMode, setAiMode] = useState<'chat' | 'revision'>('chat');
   const [aiMessage, setAiMessage] = useState('');
-  const [chatMessages, setChatMessages] = useState<Array<{role: 'user' | 'ai', content: string, id?: number}>>([
+  const [chatMessages, setChatMessages] = useState<Array<{role: 'user' | 'ai', content: string, id?: number, isRevision?: boolean, paragraphId?: string}>>([
     { role: 'ai', content: '您好！我是您的AI助手，有什么可以帮助您的吗？' }
   ]);
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
@@ -96,6 +96,7 @@ export default function ChapterEditor({ params }: { params: Promise<{ id: string
   const [selectedSummaries, setSelectedSummaries] = useState<string[]>([]);
   const [selectedParagraphs, setSelectedParagraphs] = useState<Set<string>>(new Set());
   const [summaries, setSummaries] = useState<any[]>([]);
+  const [purposeOptions, setPurposeOptions] = useState<string[]>([]);
   const leftSidebarRef = useRef<HTMLDivElement>(null);
   const rightSidebarRef = useRef<HTMLDivElement>(null);
   const tocRef = useRef<HTMLDivElement>(null);
@@ -121,6 +122,27 @@ export default function ChapterEditor({ params }: { params: Promise<{ id: string
     };
     getParams();
   }, [params]);
+
+  // 获取使用目的选项
+  useEffect(() => {
+    const fetchPurposeOptions = async () => {
+      try {
+        const response = await fetch('/api/metadata/generate');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.data && data.data.fields) {
+            const purposeField = data.data.fields.find((field: any) => field.field === 'purpose');
+            if (purposeField && purposeField.options) {
+              setPurposeOptions(purposeField.options);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('获取使用目的选项失败:', error);
+      }
+    };
+    fetchPurposeOptions();
+  }, []);
 
   // 处理调整大小的事件
   useEffect(() => {
@@ -1093,6 +1115,7 @@ export default function ChapterEditor({ params }: { params: Promise<{ id: string
       case 'heading-1':
         contentElement = (
           <h1 
+            id={block.id}
             className="text-2xl font-bold text-gray-900 cursor-text break-words"
             style={{ 
               minHeight: '24px',
@@ -1110,6 +1133,7 @@ export default function ChapterEditor({ params }: { params: Promise<{ id: string
       case 'heading-2':
         contentElement = (
           <h2 
+            id={block.id}
             className="text-xl font-bold text-gray-900 cursor-text break-words"
             style={{ 
               minHeight: '24px',
@@ -1127,6 +1151,7 @@ export default function ChapterEditor({ params }: { params: Promise<{ id: string
       case 'heading-3':
         contentElement = (
           <h3 
+            id={block.id}
             className="text-lg font-bold text-gray-900 cursor-text break-words"
             style={{ 
               minHeight: '24px',
@@ -2620,10 +2645,9 @@ export default function ChapterEditor({ params }: { params: Promise<{ id: string
                             className="flex-1 px-2 py-1 text-xs text-gray-900 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-transparent"
                           >
                             <option value="">请选择</option>
-                            <option value="申报">申报</option>
-                            <option value="临床">临床</option>
-                            <option value="总结">总结</option>
-                            <option value="其他">其他</option>
+                            {purposeOptions.map((option, index) => (
+                              <option key={index} value={option}>{option}</option>
+                            ))}
                           </select>
                           <button 
                             className="px-2 py-1 text-xs bg-green-500 text-white rounded-md hover:bg-green-600"
@@ -2848,6 +2872,75 @@ export default function ChapterEditor({ params }: { params: Promise<{ id: string
             />
           )}
           
+          {/* 目录浮窗 */}
+          {!leftSidebarCollapsed && (
+            <div 
+              ref={tocRef}
+              className="absolute left-1 bg-white border border-gray-200 rounded-r-md shadow-md z-5 overflow-hidden"
+              style={{ 
+                width: tocCollapsed ? '40px' : '200px', 
+                transition: 'width 0.3s ease-in-out',
+                maxHeight: 'calc(100vh - 100px)',
+                minHeight: '80px',
+                height: 'auto',
+                top: '50%',
+                transform: 'translateY(-50%)'
+              }}
+            >
+              {/* 浮窗标题和切换按钮 */}
+              <div className="flex items-center justify-between p-2 bg-gray-50 border-b border-gray-200">
+                <h3 className={`font-medium text-sm ${tocCollapsed ? 'hidden' : 'block'}`}>目录</h3>
+                <button 
+                  className="p-1 text-gray-600 hover:text-gray-800"
+                  onClick={() => setTocCollapsed(!tocCollapsed)}
+                >
+                  {tocCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+                </button>
+              </div>
+              
+              {/* 目录内容 */}
+              {!tocCollapsed && (
+                <div className="overflow-y-auto p-2" style={{ maxHeight: 'calc(100vh - 140px)', minHeight: '40px' }}>
+                  {toc.length > 0 ? (
+                    <ul className="space-y-1">
+                      {toc.map((item: any, index: number) => (
+                        <li key={index} className="text-sm">
+                          <a 
+                            href={`#${item.id}`}
+                            className={`block py-1 px-2 rounded hover:bg-green-50 ${selectedTocItem === item.id ? 'bg-green-100 text-green-800' : 'text-gray-800'}`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setSelectedTocItem(item.id);
+                              // 使用更可靠的方法来实现跳转
+                              if (typeof window !== 'undefined' && window.document) {
+                                // 尝试使用 scrollIntoView
+                                const element = window.document.getElementById(item.id);
+                                if (element) {
+                                  element.scrollIntoView({ behavior: 'smooth' });
+                                  return;
+                                }
+                                // 如果找不到元素，尝试使用 URL hash
+                                window.location.hash = item.id;
+                              }
+                            }}
+                          >
+                            <span className={`inline-block ${item.type === 'heading-1' ? 'font-bold' : item.type === 'heading-2' ? 'font-medium' : 'text-gray-600'}`} style={{ paddingLeft: `${(item.type === 'heading-1' ? 0 : item.type === 'heading-2' ? 16 : 32)}px` }}>
+                              {item.content}
+                            </span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="text-xs text-gray-500 text-center py-4">
+                      暂无目录
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          
           {/* 工具栏 */}
           <div className="sticky top-0 z-10 bg-white border-b border-gray-200 p-4">
             <div className="flex justify-between items-center">
@@ -2908,7 +3001,7 @@ export default function ChapterEditor({ params }: { params: Promise<{ id: string
           </div>
           
           {/* 编辑区 */}
-          <div className="flex-1 overflow-y-auto p-6" style={{ maxHeight: 'calc(100vh - 80px)' }}>
+          <div className="flex-1 overflow-y-auto p-6" style={{ maxHeight: 'calc(100vh - 80px)', paddingLeft: !leftSidebarCollapsed && !tocCollapsed ? '220px' : !leftSidebarCollapsed && tocCollapsed ? '60px' : '20px', transition: 'padding-left 0.3s ease-in-out' }}>
             <div className="max-w-3xl mx-auto">
               {Array.isArray(chapterContent) ? (
                 chapterContent.length > 0 ? (
@@ -3001,7 +3094,7 @@ export default function ChapterEditor({ params }: { params: Promise<{ id: string
                         <div className="mt-3 flex space-x-2">
                           <button
                             className="px-3 py-1 bg-green-500 text-white text-xs rounded-md hover:bg-green-600"
-                            onClick={() => applyRevision(message.paragraphId, message.content)}
+                            onClick={() => applyRevision(message.paragraphId as string, message.content)}
                           >
                             应用修订
                           </button>

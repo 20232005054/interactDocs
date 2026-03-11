@@ -6,6 +6,7 @@ from db.models import Chapter
 from schemas.schemas import ChapterCreate, ChapterUpdate
 from uuid import UUID
 from fastapi import HTTPException
+from services.ai_service import call_qwen_stream
 
 class ChapterService:
     @staticmethod
@@ -158,56 +159,79 @@ class ChapterService:
         for summary in summaries:
             summary_info += f"摘要标题：{summary.title}\n摘要内容：{summary.content}\n\n"
         
-        # 渲染提示词，要求生成章节结构
-        from services.prompt_templates import render_prompt, system_prompts
-        prompt = render_prompt(
-            "generate_chapter_structure",
-            summary_info=f"文档标题：{document.title}\n文档摘要：{document.abstract}\n文档目的：{document.purpose}\n文档关键词：{', '.join(keyword_list) if keyword_list else '无'}\n\n摘要信息：\n{summary_info}"
-        )
+        # 获取文档结构模板
+        from services.template_service import TemplateService
+        schema_templates = await TemplateService.list_schema_templates(db, document.purpose)
         
-        # 调用AI生成章节结构
-        from services.ai_service import call_qwen_stream
-        response = ""
-        async for chunk in call_qwen_stream(
-            system_prompts["generate_chapter_structure"],
-            [],
-            prompt
-        ):
-            response += chunk
-        
-        # 解析章节结构
         sections = []
-        current_section = None
         
-        for line in response.strip().split('\n'):
-            line = line.strip()
-            if not line:
-                continue
+        if schema_templates:
+            # 使用文档结构模板作为章节结构
+            template = schema_templates[0]
+            schema_json = template.schema_json
             
-            # 解析Markdown格式的标题
-            if line.startswith('# '):
-                # 一级标题
-                current_section = {
-                    'title': line[2:].strip(),
-                    'type': 'heading-1',
-                    'content': line[2:].strip(),
+            # 导入AI服务
+            from services.ai_service import call_qwen_stream
+            
+            # 解析文档结构模板
+            for item in schema_json:
+                section = {
+                    'title': item['title'],
+                    'type': item.get('type', 'heading-1'),  # 优先使用模板中的类型，默认一级标题
+                    'content': item['title'],
                     'subsections': []
                 }
-                sections.append(current_section)
-            elif line.startswith('## '):
-                # 二级标题
-                if current_section:
-                    subsection = {
-                        'title': line[3:].strip(),
-                        'type': 'heading-2',
-                        'content': line[3:].strip()
+                sections.append(section)
+        else:
+            # 渲染提示词，要求生成章节结构
+            from services.prompt_templates import render_prompt, system_prompts
+            prompt = render_prompt(
+                "generate_chapter_structure",
+                summary_info=f"文档标题：{document.title}\n文档摘要：{document.abstract}\n文档目的：{document.purpose}\n文档关键词：{', '.join(keyword_list) if keyword_list else '无'}\n\n摘要信息：\n{summary_info}"
+            )
+            
+            # 调用AI生成章节结构
+            from services.ai_service import call_qwen_stream
+            response = ""
+            async for chunk in call_qwen_stream(
+                system_prompts["generate_chapter_structure"],
+                [],
+                prompt
+            ):
+                response += chunk
+            
+            # 解析章节结构
+            current_section = None
+            
+            for line in response.strip().split('\n'):
+                line = line.strip()
+                if not line:
+                    continue
+                
+                # 解析Markdown格式的标题
+                if line.startswith('# '):
+                    # 一级标题
+                    current_section = {
+                        'title': line[2:].strip(),
+                        'type': 'heading-1',
+                        'content': line[2:].strip(),
+                        'subsections': []
                     }
-                    current_section['subsections'].append(subsection)
-            elif line.startswith('### '):
-                # 三级标题
-                if current_section and current_section['subsections']:
-                    # 将三级标题作为二级标题的内容
-                    pass
+                    sections.append(current_section)
+                elif line.startswith('## '):
+                    # 二级标题
+                    if current_section:
+                        subsection = {
+                            'title': line[3:].strip(),
+                            'type': 'heading-2',
+                            'content': line[3:].strip()
+                        }
+                        current_section['subsections'].append(subsection)
+                elif line.startswith('### '):
+                    # 三级标题
+                    if current_section and current_section['subsections']:
+                        # 将三级标题作为二级标题的内容
+                        pass
         
         # 创建一个名为"正文"的章节
         from schemas.schemas import ChapterCreate
@@ -238,6 +262,15 @@ class ChapterService:
             # 实际使用时可以取消注释下面的代码，使用AI生成完整内容
             # section_content = "这是测试内容，实际使用时由AI生成"
             
+            # 构建层级标题信息
+            hierarchy_titles = []
+            for i, s in enumerate(sections):
+                if i <= sections.index(section):
+                    hierarchy_titles.append({
+                        'type': s['type'],
+                        'content': s['title']
+                    })
+            
             # 为一级标题生成内容
             section_content_prompt = f"""
             请根据以下文档信息和摘要内容，为{section['title']}生成详细的内容：
@@ -246,6 +279,9 @@ class ChapterService:
             文档摘要：{document.abstract}
             文档目的：{document.purpose}
             文档关键词：{', '.join(keyword_list) if keyword_list else '无'}
+            
+            层级标题：
+            {chr(10).join([f"{t['type'].replace('heading-', 'H')}: {t['content']}" for t in hierarchy_titles])}
             
             摘要信息：
             {summary_info}

@@ -38,6 +38,7 @@ export default function KeywordPage({ params }: { params: Promise<{ id: string }
     { role: 'ai', content: '您好！我是您的AI助手，有什么可以帮助您的吗？' }
   ]);
   const [selectedKeywords, setSelectedKeywords] = useState<Set<string>>(new Set());
+  const [purposeOptions, setPurposeOptions] = useState<string[]>([]);
   const leftSidebarRef = useRef<HTMLDivElement>(null);
   const rightSidebarRef = useRef<HTMLDivElement>(null);
 
@@ -49,6 +50,27 @@ export default function KeywordPage({ params }: { params: Promise<{ id: string }
     };
     initDocumentId();
   }, [params]);
+
+  // 获取使用目的选项
+  useEffect(() => {
+    const fetchPurposeOptions = async () => {
+      try {
+        const response = await fetch('/api/metadata/generate');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.data && data.data.fields) {
+            const purposeField = data.data.fields.find((field: any) => field.field === 'purpose');
+            if (purposeField && purposeField.options) {
+              setPurposeOptions(purposeField.options);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('获取使用目的选项失败:', error);
+      }
+    };
+    fetchPurposeOptions();
+  }, []);
 
   // 加载文档数据
   useEffect(() => {
@@ -930,10 +952,9 @@ export default function KeywordPage({ params }: { params: Promise<{ id: string }
                             className="flex-1 px-2 py-1 text-xs text-gray-900 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-transparent"
                           >
                             <option value="">请选择</option>
-                            <option value="申报">申报</option>
-                            <option value="临床">临床</option>
-                            <option value="总结">总结</option>
-                            <option value="其他">其他</option>
+                            {purposeOptions.map((option, index) => (
+                              <option key={index} value={option}>{option}</option>
+                            ))}
                           </select>
                           <button 
                             className="px-2 py-1 text-xs bg-green-500 text-white rounded-md hover:bg-green-600"
