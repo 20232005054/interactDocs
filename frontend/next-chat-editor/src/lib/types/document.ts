@@ -9,13 +9,5 @@ export interface Document {
   status: string;
   created_at: string;
   updated_at: string;
-}
-
-export interface DocumentsResponse {
-  data: {
-    items: Document[];
-    total: number;
-    page: number;
-    page_size: number;
-  };
+  template_id: string | null;
 }

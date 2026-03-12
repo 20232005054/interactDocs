@@ -1,106 +1,101 @@
 import { create } from 'zustand';
-
-interface Document {
-  id: string;
-  title: string;
-  createdAt: string;
-  updatedAt: string;
-  template_id: string | null;
-}
+import { Document } from '../lib/types/document';
+import { Snapshot } from '../lib/types/snapshot';
+import { documentApi } from '../lib/api/documentApi';
+import { snapshotApi } from '../lib/api/snapshotApi';
 
 interface DocumentState {
-  documents: Document[];
-  currentDocument: Document | null;
-  isLoading: boolean;
+  // 状态
+  document: Document | null;
+  recentDocuments: Document[];
+  snapshots: Snapshot[];
+  loading: boolean;
   error: string | null;
-  
-  // Actions
-  setCurrentDocument: (document: Document | null) => void;
-  fetchDocuments: () => Promise<void>;
-  createDocument: (title: string) => Promise<Document>;
-  updateDocument: (id: string, data: Partial<Document>) => Promise<Document>;
-  deleteDocument: (id: string) => Promise<void>;
+  // 操作
+  fetchDocument: (documentId: string) => Promise<void>;
+  fetchRecentDocuments: () => Promise<void>;
+  updateDocument: (documentId: string, updates: Partial<Document>) => Promise<void>;
+  fetchSnapshots: (documentId: string) => Promise<void>;
+  createSnapshot: (documentId: string, description: string) => Promise<void>;
+  getDefaultSnapshotDescription: (documentId: string) => Promise<string>;
+  setError: (error: string | null) => void;
 }
 
-export const useDocumentStore = create<DocumentState>((set) => ({
-  documents: [],
-  currentDocument: null,
-  isLoading: false,
+export const useDocumentStore = create<DocumentState>((set, get) => ({
+  // 初始状态
+  document: null,
+  recentDocuments: [],
+  snapshots: [],
+  loading: false,
   error: null,
-  
-  setCurrentDocument: (document) => set({ currentDocument: document }),
-  
-  fetchDocuments: async () => {
-    set({ isLoading: true, error: null });
+
+  // 获取文档信息
+  fetchDocument: async (documentId: string) => {
+    set({ loading: true, error: null });
     try {
-      const response = await fetch('/api/documents');
-      if (!response.ok) throw new Error('Failed to fetch documents');
-      const data = await response.json();
-      set({ documents: data, isLoading: false });
+      const document = await documentApi.getDocument(documentId);
+      set({ document, loading: false });
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Failed to fetch documents', isLoading: false });
+      set({ error: '获取文档信息失败', loading: false });
+      console.error('Error fetching document:', error);
     }
   },
-  
-  createDocument: async (title) => {
-    set({ isLoading: true, error: null });
+
+  // 获取最近文档
+  fetchRecentDocuments: async () => {
     try {
-      const response = await fetch('/api/documents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title }),
-      });
-      if (!response.ok) throw new Error('Failed to create document');
-      const newDocument = await response.json();
-      set((state) => ({
-        documents: [...state.documents, newDocument],
-        currentDocument: newDocument,
-        isLoading: false,
-      }));
-      return newDocument;
+      const recentDocuments = await documentApi.getRecentDocuments();
+      set({ recentDocuments });
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Failed to create document', isLoading: false });
-      throw error;
+      console.error('Error fetching recent documents:', error);
     }
   },
-  
-  updateDocument: async (id, data) => {
-    set({ isLoading: true, error: null });
+
+  // 更新文档信息
+  updateDocument: async (documentId: string, updates: Partial<Document>) => {
     try {
-      const response = await fetch(`/api/documents/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error('Failed to update document');
-      const updatedDocument = await response.json();
-      set((state) => ({
-        documents: state.documents.map(doc => doc.id === id ? updatedDocument : doc),
-        currentDocument: state.currentDocument?.id === id ? updatedDocument : state.currentDocument,
-        isLoading: false,
-      }));
-      return updatedDocument;
+      const updatedDocument = await documentApi.updateDocument(documentId, updates);
+      set({ document: updatedDocument });
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Failed to update document', isLoading: false });
-      throw error;
+      set({ error: '更新文档信息失败' });
+      console.error('Error updating document:', error);
     }
   },
-  
-  deleteDocument: async (id) => {
-    set({ isLoading: true, error: null });
+
+  // 获取快照列表
+  fetchSnapshots: async (documentId: string) => {
     try {
-      const response = await fetch(`/api/documents/${id}`, {
-        method: 'DELETE',
-      });
-      if (!response.ok) throw new Error('Failed to delete document');
-      set((state) => ({
-        documents: state.documents.filter(doc => doc.id !== id),
-        currentDocument: state.currentDocument?.id === id ? null : state.currentDocument,
-        isLoading: false,
-      }));
+      const snapshots = await snapshotApi.getSnapshots(documentId);
+      set({ snapshots });
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Failed to delete document', isLoading: false });
-      throw error;
+      console.error('Error fetching snapshots:', error);
     }
+  },
+
+  // 创建快照
+  createSnapshot: async (documentId: string, description: string) => {
+    try {
+      await snapshotApi.createSnapshot(documentId, description);
+      // 重新获取快照列表
+      await get().fetchSnapshots(documentId);
+    } catch (error) {
+      set({ error: '创建快照失败' });
+      console.error('Error creating snapshot:', error);
+    }
+  },
+
+  // 获取默认快照描述
+  getDefaultSnapshotDescription: async (documentId: string) => {
+    try {
+      return await snapshotApi.getDefaultSnapshotDescription(documentId);
+    } catch (error) {
+      console.error('Error fetching default snapshot description:', error);
+      return '';
+    }
+  },
+
+  // 设置错误
+  setError: (error: string | null) => {
+    set({ error });
   },
 }));
