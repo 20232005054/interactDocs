@@ -76,6 +76,7 @@ class TemplateService:
         # 创建私有副本
         cloned_template = Template(
             group_id=new_group_id,
+            template_type=original_template.template_type,
             purpose=original_template.purpose,
             display_name=original_template.display_name,
             content=original_template.content,
@@ -110,6 +111,7 @@ class TemplateService:
         # 创建新版本
         new_template = Template(
             group_id=current_template.group_id,
+            template_type=current_template.template_type,
             purpose=current_template.purpose,
             display_name=current_template.display_name,
             content=content,
