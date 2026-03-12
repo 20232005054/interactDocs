@@ -102,6 +102,7 @@ export default function ChapterEditor({ params }: { params: Promise<{ id: string
   const [templates, setTemplates] = useState<any[]>([]);
   const [templatePurposes, setTemplatePurposes] = useState<string[]>([]);
   const [templatesByPurpose, setTemplatesByPurpose] = useState<Record<string, any[]>>({});
+  const [templateName, setTemplateName] = useState<string>('');
   const leftSidebarRef = useRef<HTMLDivElement>(null);
   const rightSidebarRef = useRef<HTMLDivElement>(null);
   const tocRef = useRef<HTMLDivElement>(null);
@@ -109,6 +110,22 @@ export default function ChapterEditor({ params }: { params: Promise<{ id: string
   // 生成唯一ID
   const generateId = () => {
     return 'b' + Date.now() + Math.floor(Math.random() * 1000);
+  };
+  
+  // 根据模板ID获取模板详情
+  const fetchTemplateById = async (templateId: string) => {
+    try {
+      const response = await fetch(`/api/v1/templates/${templateId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setTemplateName(data.data.display_name || '未知模板');
+      } else {
+        setTemplateName('未知模板');
+      }
+    } catch (error) {
+      console.error('获取模板详情失败:', error);
+      setTemplateName('未知模板');
+    }
   };
   
   // 解析params
@@ -242,6 +259,12 @@ export default function ChapterEditor({ params }: { params: Promise<{ id: string
         }
         const data = await response.json();
         setDocument(data.data);
+        // 如果存在template_id，获取模板详情
+        if (data.data.template_id) {
+          fetchTemplateById(data.data.template_id);
+        } else {
+          setTemplateName('未设置');
+        }
       } catch (err) {
         console.error('Error fetching document:', err);
         setError('获取文档信息失败');
@@ -2276,6 +2299,12 @@ export default function ChapterEditor({ params }: { params: Promise<{ id: string
 
       const data = await response.json();
       setDocument(data.data);
+      // 如果更新的是模板ID，刷新模板名称
+      if (field === 'template_id' && typeof value === 'string' && value) {
+        fetchTemplateById(value);
+      } else if (field === 'template_id' && !value) {
+        setTemplateName('未设置');
+      }
       setEditingDocDetail(null);
       setDocDetailValue('');
     } catch (err) {
@@ -2755,14 +2784,10 @@ export default function ChapterEditor({ params }: { params: Promise<{ id: string
                         </button>
                       </div>
                     ) : (
-                      <div className="text-xs text-gray-800 bg-gray-50 p-2 rounded-md">
-                        {document.template_id ? (
-                          templates.find(t => t.template_id === document.template_id)?.display_name || '未知模板'
-                        ) : (
-                          '未设置'
-                        )}
-                      </div>
-                    )}
+                        <div className="text-xs text-gray-800 bg-gray-50 p-2 rounded-md">
+                          {templateName || '未知模板'}
+                        </div>
+                      )}
                   </div>
                 </div>
               )}

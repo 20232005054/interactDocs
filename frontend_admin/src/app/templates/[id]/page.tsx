@@ -26,7 +26,26 @@ export default function TemplateEditPage() {
   const [template, setTemplate] = useState<Template | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    purpose: string;
+    display_name: string;
+    content: {
+      prompt: {
+        task_type: string;
+        system_prompt: string;
+        user_prompt_template: string;
+      };
+      schema: {
+        schema_json: Array<{
+          type: string;
+          title: string;
+        }>;
+      };
+      summary: {
+        title_templates: string[];
+      };
+    };
+  }>({
     purpose: '',
     display_name: '',
     content: {
@@ -57,12 +76,12 @@ export default function TemplateEditPage() {
         setFormData({
           purpose: data.data.purpose,
           display_name: data.data.display_name,
-          content: data.data.content
+          content: data.data.content as any
         });
       } catch (error) {
         console.error('Error fetching template:', error);
         // 使用模拟数据
-        const mockTemplate = {
+        const mockTemplate: Template = {
           template_id: templateId,
           group_id: '1',
           purpose: '报告',
@@ -97,7 +116,7 @@ export default function TemplateEditPage() {
         setFormData({
           purpose: mockTemplate.purpose,
           display_name: mockTemplate.display_name,
-          content: mockTemplate.content
+          content: mockTemplate.content as any
         });
       } finally {
         setLoading(false);
@@ -131,7 +150,7 @@ export default function TemplateEditPage() {
   };
 
   // 处理schema项变化
-  const handleSchemaChange = (index: number, field: string, value: string) => {
+  const handleSchemaChange = (index: number, field: 'type' | 'title', value: string) => {
     const newSchemaJson = [...formData.content.schema.schema_json];
     newSchemaJson[index] = {
       ...newSchemaJson[index],

@@ -50,6 +50,7 @@ export default function SummaryManager({ params }: { params: Promise<{ id: strin
   const [templates, setTemplates] = useState<any[]>([]);
   const [templatePurposes, setTemplatePurposes] = useState<string[]>([]);
   const [templatesByPurpose, setTemplatesByPurpose] = useState<Record<string, any[]>>({});
+  const [templateName, setTemplateName] = useState<string>('');
   const leftSidebarRef = useRef<HTMLDivElement>(null);
   const rightSidebarRef = useRef<HTMLDivElement>(null);
 
@@ -149,6 +150,20 @@ export default function SummaryManager({ params }: { params: Promise<{ id: strin
     }
   };
 
+  // 根据模板ID获取模板详情
+  const fetchTemplateById = async (templateId: string) => {
+    try {
+      const response = await fetch(`/api/v1/templates/${templateId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setTemplateName(data.data.display_name || '未知模板');
+      }
+    } catch (error) {
+      console.error('获取模板详情失败:', error);
+      setTemplateName('未知模板');
+    }
+  };
+
   // 加载文档数据
   useEffect(() => {
     if (!documentId) return;
@@ -163,6 +178,11 @@ export default function SummaryManager({ params }: { params: Promise<{ id: strin
         }
         const documentData = await documentResponse.json();
         setDocument(documentData.data);
+        
+        // 如果有模板ID，获取模板详情
+        if (documentData.data.template_id) {
+          fetchTemplateById(documentData.data.template_id);
+        }
 
         // 获取章节列表
         const chaptersResponse = await fetch(`/api/v1/documents/${documentId}/chapters`);
@@ -885,6 +905,12 @@ export default function SummaryManager({ params }: { params: Promise<{ id: strin
 
       const data = await response.json();
       setDocument(data.data);
+      
+      // 如果更新的是模板ID，重新获取模板详情
+      if (field === 'template_id' && value) {
+        fetchTemplateById(value as string);
+      }
+      
       setEditingDocDetail(null);
       setDocDetailValue('');
     } catch (err) {
@@ -1340,11 +1366,7 @@ export default function SummaryManager({ params }: { params: Promise<{ id: strin
                       </div>
                     ) : (
                       <div className="text-xs text-gray-800 bg-gray-50 p-2 rounded-md">
-                        {document.template_id ? (
-                          templates.find(t => t.template_id === document.template_id)?.display_name || '未知模板'
-                        ) : (
-                          '未设置'
-                        )}
+                        {document.template_id ? templateName : '未设置'}
                       </div>
                     )}
                   </div>

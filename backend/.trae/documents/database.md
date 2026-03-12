@@ -24,6 +24,7 @@
 | ----------------- | ------------- | --------------------------- | ----------------------- |
 | `document_id`     | `UUID`        | `PRIMARY KEY`               | 文档 ID                   |
 | `user_id`         | `UUID`        | `REFERENCES users(user_id)` | 创建用户 ID                 |
+| `template_id`     | `UUID`        | `REFERENCES templates(template_id) NULL` | 关联的模板 ID                |
 | `title`           | `VARCHAR(80)` | `NOT NULL`                  | 方案标题                    |
 | `abstract`        | `TEXT`        | `NULL`                      | 摘要                      |
 | `content`         | `JSONB`       | `DEFAULT '[]'`              | 参考正文（Block Schema格式）    |
@@ -149,6 +150,22 @@
 | `mode`            | `VARCHAR(20)` | `DEFAULT 'chat'`                    | 聊天模式（chat 或 revision）    |
 | `created_at`      | `TIMESTAMP`   | `DEFAULT CURRENT_TIMESTAMP`         | 聊天时间                     |
 
+### 2.10 模板表（`templates`）
+
+| 字段名           | 数据类型           | 约束                                  | 描述                          |
+| ------------- | -------------- | ----------------------------------- | --------------------------- |
+| `template_id` | `UUID`         | `PRIMARY KEY`                       | 模板 ID                       |
+| `group_id`    | `UUID`         | `NOT NULL`                          | 逻辑分组 ID，同一套模板的不同版本 group_id 相同 |
+| `purpose`     | `VARCHAR(50)`  | `NOT NULL`                          | 用途大类，用于第一级下拉               |
+| `display_name` | `VARCHAR(100)` | `NOT NULL`                          | 具体模板名，用于第二级下拉              |
+| `content`     | `JSONB`        | `NOT NULL`                          | 核心载体，包含提示词模板、结构模板、摘要模板     |
+| `version`     | `INTEGER`      | `NOT NULL DEFAULT 1`                | 版本号                         |
+| `is_system`   | `BOOLEAN`      | `NOT NULL DEFAULT FALSE`            | 是否为官方系统模板                  |
+| `user_id`     | `UUID`         | `REFERENCES users(user_id) NULL`    | 所属用户，系统模板此项为空              |
+| `is_active`   | `BOOLEAN`      | `NOT NULL DEFAULT TRUE`             | 是否为当前该组模板的生效/推荐版本         |
+| `created_at`  | `TIMESTAMP`    | `DEFAULT CURRENT_TIMESTAMP`         | 创建时间                       |
+| `updated_at`  | `TIMESTAMP`    | `DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP` | 更新时间 |
+
 ## 3. 数据库关系图
 
 ```
@@ -202,6 +219,30 @@
 | content_after     |
 | created_at        |
 +-------------------+
+
++-------------+
+|  templates  |
++-------------+
+| template_id |
+| group_id    |
+| purpose     |
+| display_name|
+| content     |
+| version     |
+| is_system   |
+| user_id     |
+| is_active   |
+| created_at  |
+| updated_at  |
++-------------+
+        ^
+        |
+        |
+        |
++-------------+
+|  documents  |
+| template_id |
++-------------+
 ```
 
 ## 4. 索引设计
@@ -226,6 +267,10 @@
 | `operation_history`       | `chapter_id`   | B-tree | 加速章节操作历史查询 |
 | `chat_records`            | `document_id`  | B-tree | 加速文档聊天记录查询 |
 | `chat_records`            | `chapter_id`   | B-tree | 加速章节聊天记录查询 |
+| `templates`               | `group_id`     | B-tree | 加速模板分组查询   |
+| `templates`               | `purpose`      | B-tree | 加速模板用途查询   |
+| `templates`               | `is_system`    | B-tree | 加速系统模板查询   |
+| `templates`               | `is_active`    | B-tree | 加速生效模板查询   |
 
 ### 4.3 其他索引
 
@@ -279,6 +324,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS documents (
     document_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(user_id),
+    template_id UUID REFERENCES templates(template_id),
     title VARCHAR(80) NOT NULL,
     keywords TEXT[] NOT NULL,
     abstract TEXT,
@@ -371,6 +417,21 @@ CREATE TABLE IF NOT EXISTS chat_records (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 创建模板表
+CREATE TABLE IF NOT EXISTS templates (
+    template_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    group_id UUID NOT NULL,
+    purpose VARCHAR(50) NOT NULL,
+    display_name VARCHAR(100) NOT NULL,
+    content JSONB NOT NULL,
+    version INTEGER NOT NULL DEFAULT 1,
+    is_system BOOLEAN NOT NULL DEFAULT FALSE,
+    user_id UUID REFERENCES users(user_id),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 创建索引
 CREATE INDEX IF NOT EXISTS idx_documents_user_id ON documents(user_id);
 CREATE INDEX IF NOT EXISTS idx_chapters_document_id ON chapters(document_id);
@@ -394,6 +455,13 @@ CREATE INDEX IF NOT EXISTS idx_documents_title ON documents USING GIN (to_tsvect
 CREATE INDEX IF NOT EXISTS idx_documents_keywords ON documents USING GIN (keywords);
 CREATE INDEX IF NOT EXISTS idx_chapters_order_index ON chapters(order_index);
 
+-- 创建模板表索引
+CREATE INDEX IF NOT EXISTS idx_templates_group_id ON templates(group_id);
+CREATE INDEX IF NOT EXISTS idx_templates_purpose ON templates(purpose);
+CREATE INDEX IF NOT EXISTS idx_templates_is_system ON templates(is_system);
+CREATE INDEX IF NOT EXISTS idx_templates_is_active ON templates(is_active);
+CREATE INDEX IF NOT EXISTS idx_templates_user_id ON templates(user_id);
+
 -- 创建触发器函数
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -416,6 +484,11 @@ EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_users_updated_at
 BEFORE UPDATE ON users
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_templates_updated_at
+BEFORE UPDATE ON templates
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 ```

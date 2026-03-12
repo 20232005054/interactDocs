@@ -1,20 +1,35 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.mappers.document_mapper import DocumentMapper
-from db.models import Document
+from db.models import Document, Template
 from schemas.schemas import DocumentCreate, DocumentUpdate
 from uuid import UUID
 from fastapi import HTTPException
+from services.template_service import TemplateService
 
 class DocumentService:
     @staticmethod
     async def create_document(db: AsyncSession, doc_in: DocumentCreate):
+        # 处理模板克隆逻辑
+        template_id = doc_in.template_id
+        if template_id:
+            # 检查模板是否存在
+            template = await TemplateService.get_template(db, template_id)
+            if template and template.is_system:
+                # 如果是系统模板，为用户克隆一个私有副本
+                # 这里假设用户ID会从JWT中获取，暂时使用None
+                # 实际项目中应该从请求上下文获取用户ID
+                user_id = None  # 临时值，实际项目中需要修改
+                cloned_template = await TemplateService.clone_template(db, template_id, user_id)
+                if cloned_template:
+                    template_id = cloned_template.template_id
+        
         # 创建新文档
         new_document = Document(
             title=doc_in.title,
             abstract=doc_in.abstract,
             content=doc_in.content if doc_in.content else [],
             purpose=doc_in.purpose,
-            template_id=doc_in.template_id,
+            template_id=template_id,
             status="draft"
         )
         
