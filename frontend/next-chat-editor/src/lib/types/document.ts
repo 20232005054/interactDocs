@@ -9,10 +9,9 @@ export interface Document {
   status: string;
   created_at: string;
   updated_at: string;
-  template_id?: string | null;
 }
 
-export interface DocumentListResponse {
+export interface DocumentsResponse {
   data: {
     items: Document[];
     total: number;
