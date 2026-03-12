@@ -1,12 +1,6 @@
 import { create } from 'zustand';
-
-interface Document {
-  id: string;
-  title: string;
-  createdAt: string;
-  updatedAt: string;
-  template_id: string | null;
-}
+import { Document } from '../lib/types/document';
+import { fetchDocuments as fetchDocumentsApi, createDocument as createDocumentApi } from '../lib/api/document';
 
 interface DocumentState {
   documents: Document[];
@@ -16,7 +10,7 @@ interface DocumentState {
   
   // Actions
   setCurrentDocument: (document: Document | null) => void;
-  fetchDocuments: () => Promise<void>;
+  fetchDocuments: (page?: number, pageSize?: number) => Promise<void>;
   createDocument: (title: string) => Promise<Document>;
   updateDocument: (id: string, data: Partial<Document>) => Promise<Document>;
   deleteDocument: (id: string) => Promise<void>;
@@ -30,13 +24,11 @@ export const useDocumentStore = create<DocumentState>((set) => ({
   
   setCurrentDocument: (document) => set({ currentDocument: document }),
   
-  fetchDocuments: async () => {
+  fetchDocuments: async (page = 1, pageSize = 100) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('/api/documents');
-      if (!response.ok) throw new Error('Failed to fetch documents');
-      const data = await response.json();
-      set({ documents: data, isLoading: false });
+      const documents = await fetchDocumentsApi(page, pageSize);
+      set({ documents, isLoading: false });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Failed to fetch documents', isLoading: false });
     }
@@ -45,19 +37,16 @@ export const useDocumentStore = create<DocumentState>((set) => ({
   createDocument: async (title) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('/api/documents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title }),
-      });
-      if (!response.ok) throw new Error('Failed to create document');
-      const newDocument = await response.json();
+      const documentId = await createDocumentApi({ title });
+      // 重新获取文档列表以获取完整的文档信息
+      const documents = await fetchDocumentsApi();
+      const newDocument = documents.find(doc => doc.document_id === documentId);
       set((state) => ({
-        documents: [...state.documents, newDocument],
-        currentDocument: newDocument,
+        documents,
+        currentDocument: newDocument || null,
         isLoading: false,
       }));
-      return newDocument;
+      return newDocument as Document;
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Failed to create document', isLoading: false });
       throw error;
@@ -75,8 +64,8 @@ export const useDocumentStore = create<DocumentState>((set) => ({
       if (!response.ok) throw new Error('Failed to update document');
       const updatedDocument = await response.json();
       set((state) => ({
-        documents: state.documents.map(doc => doc.id === id ? updatedDocument : doc),
-        currentDocument: state.currentDocument?.id === id ? updatedDocument : state.currentDocument,
+        documents: state.documents.map(doc => doc.document_id === id ? updatedDocument : doc),
+        currentDocument: state.currentDocument?.document_id === id ? updatedDocument : state.currentDocument,
         isLoading: false,
       }));
       return updatedDocument;
@@ -94,8 +83,8 @@ export const useDocumentStore = create<DocumentState>((set) => ({
       });
       if (!response.ok) throw new Error('Failed to delete document');
       set((state) => ({
-        documents: state.documents.filter(doc => doc.id !== id),
-        currentDocument: state.currentDocument?.id === id ? null : state.currentDocument,
+        documents: state.documents.filter(doc => doc.document_id !== id),
+        currentDocument: state.currentDocument?.document_id === id ? null : state.currentDocument,
         isLoading: false,
       }));
     } catch (error) {
