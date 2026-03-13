@@ -86,7 +86,13 @@ export default function KeywordPage({ params }: { params: Promise<{ id: string }
           documentId={documentId}
         />
 
-
+        {/* 右侧AI助手区 */}
+        <RightSidebar 
+          documentId={documentId}
+          rightSidebarCollapsed={rightSidebarCollapsed}
+          setRightSidebarCollapsed={setRightSidebarCollapsed}
+          rightSidebarWidth={rightSidebarWidth}
+        />
       </div>
     </div>
   );
