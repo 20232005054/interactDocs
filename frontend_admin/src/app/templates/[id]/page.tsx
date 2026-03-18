@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Save, X, ArrowLeft } from 'lucide-react';
+import { Save, X, ArrowLeft, Database, AlertCircle } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 
 interface Template {
@@ -26,9 +26,12 @@ export default function TemplateEditPage() {
   const [template, setTemplate] = useState<Template | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [purposes, setPurposes] = useState<string[]>([]);
   const [formData, setFormData] = useState<{
     purpose: string;
     display_name: string;
+    is_system: boolean;
+    is_active: boolean;
     content: {
       prompt: {
         task_type: string;
@@ -48,6 +51,8 @@ export default function TemplateEditPage() {
   }>({
     purpose: '',
     display_name: '',
+    is_system: true,
+    is_active: true,
     content: {
       prompt: {
         task_type: '',
@@ -63,6 +68,23 @@ export default function TemplateEditPage() {
     }
   });
 
+  // 获取所有用途
+  useEffect(() => {
+    const fetchPurposes = async () => {
+      try {
+        const response = await fetch('/api/v1/templates/purposes/list');
+        if (response.ok) {
+          const data = await response.json();
+          setPurposes(data.data.purposes);
+        }
+      } catch (error) {
+        console.error('Error fetching purposes:', error);
+      }
+    };
+
+    fetchPurposes();
+  }, []);
+
   // 获取模板详情
   useEffect(() => {
     const fetchTemplate = async () => {
@@ -76,48 +98,25 @@ export default function TemplateEditPage() {
         setFormData({
           purpose: data.data.purpose,
           display_name: data.data.display_name,
-          content: data.data.content as any
+          is_system: data.data.is_system,
+          is_active: data.data.is_active,
+          content: data.data.content || {
+            prompt: {
+              task_type: '',
+              system_prompt: '',
+              user_prompt_template: ''
+            },
+            schema: {
+              schema_json: []
+            },
+            summary: {
+              title_templates: []
+            }
+          }
         });
       } catch (error) {
         console.error('Error fetching template:', error);
-        // 使用模拟数据
-        const mockTemplate: Template = {
-          template_id: templateId,
-          group_id: '1',
-          purpose: '报告',
-          display_name: '标准医疗报告',
-          content: {
-            prompt: {
-              task_type: 'generate_paragraph',
-              system_prompt: '你是一名专业的医疗报告撰写专家',
-              user_prompt_template: '请根据以下内容生成医疗报告：{{content}}'
-            },
-            schema: {
-              schema_json: [
-                { type: 'heading-1', title: '摘要' },
-                { type: 'heading-1', title: '背景' },
-                { type: 'heading-1', title: '方法' },
-                { type: 'heading-1', title: '结果' },
-                { type: 'heading-1', title: '结论' }
-              ]
-            },
-            summary: {
-              title_templates: ['研究背景', '研究目的', '研究方法', '研究结果', '研究结论']
-            }
-          },
-          version: 1,
-          is_system: true,
-          user_id: null,
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        setTemplate(mockTemplate);
-        setFormData({
-          purpose: mockTemplate.purpose,
-          display_name: mockTemplate.display_name,
-          content: mockTemplate.content as any
-        });
+        setTemplate(null);
       } finally {
         setLoading(false);
       }
@@ -127,8 +126,16 @@ export default function TemplateEditPage() {
   }, [templateId]);
 
   // 处理表单输入变化
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // 处理布尔值输入变化
+  const handleBooleanChange = (name: string, value: boolean) => {
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -259,6 +266,8 @@ export default function TemplateEditPage() {
         body: JSON.stringify({
           purpose: formData.purpose,
           display_name: formData.display_name,
+          is_system: formData.is_system,
+          is_active: formData.is_active,
           content: formData.content
         }),
       });
@@ -283,6 +292,25 @@ export default function TemplateEditPage() {
         <div className="text-center">
           <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-green-200 border-t-green-500"></div>
           <p className="mt-2 text-gray-600">加载中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!template) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-red-300 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">模板不存在</h2>
+          <p className="text-gray-600 mb-6">无法找到指定的模板，请检查模板ID是否正确</p>
+          <button
+            onClick={() => router.push('/templates')}
+            className="inline-flex items-center px-6 py-3 bg-green-500 text-white font-medium rounded-md hover:bg-green-600 transition-colors duration-200"
+          >
+            <ArrowLeft className="h-5 w-5 mr-2" />
+            返回模板列表
+          </button>
         </div>
       </div>
     );
@@ -313,15 +341,18 @@ export default function TemplateEditPage() {
                 <label htmlFor="purpose" className="block text-sm font-medium text-gray-700 mb-1">
                   模板用途 <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
+                <select
                   id="purpose"
                   name="purpose"
                   value={formData.purpose}
                   onChange={handleInputChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
-                  placeholder="请输入模板用途（如：研究方案、临床报告等）"
-                />
+                >
+                  <option value="">请选择用途</option>
+                  {purposes.map((purpose) => (
+                    <option key={purpose} value={purpose}>{purpose}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label htmlFor="display_name" className="block text-sm font-medium text-gray-700 mb-1">
@@ -336,6 +367,36 @@ export default function TemplateEditPage() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
                   placeholder="请输入模板名称"
                 />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    是否为系统模板
+                  </label>
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={formData.is_system}
+                      onChange={(e) => handleBooleanChange('is_system', e.target.checked)}
+                      className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">是</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    是否生效
+                  </label>
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={formData.is_active}
+                      onChange={(e) => handleBooleanChange('is_active', e.target.checked)}
+                      className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">是</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

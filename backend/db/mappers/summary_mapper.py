@@ -1,12 +1,12 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from db.models import DocumentSummary, ParagraphSummaryLink
+from db.models import DocumentSummary
 from uuid import UUID
 
 class SummaryMapper:
     @staticmethod
     async def create_summary(db: AsyncSession, summary):    # 创建摘要
-        db.add(summary)                                         
+        db.add(summary)                                          
         await db.commit()
         await db.refresh(summary)
         return summary
@@ -45,47 +45,4 @@ class SummaryMapper:
     @staticmethod
     async def delete_summary(db: AsyncSession, summary):
         await db.delete(summary)
-        await db.commit()
-
-
-class ParagraphSummaryLinkMapper:
-    @staticmethod
-    async def create_link(db: AsyncSession, link):
-        db.add(link)
-        await db.commit()
-        await db.refresh(link)
-        return link
-
-    @staticmethod
-    async def get_links_by_paragraph_id(db: AsyncSession, paragraph_id: UUID):
-        result = await db.execute(
-            select(ParagraphSummaryLink)
-            .where(ParagraphSummaryLink.paragraph_id == paragraph_id)
-        )
-        return result.scalars().all()
-
-    @staticmethod
-    async def get_links_by_summary_id(db: AsyncSession, summary_id: UUID):
-        result = await db.execute(
-            select(ParagraphSummaryLink)
-            .where(ParagraphSummaryLink.summary_id == summary_id)
-        )
-        return result.scalars().all()
-
-    @staticmethod
-    async def update_link(db: AsyncSession, link_id: UUID, update_data):
-        result = await db.execute(
-            select(ParagraphSummaryLink).where(ParagraphSummaryLink.link_id == link_id)
-        )
-        link = result.scalar_one_or_none()
-        if link:
-            for key, value in update_data.items():
-                setattr(link, key, value)
-            await db.commit()
-            await db.refresh(link)
-        return link
-
-    @staticmethod
-    async def delete_link(db: AsyncSession, link):
-        await db.delete(link)
         await db.commit()

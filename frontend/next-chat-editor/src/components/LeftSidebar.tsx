@@ -50,21 +50,13 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
     toggleChapter,
     addChapter,
     updateChapterTitle,
-    deleteChapter,
-    fetchChapters
+    deleteChapter
   } = useChapterStore();
 
   // 获取最近文档
   React.useEffect(() => {
     fetchRecentDocuments();
   }, [fetchRecentDocuments]);
-
-  // 获取章节列表
-  React.useEffect(() => {
-    if (documentId) {
-      fetchChapters(documentId);
-    }
-  }, [documentId, fetchChapters]);
 
   // 获取使用目的选项
   React.useEffect(() => {

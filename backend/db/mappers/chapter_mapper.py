@@ -7,7 +7,7 @@ class ChapterMapper:
     @staticmethod
     async def get_chapters_by_document_id(db: AsyncSession, document_id: UUID):
         result = await db.execute(
-            select(Chapter).where(Chapter.document_id == document_id)
+            select(Chapter).where(Chapter.document_id == document_id).order_by(Chapter.order_index)
         )
         return result.scalars().all()
 
@@ -39,25 +39,6 @@ class ChapterMapper:
     async def delete_chapter(db: AsyncSession, chapter):
         await db.delete(chapter)
         await db.commit()
-
-    @staticmethod
-    async def get_chapters_with_paragraphs(db: AsyncSession, document_id: UUID):
-        # 获取所有章节
-        result = await db.execute(
-            select(Chapter).where(Chapter.document_id == document_id)
-        )
-        chapters = result.scalars().all()
-        
-        # 为每个章节获取段落，并返回章节和段落的列表
-        chapter_with_paragraphs = []
-        for chapter in chapters:
-            para_result = await db.execute(
-                select(Paragraph).where(Paragraph.chapter_id == chapter.chapter_id).order_by(Paragraph.order_index)
-            )
-            paragraphs = para_result.scalars().all()
-            chapter_with_paragraphs.append((chapter, paragraphs))
-        
-        return chapter_with_paragraphs
 
     @staticmethod
     async def get_chapter_with_paragraphs(db: AsyncSession, chapter_id: UUID):

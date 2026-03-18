@@ -47,40 +47,17 @@ class MetadataConfig(BaseModel):
 # --- 文档相关 (Document) ---
 class DocumentBase(BaseModel):
     title: str = Field(..., max_length=80, description="方案标题")
-    abstract: Optional[str] = Field(None, description="正文摘要")
-    content: Optional[str] = Field(None, description="参考正文")
-    purpose: Optional[str] = Field(None, description="使用目的")
-    template_id: Optional[UUID] = Field(None, description="模板ID")
+    purpose: str = Field(..., description="使用目的")
+    template_id: UUID = Field(..., description="模板ID")
 
 class DocumentCreate(DocumentBase):
     pass
 
 class DocumentUpdate(BaseModel):
     title: Optional[str] = Field(None, max_length=80, description="方案标题")
-    abstract: Optional[str] = Field(None, description="正文摘要")
-    content: Optional[str] = Field(None, description="参考正文")
     purpose: Optional[str] = Field(None, description="使用目的")
     template_id: Optional[UUID] = Field(None, description="模板ID")
-    status: Optional[str] = "draft"
 
-class DocumentVO(BaseModel):
-    document_id: UUID
-    title: str
-    abstract: Optional[str] = None
-    content: Optional[str] = None
-    purpose: Optional[str] = None
-    template_id: Optional[UUID] = None
-    user_id: Optional[UUID] = None
-    status: str
-    created_at: datetime
-    updated_at: datetime
-
-    class Config:
-        from_attributes = True
-
-class DocumentListVO(BaseModel):
-    total: int
-    items: List[DocumentVO]
 
 # --- 章节相关 (Chapter) ---
 class ParagraphBase(BaseModel):
@@ -92,15 +69,8 @@ class ParagraphBase(BaseModel):
     ai_generate: Optional[str] = Field(None, description="AI 帮填生成的内容")
     ischange: int = Field(0, description="关联摘要是否发生实质变更：0-否，1-是")
 
-class ParagraphCreate(ParagraphBase):
-    pass
-
-class ParagraphVO(ParagraphBase):
-    paragraph_id: UUID
-    chapter_id: UUID
-
-    class Config:
-        from_attributes = True
+class ParagraphCreate(BaseModel):
+    content: str = Field(..., description="文本内容")
 
 class ParagraphUpdate(BaseModel):
     content: Optional[str] = None
@@ -113,33 +83,16 @@ class ParagraphUpdate(BaseModel):
 
 class ChapterBase(BaseModel):
     title: str = Field(..., description="章节标题")
-    parent_id: Optional[UUID] = Field(None, description="父章节 ID")
-    order_index: int = Field(..., description="排序索引")
-    status: Optional[str] = Field("editing", description="章节状态")
+    status: Optional[int] = Field(0, description="章节状态：0-编辑中，1-已完成")
 
 class ChapterCreate(ChapterBase):
     document_id: UUID = Field(..., description="文档 ID")
 
-class ChapterVO(BaseModel):
-    chapter_id: UUID
-    document_id: UUID
-    parent_id: Optional[UUID] = None
-    title: str
-    status: str
-    order_index: int
-    updated_at: datetime
-    paragraphs: Optional[List[ParagraphVO]] = Field(default=[], description="章节段落")
-
-    class Config:
-        from_attributes = True
 
 class ChapterUpdate(BaseModel):
     title: Optional[str] = None
-    status: Optional[str] = None
-    order_index: Optional[int] = None
+    status: Optional[int] = None
 
-class ChapterList(BaseModel):
-    chapters: List[ChapterVO]
 
 # --- 文档版本相关 (DocumentVersion) ---
 class DocumentVersionCreate(BaseModel):
@@ -158,6 +111,9 @@ class DocumentVersion(BaseModel):
 
 class DocumentVersionList(BaseModel):
     snapshots: List[DocumentVersion]
+
+class SnapshotUpdate(BaseModel):
+    description: str
 
 # --- 操作历史相关 (OperationHistory) ---
 class OperationHistory(BaseModel):
@@ -234,68 +190,16 @@ class DocumentSummaryCreate(DocumentSummaryBase):
 class DocumentSummaryUpdate(BaseModel):
     title: Optional[str] = Field(None, description="摘要标题")
     content: Optional[str] = Field(None, description="摘要内容")
-    order_index: Optional[int] = Field(None, description="排序索引")
 
-class DocumentSummaryVO(DocumentSummaryBase):
-    summary_id: UUID
-    document_id: UUID
-    version: int
-    created_at: datetime
-    updated_at: datetime
-
-    class Config:
-        from_attributes = True
-
-class DocumentSummaryList(BaseModel):
-    total: int
-    items: List[DocumentSummaryVO]
-
-# --- 摘要-段落关联相关 (ParagraphSummaryLink) ---
-class ParagraphSummaryLinkBase(BaseModel):
-    paragraph_id: UUID = Field(..., description="段落ID")
-    summary_id: UUID = Field(..., description="摘要ID")
-    summary_version: int = Field(..., description="摘要版本")
-    summary_sections: str = Field(..., description="使用的摘要部分")
-
-class ParagraphSummaryLinkCreate(ParagraphSummaryLinkBase):
-    pass
-
-class ParagraphSummaryLinkVO(ParagraphSummaryLinkBase):
-    link_id: UUID
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 # --- 关键词相关 (DocumentKeyword) ---
-class DocumentKeywordBase(BaseModel):
-    keyword: str = Field(..., description="关键词")
-
-class DocumentKeywordCreate(DocumentKeywordBase):
-    document_id: UUID = Field(..., description="文档ID")
-
 class DocumentKeywordUpdate(BaseModel):
     keyword: str = Field(..., description="关键词")
 
-class DocumentKeywordVO(DocumentKeywordBase):
-    keyword_id: UUID
-    document_id: UUID
-    created_at: datetime
-    updated_at: datetime
-
-    class Config:
-        from_attributes = True
-
-class DocumentKeywordList(BaseModel):
-    total: int
-    items: List[DocumentKeywordVO]
 
 # --- AI帮填请求相关 ---
 class AIAssistRequest(BaseModel):
-    paragraph_id: UUID = Field(..., description="段落ID")
     summary_sections: Optional[List[str]] = Field(None, description="选择的摘要部分ID列表，不指定则使用所有摘要")
     keywords: Optional[List[str]] = Field(None, description="选择的关键词ID列表，不指定则使用所有关键词")
 
-# --- AI评估请求相关 ---
-class AIEvaluateRequest(BaseModel):
-    paragraph_id: UUID = Field(..., description="段落ID")
+

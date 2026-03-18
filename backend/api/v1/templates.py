@@ -95,19 +95,18 @@ async def list_templates(
         })
     return success_response(data={"items": items})
 
-@router.put("/{template_id}", summary="更新模板")
+@router.put("/{template_id}", summary="管理员更新模板")
 async def update_template(
     template_id: UUID,
     purpose: Optional[str] = None,
     display_name: Optional[str] = None,
     content: Optional[dict] = None,
     is_system: Optional[bool] = None,
-    user_id: Optional[UUID] = None,
     is_active: Optional[bool] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """
-    更新模板
+    管理员更新模板
     """
     update_data = {}
     if purpose:
@@ -118,8 +117,6 @@ async def update_template(
         update_data["content"] = content
     if is_system is not None:
         update_data["is_system"] = is_system
-    if user_id:
-        update_data["user_id"] = user_id
     if is_active is not None:
         update_data["is_active"] = is_active
     
@@ -141,6 +138,8 @@ async def update_template(
         "updated_at": template.updated_at
     })
 
+
+
 @router.delete("/{template_id}", summary="删除模板")
 async def delete_template(
     template_id: UUID,
@@ -153,6 +152,40 @@ async def delete_template(
     if not success:
         raise HTTPException(status_code=404, detail="模板不存在")
     return success_response(message="删除成功")
+
+@router.put("/{template_id}/content", summary="用户更新模板")
+async def update_template_content(
+    template_id: UUID,
+    content: dict,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    用户更新模板（仅修改content字段，不更新版本）
+    """
+    # 先获取模板信息，检查是否为非官方模板
+    template = await TemplateService.get_template(db, template_id)
+    if not template:
+        raise HTTPException(status_code=404, detail="模板不存在")
+    if template.is_system:
+        raise HTTPException(status_code=403, detail="不能更新官方模板")
+    
+    # 更新模板内容
+    template = await TemplateService.update_template_content(db, template_id, content)
+    if not template:
+        raise HTTPException(status_code=404, detail="模板不存在")
+    return success_response(data={
+        "template_id": template.template_id,
+        "group_id": template.group_id,
+        "purpose": template.purpose,
+        "display_name": template.display_name,
+        "content": template.content,
+        "version": template.version,
+        "is_system": template.is_system,
+        "user_id": template.user_id,
+        "is_active": template.is_active,
+        "created_at": template.created_at,
+        "updated_at": template.updated_at
+    })
 
 # 模板发现与克隆接口
 
@@ -170,8 +203,8 @@ async def list_purposes(
 @router.get("/by-purpose/{purpose}", summary="根据用途获取模板")
 async def get_templates_by_purpose(
     purpose: str,
-    is_system: bool = True,
-    is_active: bool = True,
+    is_system: Optional[bool] = None,
+    is_active: Optional[bool] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -196,30 +229,28 @@ async def get_templates_by_purpose(
         })
     return success_response(data={"items": items})
 
-@router.post("/clone/{template_id}", summary="克隆模板")
-async def clone_template(
+@router.post("/rollback/{template_id}", summary="回退官方模板")
+async def rollback_template(
     template_id: UUID,
-    user_id: UUID,
     db: AsyncSession = Depends(get_db)
 ):
     """
-    克隆模板（从系统模板创建私有副本）
+    回退官方模板（根据模板id查找对应的官方模板并回退内容）
     """
-    cloned_template = await TemplateService.clone_template(db, template_id, user_id)
-    if not cloned_template:
+    rolled_back_template = await TemplateService.rollback_template(db, template_id)
+    if not rolled_back_template:
         raise HTTPException(status_code=404, detail="模板不存在")
     return success_response(data={
-        "template_id": cloned_template.template_id,
-        "group_id": cloned_template.group_id,
-        "template_type": cloned_template.template_type,
-        "purpose": cloned_template.purpose,
-        "display_name": cloned_template.display_name,
-        "content": cloned_template.content,
-        "version": cloned_template.version,
-        "is_system": cloned_template.is_system,
-        "user_id": cloned_template.user_id,
-        "is_active": cloned_template.is_active,
-        "created_at": cloned_template.created_at,
-        "updated_at": cloned_template.updated_at
+        "template_id": rolled_back_template.template_id,
+        "group_id": rolled_back_template.group_id,
+        "purpose": rolled_back_template.purpose,
+        "display_name": rolled_back_template.display_name,
+        "content": rolled_back_template.content,
+        "version": rolled_back_template.version,
+        "is_system": rolled_back_template.is_system,
+        "user_id": rolled_back_template.user_id,
+        "is_active": rolled_back_template.is_active,
+        "created_at": rolled_back_template.created_at,
+        "updated_at": rolled_back_template.updated_at
     })
 

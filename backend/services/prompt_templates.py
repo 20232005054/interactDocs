@@ -9,6 +9,7 @@ system_prompts = {
     "extract_keywords": "你是一个专业的关键词提取助手。",
     "generate_summary": "你是一个专业的临床研究方案摘要撰写助手。",
     "analyze_summary_change": "你是一个专业的文本分析助手。",
+    "analyze_paragraph_change": "你是一个专业的文本分析助手。",
     "generate_summary_topics": "你是一个专业的临床研究方案摘要撰写助手。",
     "generate_chapter_structure": "你是一个专业的临床研究方案章节结构设计助手。",
     "generate_summary_titles": "你是一个专业的临床研究方案摘要标题设计助手。"
@@ -142,6 +143,22 @@ user_prompt_templates = {
     
     "analyze_summary_change": Template("""
 请分析以下两段文本是否存在实质性变化：
+
+旧文本：
+{{ old_content }}
+
+新文本：
+{{ new_content }}
+
+判断标准：
+1. 如果只是表述方式不同但语义相同（如同义句），返回 False
+2. 如果存在概念、数字、条件等实质性变化，返回 True
+
+请直接返回 True 或 False，不要添加任何其他内容。
+"""),
+    
+    "analyze_paragraph_change": Template("""
+请分析以下两段段落文本是否存在实质性变化：
 
 旧文本：
 {{ old_content }}

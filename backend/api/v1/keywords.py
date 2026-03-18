@@ -1,6 +1,7 @@
 from core.response import success_response
 from schemas.schemas import DocumentKeywordCreate, DocumentKeywordUpdate, DocumentKeywordVO
 from services.keyword_service import KeywordService
+import services.ai_service as ai_service
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,16 +12,13 @@ from typing import List
 
 router = APIRouter(prefix="/api/v1", tags=["关键词管理"])
 
-# AI 帮填关键词请求模型
-class AIAssistKeywordRequest(BaseModel):
-    document_id: UUID
 
-@router.post("/keywords", summary="创建关键词")
-async def create_keyword(keyword_in: DocumentKeywordCreate, db: AsyncSession = Depends(get_db)):
+@router.post("/documents/{document_id}/keywords", summary="创建关键词")
+async def create_keyword(document_id: UUID, keyword_in: DocumentKeywordCreate, db: AsyncSession = Depends(get_db)):
     """
     创建文档关键词
     """
-    new_keyword = await KeywordService.create_keyword(db, keyword_in)
+    new_keyword = await KeywordService.create_keyword(db, keyword_in, document_id)
     
     # 构建返回数据
     result = {
@@ -114,31 +112,12 @@ async def get_paragraph_keywords(paragraph_id: UUID, db: AsyncSession = Depends(
     keywords = await KeywordService.get_paragraph_related_keywords(db, paragraph_id)
     return success_response(data={"keywords": keywords})
 
-@router.post("/keywords/ai/assist", summary="AI 帮填关键词")
-async def ai_assist_keyword(request: AIAssistKeywordRequest, db: AsyncSession = Depends(get_db)):
+
+
+@router.post("/documents/{document_id}/keywords/ai/assist", summary="AI 帮填关键词")
+async def ai_assist_keyword(document_id: UUID, db: AsyncSession = Depends(get_db)):
     """
     AI 帮填关键词
     """
-    keywords = await KeywordService.ai_assist_keyword(db, request.document_id)
+    keywords = await ai_service.ai_assist_keyword(db, document_id)
     return success_response(data={"keywords": keywords})
-
-# 批量创建关键词请求模型
-class BatchKeywordCreate(BaseModel):
-    keywords: List[DocumentKeywordCreate]
-
-@router.post("/keywords/batch", summary="批量创建关键词")
-async def batch_create_keywords(request: BatchKeywordCreate, db: AsyncSession = Depends(get_db)):
-    """
-    批量创建关键词
-    """
-    created_keywords = []
-    for keyword_in in request.keywords:
-        new_keyword = await KeywordService.create_keyword(db, keyword_in)
-        created_keywords.append({
-            "keyword_id": new_keyword.keyword_id,
-            "document_id": new_keyword.document_id,
-            "keyword": new_keyword.keyword,
-            "created_at": new_keyword.created_at,
-            "updated_at": new_keyword.updated_at
-        })
-    return success_response(data={"keywords": created_keywords})

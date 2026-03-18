@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Save, X, Search, Database } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, X, Search, Database, Filter } from 'lucide-react';
 
 interface Template {
   template_id: string;
@@ -21,69 +21,62 @@ export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [purposes, setPurposes] = useState<string[]>([]);
+  const [selectedPurpose, setSelectedPurpose] = useState<string>('');
 
   const [formData, setFormData] = useState({
     purpose: '',
     display_name: '',
-    content: {}
+    content: {},
+    is_system: true
   });
   const [searchQuery, setSearchQuery] = useState('');
+
+  // 获取所有用途
+  useEffect(() => {
+    const fetchPurposes = async () => {
+      try {
+        const response = await fetch('/api/v1/templates/purposes/list');
+        if (response.ok) {
+          const data = await response.json();
+          setPurposes(data.data.purposes);
+        }
+      } catch (error) {
+        console.error('Error fetching purposes:', error);
+      }
+    };
+
+    fetchPurposes();
+  }, []);
 
   // 获取模板数据
   useEffect(() => {
     const fetchTemplates = async () => {
       try {
-        console.log('开始获取模板数据...');
-        const response = await fetch('/api/v1/templates');
-        console.log('API 响应状态:', response.status);
+        let url = '/api/v1/templates';
+        if (selectedPurpose) {
+          url = `/api/v1/templates/by-purpose/${selectedPurpose}`;
+        }
+        
+        const response = await fetch(url);
         if (!response.ok) {
           throw new Error(`Failed to fetch templates: ${response.status}`);
         }
         const data = await response.json();
-        console.log('API 响应数据:', data);
         setTemplates(data.data.items);
       } catch (error) {
         console.error('Error fetching templates:', error);
-        // 手动设置一些模拟数据，以便页面可以正常显示
-        const mockTemplates = [
-          {
-            template_id: '1',
-            group_id: '1',
-            purpose: '报告',
-            display_name: '标准医疗报告',
-            content: {},
-            version: 1,
-            is_system: true,
-            user_id: null,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          },
-          {
-            template_id: '2',
-            group_id: '2',
-            purpose: '申报',
-            display_name: '2077标准医疗器械申报书',
-            content: {},
-            version: 1,
-            is_system: true,
-            user_id: null,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-        ];
-        setTemplates(mockTemplates);
+        setTemplates([]);
       } finally {
         setLoading(false);
       }
     };
 
     fetchTemplates();
-  }, []);
+  }, [selectedPurpose]);
 
   // 处理表单输入变化
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -100,12 +93,7 @@ export default function TemplatesPage() {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            purpose: formData.purpose,
-            display_name: formData.display_name,
-            content: formData.content,
-            is_system: true
-          }),
+          body: JSON.stringify(formData),
         });
         
         if (!response.ok) {
@@ -114,7 +102,7 @@ export default function TemplatesPage() {
         
         const data = await response.json();
         setTemplates(prev => [...prev, data.data]);
-        setFormData({ purpose: '', display_name: '', content: {} });
+        setFormData({ purpose: '', display_name: '', content: {}, is_system: true });
         setIsCreating(false);
       } catch (error) {
         console.error('Error creating template:', error);
@@ -122,8 +110,6 @@ export default function TemplatesPage() {
       }
     }
   };
-
-
 
   // 处理删除模板
   const handleDeleteTemplate = async (template_id: string) => {
@@ -171,20 +157,42 @@ export default function TemplatesPage() {
           <p className="mt-2 text-gray-600">管理系统模板的创建、编辑和删除</p>
         </div>
 
-        {/* 搜索和创建按钮 */}
-        <div className="flex flex-col md:flex-row justify-between items-center mb-6">
-          <div className="relative w-full md:w-64 mb-4 md:mb-0">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-5 w-5 text-gray-400" />
+        {/* 搜索、筛选和创建按钮 */}
+        <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+          <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+            {/* 搜索框 */}
+            <div className="relative w-full sm:w-64">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                placeholder="搜索模板"
+              />
             </div>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
-              placeholder="搜索模板"
-            />
+            
+            {/* 用途筛选 */}
+            <div className="relative w-full sm:w-48">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Filter className="h-5 w-5 text-gray-400" />
+              </div>
+              <select
+                value={selectedPurpose}
+                onChange={(e) => setSelectedPurpose(e.target.value)}
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+              >
+                <option value="">所有用途</option>
+                {purposes.map((purpose) => (
+                  <option key={purpose} value={purpose}>{purpose}</option>
+                ))}
+              </select>
+            </div>
           </div>
+          
+          {/* 创建按钮 */}
           <button
             onClick={() => setIsCreating(true)}
             className="inline-flex items-center px-6 py-3 bg-green-500 text-white font-medium rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors duration-200"
@@ -203,15 +211,18 @@ export default function TemplatesPage() {
                 <label htmlFor="purpose" className="block text-sm font-medium text-gray-700 mb-1">
                   模板用途 <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
+                <select
                   id="purpose"
                   name="purpose"
                   value={formData.purpose}
                   onChange={handleInputChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
-                  placeholder="请输入模板用途（如：研究方案、临床报告等）"
-                />
+                >
+                  <option value="">请选择用途</option>
+                  {purposes.map((purpose) => (
+                    <option key={purpose} value={purpose}>{purpose}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label htmlFor="display_name" className="block text-sm font-medium text-gray-700 mb-1">
@@ -227,11 +238,29 @@ export default function TemplatesPage() {
                   placeholder="请输入模板名称"
                 />
               </div>
+              <div>
+                <label htmlFor="is_system" className="block text-sm font-medium text-gray-700 mb-1">
+                  是否为系统模板
+                </label>
+                <select
+                  id="is_system"
+                  name="is_system"
+                  value={formData.is_system.toString()}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    is_system: e.target.value === 'true'
+                  }))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                >
+                  <option value="true">是</option>
+                  <option value="false">否</option>
+                </select>
+              </div>
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={() => {
                     setIsCreating(false);
-                    setFormData({ purpose: '', display_name: '', content: {} });
+                    setFormData({ purpose: '', display_name: '', content: {}, is_system: true });
                   }}
                   className="px-4 py-2 bg-gray-200 text-gray-800 font-medium rounded-md hover:bg-gray-300 transition-colors duration-200"
                 >
@@ -250,8 +279,6 @@ export default function TemplatesPage() {
           </div>
         )}
 
-
-
         {/* 模板列表 */}
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
           <div className="overflow-x-auto">
@@ -262,7 +289,13 @@ export default function TemplatesPage() {
                     模板名称
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    描述
+                    用途
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    系统模板
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    状态
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     创建时间
@@ -286,6 +319,14 @@ export default function TemplatesPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-500">{template.purpose}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500">{template.is_system ? '是' : '否'}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${template.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        {template.is_active ? '生效' : '未生效'}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-500">{new Date(template.created_at).toLocaleDateString()}</div>

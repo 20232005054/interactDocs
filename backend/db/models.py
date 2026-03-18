@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Text, Integer, TIMESTAMP, ForeignKey, ARRAY, Boolean
+from sqlalchemy import Column, String, Text, Integer, TIMESTAMP, ForeignKey, ARRAY, Boolean, Float
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship, declarative_base
 from sqlalchemy.sql import func
@@ -22,10 +22,24 @@ class Document(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"))
     template_id = Column(UUID(as_uuid=True), ForeignKey("templates.template_id"), nullable=True)
     title = Column(String(80), nullable=False)
-    abstract = Column(Text, nullable=True)  # 正文摘要
-    content = Column(JSONB, nullable=True)  # 参考正文
+    content = Column(JSONB, nullable=True)  # 记录全局变量
+
+    """
+    {
+        "global_variables": [
+            {
+                "key": "变量名",
+                "value": "变量值",
+                "type": "变量类型",
+                "description": "变量描述",
+                "is_locked": true/false,
+                "order_index": 0  # 排序索引
+            }
+        ]
+    }
+    """
+
     purpose = Column(String(50), nullable=True)  # 使用目的
-    status = Column(String(20), default="draft")
     snapshot_cursor = Column(Integer, default=0)  # 快照计数器
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
@@ -41,9 +55,8 @@ class Chapter(Base):
 
     chapter_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     document_id = Column(UUID(as_uuid=True), ForeignKey("documents.document_id", ondelete="CASCADE"), nullable=False)
-    parent_id = Column(UUID(as_uuid=True), ForeignKey("chapters.chapter_id", ondelete="SET NULL"), nullable=True, default=None) # 递归父节点
     title = Column(String(200), nullable=False, default="")
-    status = Column(String(30), default="editing")
+    status = Column(Integer, default=0)  # 0-编辑中，1-已完成
     order_index = Column(Integer, nullable=False, default=0) # 排序索引
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
 
@@ -51,7 +64,6 @@ class Chapter(Base):
     document = relationship("Document", back_populates="chapters")
     paragraphs = relationship("Paragraph", back_populates="chapter", cascade="all, delete-orphan")
     operation_history = relationship("OperationHistory", back_populates="chapter", cascade="all, delete-orphan")
-
 
 class Paragraph(Base):
     __tablename__ = "paragraphs"
@@ -68,8 +80,6 @@ class Paragraph(Base):
 
     # 关系
     chapter = relationship("Chapter", back_populates="paragraphs")
-    summary_links = relationship("ParagraphSummaryLink", back_populates="paragraph", cascade="all, delete-orphan")
-    keyword_links = relationship("KeywordParagraphLink", back_populates="paragraph", cascade="all, delete-orphan")
 
 class DocumentVersion(Base):
     __tablename__ = "document_versions"
@@ -120,7 +130,6 @@ class AIEvaluation(Base):
 
     chapter = relationship("Chapter")
 
-
 class DocumentSummary(Base):
     __tablename__ = "document_summaries"
     summary_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -136,23 +145,7 @@ class DocumentSummary(Base):
 
     # 关系
     document = relationship("Document", back_populates="summaries")
-    paragraph_links = relationship("ParagraphSummaryLink", back_populates="summary", cascade="all, delete-orphan")
-    keyword_links = relationship("KeywordSummaryLink", back_populates="summary", cascade="all, delete-orphan")
     history = relationship("DocumentSummaryHistory", back_populates="summary", cascade="all, delete-orphan")
-
-
-class ParagraphSummaryLink(Base):
-    __tablename__ = "paragraph_summary_links"
-    link_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    paragraph_id = Column(UUID(as_uuid=True), ForeignKey("paragraphs.paragraph_id", ondelete="CASCADE"), nullable=False)
-    summary_id = Column(UUID(as_uuid=True), ForeignKey("document_summaries.summary_id", ondelete="CASCADE"), nullable=False)
-    summary_version = Column(Integer, nullable=False)
-    created_at = Column(TIMESTAMP, server_default=func.now())
-
-    # 关系
-    paragraph = relationship("Paragraph", back_populates="summary_links")
-    summary = relationship("DocumentSummary", back_populates="paragraph_links")
-
 
 class DocumentKeyword(Base):
     __tablename__ = "document_keywords"
@@ -165,35 +158,7 @@ class DocumentKeyword(Base):
 
     # 关系
     document = relationship("Document", back_populates="keywords")
-    summary_links = relationship("KeywordSummaryLink", back_populates="keyword", cascade="all, delete-orphan")
-    paragraph_links = relationship("KeywordParagraphLink", back_populates="keyword", cascade="all, delete-orphan")
-    history = relationship("DocumentKeywordHistory", back_populates="keyword", cascade="all, delete-orphan")
-
-
-class KeywordSummaryLink(Base):
-    __tablename__ = "keyword_summary_links"
-    link_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    keyword_id = Column(UUID(as_uuid=True), ForeignKey("document_keywords.keyword_id", ondelete="CASCADE"), nullable=False)
-    summary_id = Column(UUID(as_uuid=True), ForeignKey("document_summaries.summary_id", ondelete="CASCADE"), nullable=False)
-    created_at = Column(TIMESTAMP, server_default=func.now())
-
-    # 关系
-    keyword = relationship("DocumentKeyword", back_populates="summary_links")
-    summary = relationship("DocumentSummary", back_populates="keyword_links")
-
-
-class KeywordParagraphLink(Base):
-    __tablename__ = "keyword_paragraph_links"
-    link_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    keyword_id = Column(UUID(as_uuid=True), ForeignKey("document_keywords.keyword_id", ondelete="CASCADE"), nullable=False)
-    paragraph_id = Column(UUID(as_uuid=True), ForeignKey("paragraphs.paragraph_id", ondelete="CASCADE"), nullable=False)
-    keyword_version = Column(Integer, nullable=False)
-    created_at = Column(TIMESTAMP, server_default=func.now())
-
-    # 关系
-    keyword = relationship("DocumentKeyword", back_populates="paragraph_links")
-    paragraph = relationship("Paragraph", back_populates="keyword_links")
-
+    history = relationship("DocumentKeywordHistory", back_populates="document_keyword", cascade="all, delete-orphan")
 
 class DocumentSummaryHistory(Base):
     __tablename__ = "document_summary_history"
@@ -207,7 +172,6 @@ class DocumentSummaryHistory(Base):
     # 关系
     summary = relationship("DocumentSummary", back_populates="history")
 
-
 class DocumentKeywordHistory(Base):
     __tablename__ = "document_keyword_history"
     history_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -217,8 +181,7 @@ class DocumentKeywordHistory(Base):
     created_at = Column(TIMESTAMP, server_default=func.now())
 
     # 关系
-    keyword = relationship("DocumentKeyword", back_populates="history")
-
+    document_keyword = relationship("DocumentKeyword", back_populates="history")
 
 class Template(Base):
     __tablename__ = "templates"
@@ -233,6 +196,26 @@ class Template(Base):
     is_active = Column(Boolean, nullable=False, default=True)  # 是否为当前该组模板的生效/推荐版本
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+
+# 统一的依赖边表 (构建文档知识图谱的核心)
+class DependencyEdge(Base):
+    __tablename__ = "dependency_edges"
+    
+    edge_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # 依赖方 (主体：通常是生成的段落 Paragraph)
+    source_type = Column(String(30), nullable=False)  # 例: 'paragraph', 'chapter', 'document'
+    source_id = Column(UUID(as_uuid=True), nullable=False)
+    
+    # 被依赖方 (客体：如 摘要、全局变量、关键词)
+    target_type = Column(String(30), nullable=False)  # 例: 'summary', 'document_entity', 'keyword'
+    target_id = Column(UUID(as_uuid=True), nullable=False)
+    
+    # 依赖状态记录 (用于溯源和报警)
+    target_version = Column(Integer, nullable=True)   # 生成时依赖的客体版本号
+    
+    relevance_score = Column(Float, default=1.0)  # 关联权重
+    created_at = Column(TIMESTAMP, server_default=func.now())
 
 # 添加Document与Template的关系
 Document.template = relationship("Template", backref="documents")
