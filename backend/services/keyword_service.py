@@ -2,12 +2,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.mappers.keyword_mapper import KeywordMapper
 from db.mappers.dependency_edge_mapper import DependencyEdgeMapper
 from db.models import DocumentKeyword, DependencyEdge
-from schemas.schemas import DocumentKeywordCreate, DocumentKeywordUpdate
+from schemas.schemas import  DocumentKeywordUpdate
 from uuid import UUID
 
 class KeywordService:
     @staticmethod
-    async def create_keyword(db: AsyncSession, keyword_in: DocumentKeywordCreate, document_id: UUID):
+    async def create_keyword(db: AsyncSession, keyword_in: DocumentKeywordUpdate, document_id: UUID):
         new_keyword = DocumentKeyword(
             document_id=document_id,
             keyword=keyword_in.keyword

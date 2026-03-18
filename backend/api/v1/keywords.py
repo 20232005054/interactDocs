@@ -1,5 +1,5 @@
 from core.response import success_response
-from schemas.schemas import DocumentKeywordCreate, DocumentKeywordUpdate, DocumentKeywordVO
+from schemas.schemas import  DocumentKeywordUpdate
 from services.keyword_service import KeywordService
 import services.ai_service as ai_service
 
@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api/v1", tags=["关键词管理"])
 
 
 @router.post("/documents/{document_id}/keywords", summary="创建关键词")
-async def create_keyword(document_id: UUID, keyword_in: DocumentKeywordCreate, db: AsyncSession = Depends(get_db)):
+async def create_keyword(document_id: UUID, keyword_in: DocumentKeywordUpdate, db: AsyncSession = Depends(get_db)):
     """
     创建文档关键词
     """

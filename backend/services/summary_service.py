@@ -8,7 +8,6 @@ from sqlalchemy import func, select, update
 import json
 from fastapi import HTTPException
 from services.prompt_templates import render_prompt, system_prompts
-from services.ai_service import call_qwen_stream
 
 class SummaryService:
     @staticmethod
@@ -191,6 +190,7 @@ class SummaryService:
         )
         
         response = ""
+        from services.ai_service import call_qwen_stream
         async for chunk in call_qwen_stream(
             system_prompts["analyze_summary_change"],
             [],
