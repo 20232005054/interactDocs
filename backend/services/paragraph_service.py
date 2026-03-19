@@ -7,7 +7,6 @@ from db.models import Paragraph
 from schemas.schemas import ParagraphCreate, ParagraphUpdate
 from uuid import UUID
 from fastapi import HTTPException
-from services.ai_service import is_substantial_change
 
 class ParagraphService:
     @staticmethod
@@ -147,8 +146,6 @@ class ParagraphService:
         # 保存新段落
         return await ParagraphMapper.create_paragraph(db, new_paragraph)
 
-
-
     @staticmethod
     async def _handle_paragraph_change(db: AsyncSession, paragraph_id: UUID, is_substantial_change):
         """
@@ -183,7 +180,8 @@ class ParagraphService:
             raise HTTPException(status_code=400, detail="AI帮填结果不存在")
         
         # 检查内容是否发生实质性变更
-        is_substantial_change = await is_substantial_change(
+        from services.ai_service import is_substantial_change
+        is_schange = await is_substantial_change(
             paragraph.content, paragraph.ai_generate
         )
         
@@ -197,7 +195,7 @@ class ParagraphService:
         await ParagraphMapper.update_paragraph(db, paragraph_id, update_data)
         
         # 处理段落变更时的摘要更新
-        await ParagraphService._handle_paragraph_change(db, paragraph_id, is_substantial_change)
+        await ParagraphService._handle_paragraph_change(db, paragraph_id, is_schange)
         
         # 返回更新后的段落
         return await ParagraphMapper.get_paragraph_by_id(db, paragraph_id)

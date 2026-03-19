@@ -112,8 +112,6 @@ async def get_paragraph_keywords(paragraph_id: UUID, db: AsyncSession = Depends(
     keywords = await KeywordService.get_paragraph_related_keywords(db, paragraph_id)
     return success_response(data={"keywords": keywords})
 
-
-
 @router.post("/documents/{document_id}/keywords/ai/assist", summary="AI 帮填关键词")
 async def ai_assist_keyword(document_id: UUID, db: AsyncSession = Depends(get_db)):
     """

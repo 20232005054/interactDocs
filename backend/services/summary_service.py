@@ -1,15 +1,12 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.mappers.summary_mapper import SummaryMapper
 from db.mappers.dependency_edge_mapper import DependencyEdgeMapper
-from db.models import DocumentSummary, DependencyEdge
-from schemas.schemas import DocumentSummaryCreate, DocumentSummaryUpdate
+from db.models import DocumentSummary, DocumentSummaryHistory
+from schemas.schemas import DocumentSummaryUpdate
 from uuid import UUID
 from sqlalchemy import func, select, update
-import json
 from fastapi import HTTPException
-from services.prompt_templates import render_prompt, system_prompts
-from services.ai_client import call_qwen_stream
-from services.ai_service import is_substantial_change
+
 
 class SummaryService:
     @staticmethod
@@ -29,14 +26,11 @@ class SummaryService:
         
         # 检查是否有实质性变更
         # 处理 content 为空字符串的情况
+        from services.ai_service import is_substantial_change
         new_content = summary_in.content if summary_in.content is not None else old_summary.content
-        is_substantial_change = await is_substantial_change(
-            old_summary.content, 
-            new_content
-        )
+        is_change = await is_substantial_change(old_summary.content, new_content)
         
         # 创建历史记录
-        from db.models import DocumentSummaryHistory
         history = DocumentSummaryHistory(
             summary_id=summary_id,
             version=old_summary.version,
@@ -51,12 +45,12 @@ class SummaryService:
             "content": new_content,
             "order_index": old_summary.order_index,  # 保持原有排序索引
             "version": old_summary.version + 1,
-            "is_change": 1 if is_substantial_change else 0
+            "is_change": 1 if is_change else 0
         }
         updated_summary = await SummaryMapper.update_summary(db, summary_id, update_data)
         
         # 处理关联段落更新，传递变更状态
-        await SummaryService._handle_summary_change(db, old_summary, updated_summary, is_substantial_change)
+        await SummaryService._handle_summary_change(db, old_summary, updated_summary, is_change)
         return updated_summary
 
     @staticmethod
@@ -188,44 +182,6 @@ class SummaryService:
             # 更新段落的ischange字段为1，表示关联摘要发生了实质变更
             from db.mappers.paragraph_mapper import ParagraphMapper
             await ParagraphMapper.update_paragraph(db, edge.source_id, {"ischange": 1})
-
-    @staticmethod
-    async def create_paragraph_summary_link(db: AsyncSession, paragraph_id: UUID, summary_id: UUID):
-        summary = await SummaryMapper.get_summary_by_id(db, summary_id)
-        if not summary:
-            return None
-        
-        # 检查是否已存在相同的依赖边
-        existing_edges = await DependencyEdgeMapper.get_edges_by_source_and_target_type(
-            db, "paragraph", paragraph_id, "summary"
-        )
-        
-        # 如果已存在关联，更新它
-        for edge in existing_edges:
-            if edge.target_id == summary_id:
-                await DependencyEdgeMapper.update_edge(db, edge.edge_id, {
-                    "target_version": summary.version
-                })
-                return edge
-        
-        # 创建新的依赖边
-        edge = DependencyEdge(
-            source_type="paragraph",
-            source_id=paragraph_id,
-            target_type="summary",
-            target_id=summary_id,
-            target_version=summary.version,
-            relevance_score=1.0
-        )
-        
-        return await DependencyEdgeMapper.create_edge(db, edge)
-
-    @staticmethod
-    async def get_paragraph_summary_links(db: AsyncSession, paragraph_id: UUID):
-        return await DependencyEdgeMapper.get_edges_by_source_and_target_type(
-            db, "paragraph", paragraph_id, "summary"
-        )
-
     @staticmethod
     async def get_summary_related_paragraphs(db: AsyncSession, summary_id: UUID):
         """

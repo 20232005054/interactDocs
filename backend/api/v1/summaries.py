@@ -172,7 +172,7 @@ async def ai_assist_summary(summary_id: UUID, db: AsyncSession = Depends(get_db)
     - 场景3：无标题有内容 → AI帮填标题
     """
     # 调用AI服务帮填单个摘要
-    summary = await ai_service.assist_single_summary(db, str(summary_id))
+    summary = await ai_service.assist_single_summary(db, summary_id)
     if not summary:
         raise HTTPException(status_code=404, detail="摘要不存在")
     return success_response(data=summary)

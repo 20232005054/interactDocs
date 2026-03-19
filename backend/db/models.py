@@ -49,6 +49,7 @@ class Document(Base):
     chat_records = relationship("ChatRecord", back_populates="document", cascade="all, delete-orphan")
     summaries = relationship("DocumentSummary", back_populates="document", cascade="all, delete-orphan")
     keywords = relationship("DocumentKeyword", back_populates="document", cascade="all, delete-orphan")
+    template = relationship("Template", backref="documents")
 
 class Chapter(Base):
     __tablename__ = "chapters"
@@ -217,5 +218,3 @@ class DependencyEdge(Base):
     relevance_score = Column(Float, default=1.0)  # 关联权重
     created_at = Column(TIMESTAMP, server_default=func.now())
 
-# 添加Document与Template的关系
-Document.template = relationship("Template", backref="documents")

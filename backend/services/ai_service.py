@@ -25,6 +25,8 @@ from services.ai_client import call_qwen_stream
 from difflib import SequenceMatcher
 import re
 
+from services.dependency_service import DependencyService
+
 # 配置您的百炼 API Key
 # dashscope.api_key = "您的阿里云百炼API_KEY"
 
@@ -226,9 +228,8 @@ async def ai_assist_paragraph(db, paragraph_id, assist_request):
                     summary_id = uuid.UUID(summary_id_str)
                     summary = await SummaryMapper.get_summary_by_id(db, summary_id)
                     if summary:
-                        from services.summary_service import SummaryService
-                        await SummaryService.create_paragraph_summary_link(
-                            db, paragraph_id, summary.summary_id
+                        await DependencyService.create_dependency_edge(
+                            db, "paragraph", paragraph_id, "summary", summary.summary_id, target_version=summary.version
                         )
                 except Exception as e:
                     print(f"创建摘要关联失败: {e}")
@@ -247,9 +248,13 @@ async def ai_assist_paragraph(db, paragraph_id, assist_request):
             for keyword_id_str in local_used_keyword_ids:
                 try:
                     keyword_id = uuid.UUID(keyword_id_str)
-                    await KeywordService.create_keyword_paragraph_link(
-                        db, keyword_id, paragraph_id
-                    )
+                    
+                    from db.mappers.keyword_mapper import KeywordMapper
+                    keyword = await KeywordMapper.get_keyword_by_id(db, keyword_id)
+                    if keyword:
+                        await DependencyService.create_dependency_edge(
+                            db, "paragraph", paragraph_id, "keyword", keyword_id, target_version=keyword.version
+                        )
                 except Exception as e:
                     print(f"创建关键词关联失败: {e}")
                     pass
@@ -312,7 +317,6 @@ async def is_substantial_change(old_content: str, new_content: str) -> bool:
     print("--------------------------------\n"+response+"\n--------------------------------")
     
     return response.strip().lower() == "true"
-
 
 # AI评估段落内容
 def ai_evaluate_paragraph(paragraph_id):
@@ -639,8 +643,9 @@ async def generate_chapter_content_stream(db, chapter_id):
         
         # 建立段落与所有摘要的关联
         for summary in summaries:
-            await SummaryService.create_paragraph_summary_link(
-                db, content_paragraph.paragraph_id, summary.summary_id
+            
+            await DependencyService.create_dependency_edge(
+                db, "paragraph", content_paragraph.paragraph_id, "summary", summary.summary_id, target_version=summary.version
             )
         
         # 处理子章节
@@ -712,8 +717,9 @@ async def generate_chapter_content_stream(db, chapter_id):
             
             # 建立段落与所有摘要的关联
             for summary in summaries:
-                await SummaryService.create_paragraph_summary_link(
-                    db, subsection_content_paragraph.paragraph_id, summary.summary_id
+                
+                await DependencyService.create_dependency_edge(
+                    db, "paragraph", subsection_content_paragraph.paragraph_id, "summary", summary.summary_id, target_version=summary.version
                 )
     
     # 发送结束标识
@@ -948,7 +954,10 @@ async def generate_all_summaries(db, document_id):
                     if keyword:
                         # 检查关键词是否出现在摘要内容中
                         if keyword.keyword.lower() in summary_content:
-                            await KeywordService.create_keyword_summary_link(db, keyword_id, summary.summary_id)
+                            
+                            await DependencyService.create_dependency_edge(
+                                db, "summary", summary.summary_id, "keyword", keyword_id
+                            )
                 except Exception as e:
                     print(f"创建关键词摘要关联失败: {e}")
                     pass
@@ -968,7 +977,7 @@ async def generate_all_summaries(db, document_id):
     return generated_summaries
 
 # AI帮填单个摘要
-async def assist_single_summary(db, summary_id: str):
+async def assist_single_summary(db, summary_id):
     """
     帮填单个摘要
     根据摘要状态自动判断帮填场景：
@@ -976,11 +985,12 @@ async def assist_single_summary(db, summary_id: str):
     - 场景2：有标题无内容 → AI只填内容
     - 场景3：无标题有内容 → AI帮填标题
     """
-    from uuid import UUID
-    summary_uuid = UUID(summary_id)
-    
-    # 导入必要的模块
-    from services.summary_service import SummaryService
+    # 检查 summary_id 是否已经是 UUID 对象
+    if isinstance(summary_id, uuid.UUID):
+        summary_uuid = summary_id
+    else:
+        summary_uuid = uuid.UUID(summary_id)
+
     
     # 获取摘要信息
     summary = await SummaryMapper.get_summary_by_id(db, summary_uuid)
@@ -1016,27 +1026,16 @@ async def assist_single_summary(db, summary_id: str):
     }
     
     # 构建统一的提示词
-    prompt = f"""
-    你是一个专业的临床研究方案摘要撰写助手。
-    
-    请根据以下摘要数据，填充缺失的内容：
-    {json.dumps(summary_data, ensure_ascii=False, indent=2)}
-    
-    要求：
-    1. 分析摘要数据，识别缺失的内容
-    2. **重要**：只有当标题为空时，才需要生成新标题；如果标题已存在，请勿修改标题
-    3. 根据文档信息和关键词，生成合适的内容
-    4. 确保生成的内容专业、准确，符合临床研究规范
-    5. 直接输出结果，格式如下：
-    标题：[如果原标题为空则生成新标题，否则使用原标题]
-    内容：[生成的内容]
-    6. 只输出标题和内容，不要添加任何其他说明文字
-    """
+    prompt = render_prompt(
+        "assist_summary",
+        summary_data=json.dumps(summary_data, ensure_ascii=False, indent=2)
+    )
     
     # 调用AI生成内容
     response = ""
+    from services.prompt_templates import system_prompts
     async for chunk in call_qwen_stream(
-        "你是一个专业的临床研究方案摘要撰写助手",
+        system_prompts["generate_summary"],
         [],
         prompt
     ):
@@ -1087,7 +1086,10 @@ async def assist_single_summary(db, summary_id: str):
             try:
                 # 检查关键词是否出现在摘要内容中
                 if keyword.keyword.lower() in summary_content:
-                    await KeywordService.create_keyword_summary_link(db, keyword.keyword_id, updated_summary.summary_id)
+                    
+                    await DependencyService.create_dependency_edge(
+                        db, "summary", updated_summary.summary_id, "keyword", keyword.keyword_id
+                    )
             except Exception as e:
                 print(f"创建关键词摘要关联失败: {e}")
                 pass

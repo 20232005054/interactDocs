@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.mappers.keyword_mapper import KeywordMapper
 from db.mappers.dependency_edge_mapper import DependencyEdgeMapper
-from db.models import DocumentKeyword, DependencyEdge
+from db.models import DocumentKeyword, DocumentKeywordHistory
 from schemas.schemas import  DocumentKeywordUpdate
 from uuid import UUID
 
@@ -29,40 +29,26 @@ class KeywordService:
         if not old_keyword:
             return None
         
-        """
-                # 检查是否有实质性变更
-        is_substantial_change = await KeywordService._is_substantial_change(
+        # 检查是否有实质性变更
+        from services.ai_service import is_substantial_change
+        is_change = await is_substantial_change(
             old_keyword.keyword, 
             keyword_in.keyword
         )
         
-        if is_substantial_change:
-            # 创建历史记录
-            from db.models import DocumentKeywordHistory
-            history = DocumentKeywordHistory(
-                keyword_id=keyword_id,
-                version=old_keyword.version,
-                keyword=old_keyword.keyword
-            )
-            await db.add(history)
-            
-            # 更新关键词
-            update_data = {
-                "keyword": keyword_in.keyword,
-                "version": old_keyword.version + 1
-            }
+        # 准备更新数据
+        update_data = {
+            "keyword": keyword_in.keyword,
+            "version": old_keyword.version + 1
+        }
+        
+        if is_change:
             updated_keyword = await KeywordMapper.update_keyword(db, keyword_id, update_data)
-            
             # 处理关联的摘要和段落更新
             await KeywordService._handle_keyword_change(db, old_keyword, updated_keyword)
             return updated_keyword
-        else:
-            # 不需要更新
-            return old_keyword
-        """
-
-        # 直接创建历史记录
-        from db.models import DocumentKeywordHistory
+        
+        # 创建历史记录
         history = DocumentKeywordHistory(
             keyword_id=keyword_id,
             version=old_keyword.version,
@@ -71,15 +57,7 @@ class KeywordService:
         db.add(history)
         
         # 直接更新关键词
-        update_data = {
-            "keyword": keyword_in.keyword,
-            "version": old_keyword.version + 1
-        }
-        updated_keyword = await KeywordMapper.update_keyword(db, keyword_id, update_data)
-        
-        # 注释掉关联的摘要和段落更新处理
-        # await KeywordService._handle_keyword_change(db, old_keyword, updated_keyword)
-        
+        updated_keyword = await KeywordMapper.update_keyword(db, keyword_id, update_data)  
         return updated_keyword
 
     @staticmethod
@@ -91,59 +69,29 @@ class KeywordService:
         return {"message": "关键词不存在"}
 
     @staticmethod
-    async def create_keyword_summary_link(db: AsyncSession, keyword_id: UUID, summary_id: UUID):
-        # 检查是否已存在相同的依赖边
-        existing_edges = await DependencyEdgeMapper.get_edges_by_source_and_target_type(
-            db, "summary", summary_id, "keyword"
+    async def _handle_keyword_change(db: AsyncSession, old_keyword: DocumentKeyword, updated_keyword: DocumentKeyword):
+        """
+        处理关键词变更时对关联的摘要和段落的影响
+        """
+        # 获取与旧关键词关联的所有依赖边
+        old_edges = await DependencyEdgeMapper.get_edges_by_target(
+            db, "keyword", old_keyword.keyword_id
         )
         
-        # 如果已存在关联，更新它
-        for edge in existing_edges:
-            if edge.target_id == keyword_id:
-                return edge
-        
-        # 创建新的依赖边
-        edge = DependencyEdge(
-            source_type="summary",
-            source_id=summary_id,
-            target_type="keyword",
-            target_id=keyword_id,
-            relevance_score=1.0
-        )
-        
-        return await DependencyEdgeMapper.create_edge(db, edge)
-
-    @staticmethod
-    async def create_keyword_paragraph_link(db: AsyncSession, keyword_id: UUID, paragraph_id: UUID):
-        # 获取关键词信息，包括版本
-        keyword = await KeywordMapper.get_keyword_by_id(db, keyword_id)
-        if not keyword:
-            return None
-        
-        # 检查是否已存在相同的依赖边
-        existing_edges = await DependencyEdgeMapper.get_edges_by_source_and_target_type(
-            db, "paragraph", paragraph_id, "keyword"
-        )
-        
-        # 如果已存在关联，更新它
-        for edge in existing_edges:
-            if edge.target_id == keyword_id:
-                await DependencyEdgeMapper.update_edge(db, edge.edge_id, {
-                    "target_version": keyword.version
-                })
-                return edge
-        
-        # 创建新的依赖边
-        edge = DependencyEdge(
-            source_type="paragraph",
-            source_id=paragraph_id,
-            target_type="keyword",
-            target_id=keyword_id,
-            target_version=keyword.version,
-            relevance_score=1.0
-        )
-        
-        return await DependencyEdgeMapper.create_edge(db, edge)
+        # 对于每个关联，更新 is_change 为 1
+        for edge in old_edges:
+            if edge.source_type == "summary":
+                from db.mappers.summary_mapper import SummaryMapper
+                summary = await SummaryMapper.get_summary_by_id(db, edge.source_id)
+                if summary:
+                    # 更新摘要的 is_change 为 1
+                    await SummaryMapper.update_summary(db, summary.summary_id, {"is_change": 1})
+            elif edge.source_type == "paragraph":
+                from db.mappers.paragraph_mapper import ParagraphMapper
+                paragraph = await ParagraphMapper.get_paragraph_by_id(db, edge.source_id)
+                if paragraph:
+                    # 更新段落的 ischange 为 1
+                    await ParagraphMapper.update_paragraph(db, paragraph.paragraph_id, {"ischange": 1})
 
     @staticmethod
     async def get_summary_related_keywords(db: AsyncSession, summary_id: UUID):
@@ -194,5 +142,4 @@ class KeywordService:
                 })
         
         return related_keywords
-
-
+    

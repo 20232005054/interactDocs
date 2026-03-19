@@ -22,14 +22,16 @@ class DependencyEdgeMapper:
         return result.scalars().all()
 
     @staticmethod
-    async def get_edges_by_source_and_target_type(db: AsyncSession, source_type: str, source_id: UUID, target_type: str):
-        result = await db.execute(
-            select(DependencyEdge).where(
-                DependencyEdge.source_type == source_type,
-                DependencyEdge.source_id == source_id,
-                DependencyEdge.target_type == target_type
-            )
+    async def get_edges_by_source_and_target_type(db: AsyncSession, source_type: str, source_id: UUID, target_type: str = None):
+        query = select(DependencyEdge).where(
+            DependencyEdge.source_type == source_type,
+            DependencyEdge.source_id == source_id
         )
+        
+        if target_type is not None:
+            query = query.where(DependencyEdge.target_type == target_type)
+        
+        result = await db.execute(query)
         return result.scalars().all()
 
     @staticmethod
