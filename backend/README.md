@@ -1,8 +1,6 @@
-
-
 # 方案生成系统后端
 
-基于 FastAPI 的方案生成系统后端服务，提供文档管理、章节管理、段落管理、摘要管理、关键词管理等功能，并集成 AI 辅助写作能力。
+基于 FastAPI 的方案生成系统后端服务，提供文档管理、章节管理、段落管理、摘要管理、关键词管理、模板管理等功能，并集成 AI 辅助写作能力。
 
 ## 项目简介
 
@@ -40,19 +38,27 @@
 - 摘要与段落关联管理
 - 批量创建摘要
 - 批量更新摘要顺序
+- 在指定摘要后插入新摘要
 
 ### 5. 关键词管理
 - 关键词的增删改查
 - 关键词与摘要/段落关联管理
 - 批量创建关键词
 
-### 6. AI 智能功能
+### 6. 模板管理
+- 模板的增删改查
+- 系统模板与用户模板管理
+- 模板版本控制
+- 模板回滚功能
+
+### 7. AI 智能功能
 - **AI 帮填**: 根据上下文智能填写段落、摘要、关键词内容
 - **AI 评估**: 评估段落内容的质量和适配度
 - **AI 修订**: 对选定内容进行智能修订
 - **AI 对话**: 与 AI 助理实时对话，获取写作建议
+- **AI 生成**: 基于模板生成摘要和段落内容
 
-### 7. 辅助功能
+### 8. 辅助功能
 - 获取生成方案元数据
 - 获取使用教程
 - 获取操作历史记录
@@ -68,16 +74,21 @@ backend/
 │   ├── documents.py           # 文档管理接口
 │   ├── endpoints.py           # 辅助功能接口
 │   ├── keywords.py            # 关键词管理接口
-│   └── summaries.py           # 摘要管理接口
+│   ├── paragraphs.py          # 段落管理接口
+│   ├── summaries.py           # 摘要管理接口
+│   └── templates.py           # 模板管理接口
 ├── core/                      # 核心功能
 │   └── response.py            # 响应格式化
 ├── db/                        # 数据库层
 │   ├── mappers/               # 数据映射器
 │   │   ├── chapter_mapper.py
+│   │   ├── dependency_edge_mapper.py
 │   │   ├── document_mapper.py
 │   │   ├── keyword_mapper.py
+│   │   ├── operation_history_mapper.py
 │   │   ├── paragraph_mapper.py
-│   │   └── summary_mapper.py
+│   │   ├── summary_mapper.py
+│   │   └── template_mapper.py
 │   ├── models.py              # SQLAlchemy 模型
 │   └── session.py             # 数据库会话
 ├── schemas/                   # Pydantic 数据模型
@@ -85,12 +96,18 @@ backend/
 ├── services/                  # 业务逻辑层
 │   ├── ai_service.py          # AI 服务
 │   ├── chapter_service.py     # 章节服务
-│   ├── document_service.py   # 文档服务
-│   ├── keyword_service.py    # 关键词服务
-│   ├── paragraph_service.py  # 段落服务
-│   └── summary_service.py    # 摘要服务
+│   ├── document_service.py    # 文档服务
+│   ├── endpoint_service.py    # 端点服务
+│   ├── keyword_service.py     # 关键词服务
+│   ├── paragraph_service.py   # 段落服务
+│   ├── prompt_templates.py    # 提示词模板
+│   ├── summary_service.py     # 摘要服务
+│   └── template_service.py    # 模板服务
+├── .trae/documents/           # 项目文档
+│   ├── api.md                 # API 文档
+│   └── database.md            # 数据库文档
 ├── main.py                    # 应用入口
-└── test.py                    # 测试脚本
+└── requirements.txt           # 依赖文件
 ```
 
 ## 快速开始
@@ -141,11 +158,21 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 | 文档 | POST /api/v1/documents | 创建文档 |
 | 文档 | GET /api/v1/documents/{id} | 获取文档详情 |
 | 章节 | POST /api/v1/chapters | 创建章节 |
-| 段落 | POST /api/v1/chapters/{id}/paragraphs | 创建段落 |
+| 章节 | GET /api/v1/chapters/{id} | 获取章节详情 |
+| 段落 | POST /api/v1/paragraphs | 创建段落 |
+| 段落 | PUT /api/v1/paragraphs/{id} | 更新段落 |
 | 摘要 | POST /api/v1/summaries | 创建摘要 |
+| 摘要 | POST /api/v1/summaries/generate | AI 生成摘要 |
+| 摘要 | POST /api/v1/summaries/{id}/insert-after | 在摘要后插入新摘要 |
 | 关键词 | POST /api/v1/keywords | 创建关键词 |
-| AI | POST /api/v1/ai/chat | AI 对话 |
-| AI | POST /api/v1/ai/revision | AI 修订 |
+| 关键词 | GET /api/v1/keywords/document/{id} | 获取文档关键词 |
+| 模板 | POST /api/v1/templates | 创建模板 |
+| 模板 | GET /api/v1/templates | 获取模板列表 |
+| 模板 | PUT /api/v1/templates/{id} | 管理员更新模板 |
+| 模板 | PUT /api/v1/templates/{id}/content | 用户更新模板内容 |
+| 模板 | POST /api/v1/templates/{id}/rollback | 回退模板 |
+| AI | POST /api/v1/ai/assist-paragraph/{id} | AI 帮填段落 |
+| AI | GET /api/v1/ai/evaluate-paragraph/{id} | AI 评估段落 |
 
 ## 许可证
 
