@@ -8,6 +8,8 @@ from sqlalchemy import func, select, update
 import json
 from fastapi import HTTPException
 from services.prompt_templates import render_prompt, system_prompts
+from services.ai_client import call_qwen_stream
+from services.ai_service import is_substantial_change
 
 class SummaryService:
     @staticmethod
@@ -28,7 +30,7 @@ class SummaryService:
         # 检查是否有实质性变更
         # 处理 content 为空字符串的情况
         new_content = summary_in.content if summary_in.content is not None else old_summary.content
-        is_substantial_change = await SummaryService._is_substantial_change(
+        is_substantial_change = await is_substantial_change(
             old_summary.content, 
             new_content
         )
@@ -161,44 +163,7 @@ class SummaryService:
         # 返回更新后的摘要
         return await SummaryMapper.get_summary_by_id(db, summary_id)
 
-    @staticmethod
-    async def _is_substantial_change(old_content, new_content):
-        """
-        检测摘要内容是否发生实质性变更
-        """
-        # 初步筛选：检查是否有明显的非实质性变更
-        def normalize_content(content):
-            if isinstance(content, str):
-                # 移除多余空格和标点符号
-                import re
-                return re.sub(r'\s+', ' ', content).strip()
-            return content
-        
-        # 比较规范化后的内容
-        normalized_old = normalize_content(old_content)
-        normalized_new = normalize_content(new_content)
-        
-        if normalized_old == normalized_new:
-            return False
-        
-        # 使用AI判断是否为实质性语义变更
 
-        prompt = render_prompt(
-            "analyze_summary_change",
-            old_content=json.dumps(old_content, ensure_ascii=False),
-            new_content=json.dumps(new_content, ensure_ascii=False)
-        )
-        
-        response = ""
-        from services.ai_service import call_qwen_stream
-        async for chunk in call_qwen_stream(
-            system_prompts["analyze_summary_change"],
-            [],
-            prompt
-        ):
-            response += chunk
-        
-        return response.strip().lower() == "true"
 
     @staticmethod
     async def _handle_summary_change(db: AsyncSession, old_summary: DocumentSummary, new_summary: DocumentSummary, is_substantial_change):

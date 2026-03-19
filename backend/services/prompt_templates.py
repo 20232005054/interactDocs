@@ -8,8 +8,7 @@ system_prompts = {
     "generate_chapters": "你是一个专业的临床试验方案辅助撰写助手。",
     "extract_keywords": "你是一个专业的关键词提取助手。",
     "generate_summary": "你是一个专业的临床研究方案摘要撰写助手。",
-    "analyze_summary_change": "你是一个专业的文本分析助手。",
-    "analyze_paragraph_change": "你是一个专业的文本分析助手。",
+    "analyze_content_change": "你是一个专业的文本分析助手。",
     "generate_summary_topics": "你是一个专业的临床研究方案摘要撰写助手。",
     "generate_chapter_structure": "你是一个专业的临床研究方案章节结构设计助手。",
     "generate_summary_titles": "你是一个专业的临床研究方案摘要标题设计助手。"
@@ -140,38 +139,7 @@ user_prompt_templates = {
 5. 直接输出摘要内容，使用纯文本格式
 6. 不要使用任何标题符号或格式标记
 """),
-    
-    "analyze_summary_change": Template("""
-请分析以下两段文本是否存在实质性变化：
 
-旧文本：
-{{ old_content }}
-
-新文本：
-{{ new_content }}
-
-判断标准：
-1. 如果只是表述方式不同但语义相同（如同义句），返回 False
-2. 如果存在概念、数字、条件等实质性变化，返回 True
-
-请直接返回 True 或 False，不要添加任何其他内容。
-"""),
-    
-    "analyze_paragraph_change": Template("""
-请分析以下两段段落文本是否存在实质性变化：
-
-旧文本：
-{{ old_content }}
-
-新文本：
-{{ new_content }}
-
-判断标准：
-1. 如果只是表述方式不同但语义相同（如同义句），返回 False
-2. 如果存在概念、数字、条件等实质性变化，返回 True
-
-请直接返回 True 或 False，不要添加任何其他内容。
-"""),
     
     "generate_summary_topics": Template("""
 请根据以下文档信息，生成4-6个不同的摘要主题：
@@ -220,6 +188,27 @@ user_prompt_templates = {
 3. 标题要符合{{ purpose }}的专业规范
 4. 直接输出标题列表，每个标题占一行
 5. 不要添加任何序号或其他格式标记
+"""),
+
+    "analyze_content_change": Template("""
+你是一位专业的文本分析专家。
+请比较以下两段文本，判断它们是否发生了实质性的语义变更。
+
+旧文本：
+{{ old_content }}
+
+新文本：
+{{ new_content }}
+
+判断标准：
+1. 如果只是格式、标点、空格的修改，不算实质性变更
+2. 如果只是个别字词的替换但意思不变，不算实质性变更
+3. 如果内容的核心含义、关键信息发生了变化，算实质性变更
+4. 如果添加了新的重要信息或删除了关键信息，算实质性变更
+
+请只回答 "true" 或 "false"：
+- "true" 表示发生了实质性变更
+- "false" 表示没有发生实质性变更
 """)
 }
 

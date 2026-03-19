@@ -7,8 +7,7 @@ from db.models import Paragraph
 from schemas.schemas import ParagraphCreate, ParagraphUpdate
 from uuid import UUID
 from fastapi import HTTPException
-import json
-from services.ai_service import call_qwen_stream
+from services.ai_service import is_substantial_change
 
 class ParagraphService:
     @staticmethod
@@ -49,7 +48,7 @@ class ParagraphService:
         # 检查内容是否发生实质性变更
         is_substantial_change = False
         if paragraph_in.content is not None:
-            is_substantial_change = await ParagraphService._is_substantial_change(
+            is_substantial_change = await is_substantial_change(
                 paragraph.content, paragraph_in.content
             )
         
@@ -148,43 +147,7 @@ class ParagraphService:
         # 保存新段落
         return await ParagraphMapper.create_paragraph(db, new_paragraph)
 
-    @staticmethod
-    async def _is_substantial_change(old_content, new_content):
-        """
-        检测段落内容是否发生实质性变更
-        """
-        # 初步筛选：检查是否有明显的非实质性变更
-        def normalize_content(content):
-            if isinstance(content, str):
-                # 移除多余空格和标点符号
-                import re
-                return re.sub(r'\s+', ' ', content).strip()
-            return content
-        
-        # 比较规范化后的内容
-        normalized_old = normalize_content(old_content)
-        normalized_new = normalize_content(new_content)
-        
-        if normalized_old == normalized_new:
-            return False
-        
-        # 使用AI判断是否为实质性语义变更
-        from services.prompt_templates import render_prompt, system_prompts
-        prompt = render_prompt(
-            "analyze_paragraph_change",
-            old_content=json.dumps(old_content, ensure_ascii=False),
-            new_content=json.dumps(new_content, ensure_ascii=False)
-        )
-        
-        response = ""
-        async for chunk in call_qwen_stream(
-            system_prompts["analyze_paragraph_change"],
-            [],
-            prompt
-        ):
-            response += chunk
-        
-        return response.strip().lower() == "true"
+
 
     @staticmethod
     async def _handle_paragraph_change(db: AsyncSession, paragraph_id: UUID, is_substantial_change):
@@ -220,7 +183,7 @@ class ParagraphService:
             raise HTTPException(status_code=400, detail="AI帮填结果不存在")
         
         # 检查内容是否发生实质性变更
-        is_substantial_change = await ParagraphService._is_substantial_change(
+        is_substantial_change = await is_substantial_change(
             paragraph.content, paragraph.ai_generate
         )
         

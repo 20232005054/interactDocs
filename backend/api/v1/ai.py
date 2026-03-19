@@ -1,15 +1,12 @@
 import json
-import uuid
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.session import get_db
 from db.models import Document, ChatRecord, Chapter
-from schemas.schemas import AIChatRequest, AIRevisionRequest, AIRevisionResponse
-from services.ai_service import call_qwen_stream, get_ai_revision
-from core.response import success_response
-from fastapi import HTTPException
+from schemas.schemas import AIChatRequest
+from services.ai_client import call_qwen_stream
 
 router = APIRouter(prefix="/api/v1/ai")
 
@@ -135,45 +132,3 @@ async def ai_chat_stream(request: AIChatRequest, db: AsyncSession = Depends(get_
 
     return StreamingResponse(chat_generator(), media_type="text/event-stream")
 
-
-@router.post("/revision", summary="AI 修订模式")
-async def ai_revision(request: AIRevisionRequest, db: AsyncSession = Depends(get_db)):
-    # 检查是否传入了选中的段落
-    if not request.selected_paragraphs or len(request.selected_paragraphs) != 1:
-        raise HTTPException(status_code=400, detail="修订模式只能传入一个段落")
-    
-    # 获取选中的段落
-    selected_paragraph = request.selected_paragraphs[0]
-    paragraph_content = selected_paragraph.get('content', '')
-    
-    if not paragraph_content:
-        raise HTTPException(status_code=400, detail="段落内容不能为空")
-    
-    # 构建修订指令，包含用户选中的信息
-    instruction_with_context = request.instruction
-    
-    # 添加用户选中的信息到修订指令
-    selected_paragraphs_text = f"段落：{paragraph_content}"
-    instruction_with_context += f"\n\n用户选中的段落：\n{selected_paragraphs_text}"
-    
-    if request.selected_keywords:
-        selected_keywords_text = ", ".join([k.get('keyword', '') for k in request.selected_keywords])
-        instruction_with_context += f"\n\n用户选中的关键词：{selected_keywords_text}"
-    
-    if request.selected_summaries:
-        selected_summaries_text = "\n".join([f"摘要 {i+1}：{s.get('title', '')} - {s.get('content', '')}" for i, s in enumerate(request.selected_summaries)])
-        instruction_with_context += f"\n\n用户选中的摘要：\n{selected_summaries_text}"
-    
-    # 将段落转换为Block Schema格式
-    chapter_content = [{
-        "id": selected_paragraph.get('paragraph_id', str(uuid.uuid4())),
-        "type": selected_paragraph.get('para_type', 'paragraph'),
-        "content": paragraph_content,
-        "metadata": {}
-    }]
-    
-    # 调用AI服务进行修订
-    revised_content = await get_ai_revision(chapter_content, instruction_with_context)
-    
-    # 只返回修订内容，不修改数据库
-    return success_response(data={"content": revised_content, "message": "修订成功"})

@@ -20,135 +20,24 @@ from sqlalchemy import select, update
 from db.models import Paragraph, Chapter, Document, DocumentKeyword
 from services.keyword_service import KeywordService
 
+from services.ai_client import call_qwen_stream
+
+from difflib import SequenceMatcher
+import re
+
 # 配置您的百炼 API Key
 # dashscope.api_key = "您的阿里云百炼API_KEY"
 
-# 通用通义千问流式调用函数
-async def call_qwen_stream(system_prompt: str, history: list, user_input: str):
-    """
-    通用通义千问流式调用函数
-    """
-    messages = [{'role': 'system', 'content': system_prompt}] + history + [{'role': 'user', 'content': user_input}]
-
-    responses = dashscope.Generation.call(
-        model='qwen-max',
-        messages=messages,
-        result_format='message',
-        stream=True,
-        incremental_output=True
-    )
-
-    for response in responses:
-        if response.status_code == HTTPStatus.OK:
-            yield response.output.choices[0]['message']['content']
-        else:
-            # 错误处理逻辑
-            error_msg = f"AI 调用失败: {response.message}"
-            yield f"Error: {error_msg}"
-
-# AI修订章节内容
-async def get_ai_revision(chapter_content: list, instruction: str):
-    """
-    调用百炼 Qwen 模型修订章节内容
-    """
-    # 将Block Schema格式转换为纯文本，支持嵌套的children结构
-    def convert_block_to_text(block, level=0):
-        text = ""
-        block_type = block.get('type')
-        content = block.get('content', '')
-        
-        if block_type == 'heading-1':
-            text += f"{'#' * 1} {content}\n\n"
-        elif block_type == 'heading-2':
-            text += f"{'#' * 2} {content}\n\n"
-        elif block_type == 'heading-3':
-            text += f"{'#' * 3} {content}\n\n"
-        elif block_type == 'paragraph':
-            text += f"{content}\n\n"
-        elif block_type == 'list':
-            items = block.get('items', [])
-            for item in items:
-                text += f"- {item}\n"
-            text += "\n"
-        
-        # 处理children
-        children = block.get('children', [])
-        for child in children:
-            text += convert_block_to_text(child, level + 1)
-        
-        return text
-    
-    # 转换所有block
-    text_content = ""
-    for block in chapter_content:
-        text_content += convert_block_to_text(block)
-
-    # 渲染提示词
-    prompt = render_prompt(
-        "revision",
-        instruction=instruction,
-        text_content=text_content
-    )
-
-    response = dashscope.Generation.call(
-        model='qwen-max',
-        messages=[
-            {'role': 'system', 'content': system_prompts["revision"]},
-            {'role': 'user', 'content': prompt}
-        ],
-        result_format='message'
-    )
-
-    if response.status_code == HTTPStatus.OK:
-        # 将修订后的纯文本转换回Block Schema格式
-        revised_text = response.output.choices[0]['message']['content']
-        
-        # 处理AI响应，移除[ACTION]指令和重复内容
-        if '[ACTION]' in revised_text:
-            parts = revised_text.split('[ACTION]')
-            revised_text = parts[0].strip()
-        
-        # 移除重复内容
-        lines = revised_text.split('\n')
-        seen_lines = set()
-        unique_lines = []
-        for line in lines:
-            line = line.strip()
-            if line and line not in seen_lines:
-                seen_lines.add(line)
-                unique_lines.append(line)
-        revised_text = ' '.join(unique_lines)
-        
-        # 这里简化处理，实际项目中可能需要更复杂的解析
-        # 简单将修订后的内容作为一个段落Block
-        revised_content = [{
-            "id": str(uuid.uuid4()),
-            "type": "paragraph",
-            "content": revised_text,
-            "metadata": {}
-        }]
-        return revised_content
-    else:
-        return chapter_content
-
 # AI帮填关键词
 async def ai_assist_keyword(db, document_id):
-    """
-    AI 帮填关键词
-    """
-    # 导入必要的模块
-    
-    
     # 获取文档信息
     document = await DocumentMapper.get_document_by_id(db, document_id)
     if not document:
         return []
-    
     # 渲染提示词
     prompt = render_prompt(
         "extract_keywords",
         title=document.title,
-        abstract=None,
         purpose=document.purpose
     )
     
@@ -160,6 +49,8 @@ async def ai_assist_keyword(db, document_id):
     ):
         response += chunk
     
+    print("------------------------------\n"+response+"\n------------------------------")
+
     # 解析关键词列表
     keywords = []
     for line in response.strip().split('\n'):
@@ -195,187 +86,233 @@ async def ai_assist_keyword(db, document_id):
     return saved_keywords
 
 # 定义AI帮填段落
-def ai_assist_paragraph(paragraph_id, assist_request):
-    """
-    AI 帮填段落内容
-    """
-    async def generate_and_save(db):
-   
+async def ai_assist_paragraph(db, paragraph_id, assist_request):
+    try:
+        # 1. 查询段落信息及其所属章节和文档的元数据，预加载关键词
+        result = await db.execute(
+            select(Paragraph, Chapter, Document)
+            .join(Chapter, Paragraph.chapter_id == Chapter.chapter_id)
+            .join(Document, Chapter.document_id == Document.document_id)
+            .options(joinedload(Document.keywords))
+            .where(Paragraph.paragraph_id == paragraph_id)
+        )
+        data = result.first()
+
+        if not data:
+            yield "data: {\"error\": \"段落或章节或文档不存在\"}\n\n"
+            return
+
+        target_paragraph, chapter, document = data
         
-        try:
-            # 1. 查询段落信息及其所属章节和文档的元数据，预加载关键词
-            result = await db.execute(
-                select(Paragraph, Chapter, Document)
-                .join(Chapter, Paragraph.chapter_id == Chapter.chapter_id)
-                .join(Document, Chapter.document_id == Document.document_id)
-                .options(joinedload(Document.keywords))
-                .where(Paragraph.paragraph_id == paragraph_id)
-            )
-            data = result.first()
+        # 检查段落类型，只有paragraph类型的段落才能使用AI帮填
+        if target_paragraph.para_type != "paragraph":
+            yield "data: {\"error\": \"只有正文类型的段落才能使用AI帮填功能\"}\n\n"
+            return
 
-            if not data:
-                yield "data: {\"error\": \"段落或章节或文档不存在\"}\n\n"
-                return
+        # 2. 提取当前段落的所有层级标题
+        hierarchy_titles = []
+        para_result = await db.execute(
+            select(Paragraph).where(Paragraph.chapter_id == chapter.chapter_id).order_by(Paragraph.order_index)
+        )
+        paragraphs = para_result.scalars().all()
+        
+        for para in paragraphs:
+            if para.para_type in ['heading-1', 'heading-2', 'heading-3']:
+                hierarchy_titles.append({
+                    "type": para.para_type,
+                    "content": para.content
+                })
+            if para.paragraph_id == paragraph_id:
+                break
 
-            target_paragraph, chapter, document = data
+        # 3. 获取摘要信息
+        summary_sections = None
+        used_summary_ids = []
+        
+        if assist_request.summary_sections:
+            # 根据用户传入的摘要ID列表获取对应的摘要内容
             
-            # 检查段落类型，只有paragraph类型的段落才能使用AI帮填
-            if target_paragraph.para_type != "paragraph":
-                yield "data: {\"error\": \"只有正文类型的段落才能使用AI帮填功能\"}\n\n"
-                return
-
-            # 2. 提取当前段落的所有层级标题
-            hierarchy_titles = []
-            para_result = await db.execute(
-                select(Paragraph).where(Paragraph.chapter_id == chapter.chapter_id).order_by(Paragraph.order_index)
-            )
-            paragraphs = para_result.scalars().all()
-            
-            for para in paragraphs:
-                if para.para_type in ['heading-1', 'heading-2', 'heading-3']:
-                    hierarchy_titles.append({
-                        "type": para.para_type,
-                        "content": para.content
-                    })
-                if para.paragraph_id == paragraph_id:
-                    break
-
-            # 3. 获取摘要信息
-            summary_sections = None
-            used_summary_ids = []
-            
-            if assist_request.summary_sections:
-                # 根据用户传入的摘要ID列表获取对应的摘要内容
-                
+            summaries = []
+            for summary_id in assist_request.summary_sections:
+                summary = await SummaryMapper.get_summary_by_id(db, summary_id)
+                if summary:
+                    summaries.append(f"{summary.title}：\n{summary.content}")
+                    used_summary_ids.append(summary_id)
+            if summaries:
+                summary_sections = "\n\n".join(summaries)
+        else:
+            # 不指定摘要时，获取文档的所有摘要
+            all_summaries = await SummaryService.get_summaries_by_document_id(db, document.document_id)
+            if all_summaries:
                 summaries = []
-                for summary_id in assist_request.summary_sections:
-                    summary = await SummaryMapper.get_summary_by_id(db, summary_id)
-                    if summary:
-                        summaries.append(f"{summary.title}：\n{summary.content}")
-                        used_summary_ids.append(summary_id)
+                for summary in all_summaries:
+                    summaries.append(f"{summary.title}：\n{summary.content}")
+                    used_summary_ids.append(str(summary.summary_id))
                 if summaries:
                     summary_sections = "\n\n".join(summaries)
+
+        # 4. 处理关键词
+        document_keywords = []
+        used_keyword_ids = []
+        all_keywords = []
+        
+        if assist_request.keywords:
+            # 根据用户传入的关键词ID列表获取对应的关键词内容
+            for keyword_id in assist_request.keywords:
+                keyword = await KeywordMapper.get_keyword_by_id(db, keyword_id)
+                if keyword:
+                    document_keywords.append(keyword.keyword)
+                    used_keyword_ids.append(keyword_id)
+        else:
+            # 不指定关键词时，收集所有关键词用于AI生成和后续匹配
+            if document.keywords:
+                for keyword in document.keywords:
+                    document_keywords.append(keyword.keyword)
+                    all_keywords.append((keyword.keyword, str(keyword.keyword_id)))
+
+        # 获取流式输出内容
+        chapter_title = chapter.title
+        full_content = ""
+        
+        # 渲染提示词
+        prompt = render_prompt(
+            "assist",
+            title=document.title,
+            keywords=", ".join(document_keywords),
+            chapter_title=chapter_title,
+            hierarchy_titles=hierarchy_titles,
+            summary_sections=summary_sections,
+            current_content=target_paragraph.content
+        )
+
+        responses = dashscope.Generation.call(
+            model='qwen-max',  # 或者使用 qwen-plus
+            messages=[
+                {'role': 'system', 'content': system_prompts["assist"]},
+                {'role': 'user', 'content': prompt}
+            ],
+            result_format='message',
+            stream=True,
+            incremental_output=True
+        )
+
+        for response in responses:
+            if response.status_code == HTTPStatus.OK:
+                content = response.output.choices[0]['message']['content']
+                # 封装为前端易读的 SSE 格式
+                chunk = f"data: {json.dumps({'content': content})}\n\n"
+                full_content += content
+                yield chunk
             else:
-                # 不指定摘要时，获取文档的所有摘要
-                all_summaries = await SummaryService.get_summaries_by_document_id(db, document.document_id)
-                if all_summaries:
-                    summaries = []
-                    for summary in all_summaries:
-                        summaries.append(f"{summary.title}：\n{summary.content}")
-                        used_summary_ids.append(str(summary.summary_id))
-                    if summaries:
-                        summary_sections = "\n\n".join(summaries)
+                chunk = f"data: {json.dumps({'error': 'AI 生成失败'})}\n\n"
+                yield chunk
 
-            # 4. 处理关键词
-            document_keywords = []
-            used_keyword_ids = []
-            all_keywords = []
-            
-            if assist_request.keywords:
-                # 根据用户传入的关键词ID列表获取对应的关键词内容
-                for keyword_id in assist_request.keywords:
-                    keyword = await KeywordMapper.get_keyword_by_id(db, keyword_id)
-                    if keyword:
-                        document_keywords.append(keyword.keyword)
-                        used_keyword_ids.append(keyword_id)
-            else:
-                # 不指定关键词时，收集所有关键词用于AI生成和后续匹配
-                if document.keywords:
-                    for keyword in document.keywords:
-                        document_keywords.append(keyword.keyword)
-                        all_keywords.append((keyword.keyword, str(keyword.keyword_id)))
-
-            # 获取流式输出内容
-            chapter_title = chapter.title
-            full_content = ""
-            
-            # 渲染提示词
-            prompt = render_prompt(
-                "assist",
-                title=document.title,
-                keywords=", ".join(document_keywords),
-                chapter_title=chapter_title,
-                hierarchy_titles=hierarchy_titles,
-                summary_sections=summary_sections,
-                current_content=target_paragraph.content
+        # 流结束后，将最终内容存入数据库
+        from sqlalchemy import update
+        await db.execute(
+            update(Paragraph)
+            .where(Paragraph.paragraph_id == paragraph_id)
+            .values(
+                ai_generate=full_content
             )
+        )
+        await db.commit()
 
-            responses = dashscope.Generation.call(
-                model='qwen-max',  # 或者使用 qwen-plus
-                messages=[
-                    {'role': 'system', 'content': system_prompts["assist"]},
-                    {'role': 'user', 'content': prompt}
-                ],
-                result_format='message',
-                stream=True,
-                incremental_output=True
-            )
-
-            for response in responses:
-                if response.status_code == HTTPStatus.OK:
-                    content = response.output.choices[0]['message']['content']
-                    # 封装为前端易读的 SSE 格式
-                    chunk = f"data: {json.dumps({'content': content})}\n\n"
-                    full_content += content
-                    yield chunk
-                else:
-                    chunk = f"data: {json.dumps({'error': 'AI 生成失败'})}\n\n"
-                    yield chunk
-
-            # 流结束后，将最终内容存入数据库
-            from sqlalchemy import update
-            await db.execute(
-                update(Paragraph)
-                .where(Paragraph.paragraph_id == paragraph_id)
-                .values(
-                    ai_generate=full_content
-                )
-            )
-            await db.commit()
-
-            # 建立段落与摘要的关联
-            if used_summary_ids:
-                for summary_id_str in used_summary_ids:
-                    try:
-                        from db.mappers.summary_mapper import SummaryMapper
-                        summary_id = uuid.UUID(summary_id_str)
-                        summary = await SummaryMapper.get_summary_by_id(db, summary_id)
-                        if summary:
-                            from services.summary_service import SummaryService
-                            await SummaryService.create_paragraph_summary_link(
-                                db, paragraph_id, summary.summary_id
-                            )
-                    except Exception as e:
-                        print(f"创建摘要关联失败: {e}")
-                        pass
-
-            # 建立段落与关键词的关联
-            local_used_keyword_ids = used_keyword_ids.copy()
-            
-            # 如果用户未指定关键词，根据生成的内容进行字符串匹配
-            if not assist_request.keywords and all_keywords:
-                for keyword, keyword_id_str in all_keywords:
-                    if keyword in full_content:
-                        local_used_keyword_ids.append(keyword_id_str)
-            
-            if local_used_keyword_ids:
-                for keyword_id_str in local_used_keyword_ids:
-                    try:
-                        keyword_id = uuid.UUID(keyword_id_str)
-                        await KeywordService.create_keyword_paragraph_link(
-                            db, keyword_id, paragraph_id
+        # 建立段落与摘要的关联
+        if used_summary_ids:
+            for summary_id_str in used_summary_ids:
+                try:
+                    from db.mappers.summary_mapper import SummaryMapper
+                    summary_id = uuid.UUID(summary_id_str)
+                    summary = await SummaryMapper.get_summary_by_id(db, summary_id)
+                    if summary:
+                        from services.summary_service import SummaryService
+                        await SummaryService.create_paragraph_summary_link(
+                            db, paragraph_id, summary.summary_id
                         )
-                    except Exception as e:
-                        print(f"创建关键词关联失败: {e}")
-                        pass
+                except Exception as e:
+                    print(f"创建摘要关联失败: {e}")
+                    pass
 
-            # 发送结束标识
-            yield "data: [DONE]\n\n"
-        except Exception as e:
-            print(f"AI 帮填失败: {e}")
-            yield f"data: {{\"error\": \"AI 帮填失败\"}}\n\n"
+        # 建立段落与关键词的关联
+        local_used_keyword_ids = used_keyword_ids.copy()
+        
+        # 如果用户未指定关键词，根据生成的内容进行字符串匹配
+        if not assist_request.keywords and all_keywords:
+            for keyword, keyword_id_str in all_keywords:
+                if keyword in full_content:
+                    local_used_keyword_ids.append(keyword_id_str)
+        
+        if local_used_keyword_ids:
+            for keyword_id_str in local_used_keyword_ids:
+                try:
+                    keyword_id = uuid.UUID(keyword_id_str)
+                    await KeywordService.create_keyword_paragraph_link(
+                        db, keyword_id, paragraph_id
+                    )
+                except Exception as e:
+                    print(f"创建关键词关联失败: {e}")
+                    pass
 
-    return generate_and_save
+        # 发送结束标识
+        yield "data: [DONE]\n\n"
+    except Exception as e:
+        print(f"AI 帮填失败: {e}")
+        yield f"data: {{\"error\": \"AI 帮填失败\"}}\n\n"
+
+
+# 检查内容是否发生实质性变更
+async def is_substantial_change(old_content: str, new_content: str) -> bool:
+    """
+    检测内容是否发生实质性变更
+    适用于段落、摘要等文本内容的变更检测
+    采用多层判断策略，尽可能减少AI调用
+    """
+    # --- 第一层：规范化比较 ---
+    def advanced_normalize(content):
+        """高级规范化：移除多余空格、标点符号，统一大小写"""
+        if isinstance(content, str):
+            text = re.sub(r'\s+', ' ', content) # 移除多余空格和换行
+            text = re.sub(r'[^\w\s]', '', text) # 移除标点符号
+            text = text.lower().strip() # 统一小写
+            return text
+        return content
+    
+    norm_old = advanced_normalize(old_content)
+    norm_new = advanced_normalize(new_content)
+    
+    if norm_old == norm_new:
+        return False    # 规范化后完全相同，说明只是格式变化
+    
+    len_old, len_new = len(norm_old), len(norm_new)
+    if len_old > 0:
+        change_rate = abs(len_new - len_old) / len_old
+        if change_rate > 0.4:  # 长度变化超过40%，肯定是实质性变更
+            return True
+    
+    similarity = SequenceMatcher(None, norm_old, norm_new).ratio()
+    if similarity > 0.9:    # 如果相似度在 90% 以上，通常只是修饰词、标点或错别字
+        return False
+        
+    # --- 最后一层：AI 兜底 ---
+    prompt = render_prompt(
+        "analyze_content_change",
+        old_content=json.dumps(old_content, ensure_ascii=False),
+        new_content=json.dumps(new_content, ensure_ascii=False)
+    )
+    
+    response = ""
+    async for chunk in call_qwen_stream(
+        system_prompts["analyze_content_change"],
+        [],
+        prompt
+    ):
+        response += chunk
+
+    print("--------------------------------\n"+response+"\n--------------------------------")
+    
+    return response.strip().lower() == "true"
+
 
 # AI评估段落内容
 def ai_evaluate_paragraph(paragraph_id):

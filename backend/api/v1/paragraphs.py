@@ -131,16 +131,9 @@ async def ai_assist_paragraph(paragraph_id: UUID, assist_request: AIAssistReques
     AI 帮填段落内容
     """
     try:
-        # 调用服务层方法获取生成器函数
-        generate_and_save_func = ai_service.ai_assist_paragraph(paragraph_id, assist_request)
-        
-        # 调用生成器函数，传入数据库会话
-        async def generate_content():
-            async for chunk in generate_and_save_func(db):
-                yield chunk
-        
+        # 直接调用服务层方法，传入数据库会话
         return StreamingResponse(
-            generate_content(),
+            ai_service.ai_assist_paragraph(db, paragraph_id, assist_request),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
