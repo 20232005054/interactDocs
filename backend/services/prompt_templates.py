@@ -139,7 +139,6 @@ user_prompt_templates = {
 5. 直接输出摘要内容，使用纯文本格式
 6. 不要使用任何标题符号或格式标记
 """),
-
     
     "generate_summary_topics": Template("""
 请根据以下文档信息，生成4-6个不同的摘要主题：

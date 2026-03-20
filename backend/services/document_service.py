@@ -107,14 +107,18 @@ class DocumentService:
         if not document:
             raise HTTPException(status_code=404, detail="文档不存在")
         
-        # 确保每个变量都有 order_index
+        # 将 Pydantic 模型转换为字典列表
+        variables_dict = []
         for i, var in enumerate(global_variables):
-            if "order_index" not in var:
-                var["order_index"] = i
+            var_dict = var.dict() if hasattr(var, 'dict') else var
+            # 确保每个变量都有 order_index
+            if var_dict.get("order_index") is None:
+                var_dict["order_index"] = i
+            variables_dict.append(var_dict)
         
         # 更新 content 字段
         content = document.content or {}
-        content["global_variables"] = global_variables
+        content["global_variables"] = variables_dict
         
         await DocumentMapper.update_document(db, document_id, {"content": content})
         updated_document = await DocumentMapper.get_document_by_id(db, document_id)
@@ -130,6 +134,9 @@ class DocumentService:
         if not document:
             raise HTTPException(status_code=404, detail="文档不存在")
         
+        # 将 Pydantic 模型转换为字典
+        var_dict = variable.dict() if hasattr(variable, 'dict') else variable
+        
         # 获取现有全局变量
         content = document.content or {}
         global_variables = content.get("global_variables", [])
@@ -137,12 +144,12 @@ class DocumentService:
         # 计算新变量的 order_index
         if global_variables:
             max_order = max(var.get("order_index", 0) for var in global_variables)
-            variable["order_index"] = max_order + 1
+            var_dict["order_index"] = max_order + 1
         else:
-            variable["order_index"] = 0
+            var_dict["order_index"] = 0
         
         # 添加新变量
-        global_variables.append(variable)
+        global_variables.append(var_dict)
         content["global_variables"] = global_variables
         
         # 更新文档

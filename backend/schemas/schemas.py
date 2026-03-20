@@ -59,6 +59,22 @@ class DocumentUpdate(BaseModel):
     template_id: Optional[UUID] = Field(None, description="模板ID")
 
 
+# --- 全局变量相关 (GlobalVariable) ---
+class GlobalVariable(BaseModel):
+    """全局变量模型"""
+    key: str = Field(..., description="变量名")
+    value: str = Field(..., description="变量值")
+    type: Optional[str] = Field(None, description="变量类型")
+    description: Optional[str] = Field(None, description="变量描述")
+    is_locked: Optional[bool] = Field(False, description="是否锁定")
+    order_index: Optional[int] = Field(None, description="排序索引")
+
+
+class GlobalVariablesUpdate(BaseModel):
+    """更新全局变量请求模型"""
+    variables: List[GlobalVariable] = Field(..., description="全局变量列表")
+
+
 # --- 章节相关 (Chapter) ---
 class ParagraphBase(BaseModel):
     content: str = Field(..., description="文本内容")

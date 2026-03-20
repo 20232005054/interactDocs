@@ -1,10 +1,9 @@
-from schemas.schemas import DocumentKeywordUpdate
 import dashscope
 from http import HTTPStatus
 import json
 import uuid
 
-from schemas.schemas import DocumentSummaryCreate,ParagraphCreate
+from schemas.schemas import DocumentSummaryCreate,ParagraphCreate, DocumentKeywordUpdate
 from db.mappers.summary_mapper import SummaryMapper
 from db.mappers.document_mapper import DocumentMapper
 from sqlalchemy.orm import joinedload
@@ -16,9 +15,8 @@ from db.mappers.paragraph_mapper import ParagraphMapper
 from services.prompt_templates import render_prompt, system_prompts
 from fastapi import HTTPException
 
-from sqlalchemy import select, update
-from db.models import Paragraph, Chapter, Document, DocumentKeyword
-from services.keyword_service import KeywordService
+from sqlalchemy import select, update, func
+from db.models import Paragraph, Chapter, Document, DocumentKeyword, DocumentSummary
 
 from services.ai_client import call_qwen_stream
 
@@ -26,6 +24,7 @@ from difflib import SequenceMatcher
 import re
 
 from services.dependency_service import DependencyService
+from db.mappers.template_mapper import TemplateMapper
 
 # 配置您的百炼 API Key
 # dashscope.api_key = "您的阿里云百炼API_KEY"
@@ -87,8 +86,18 @@ async def ai_assist_keyword(db, document_id):
     
     return saved_keywords
 
-# 定义AI帮填段落
-async def ai_assist_paragraph(db, paragraph_id, assist_request):
+# AI帮填段落
+async def ai_assist_paragraph(db, paragraph_id, assist_request, upstream_summary: dict = None):
+    """
+    AI帮填段落
+    
+    Args:
+        db: 数据库会话
+        paragraph_id: 段落ID
+        assist_request: 帮填请求参数
+        upstream_summary: 上游依赖的摘要信息（可选），当摘要发生变动时传入
+            格式: {"summary_id": str, "title": str, "content": str}
+    """
     try:
         # 1. 查询段落信息及其所属章节和文档的元数据，预加载关键词
         result = await db.execute(
@@ -100,16 +109,7 @@ async def ai_assist_paragraph(db, paragraph_id, assist_request):
         )
         data = result.first()
 
-        if not data:
-            yield "data: {\"error\": \"段落或章节或文档不存在\"}\n\n"
-            return
-
         target_paragraph, chapter, document = data
-        
-        # 检查段落类型，只有paragraph类型的段落才能使用AI帮填
-        if target_paragraph.para_type != "paragraph":
-            yield "data: {\"error\": \"只有正文类型的段落才能使用AI帮填功能\"}\n\n"
-            return
 
         # 2. 提取当前段落的所有层级标题
         hierarchy_titles = []
@@ -131,9 +131,13 @@ async def ai_assist_paragraph(db, paragraph_id, assist_request):
         summary_sections = None
         used_summary_ids = []
         
-        if assist_request.summary_sections:
+        # 如果传入了上游变动摘要，优先使用变动摘要的信息
+        if upstream_summary:
+            # 使用变动摘要生成段落
+            summary_sections = f"{upstream_summary.get('title', '')}：\n{upstream_summary.get('content', '')}"
+            used_summary_ids.append(upstream_summary.get('summary_id'))
+        elif assist_request.summary_sections:
             # 根据用户传入的摘要ID列表获取对应的摘要内容
-            
             summaries = []
             for summary_id in assist_request.summary_sections:
                 summary = await SummaryMapper.get_summary_by_id(db, summary_id)
@@ -210,7 +214,7 @@ async def ai_assist_paragraph(db, paragraph_id, assist_request):
                 yield chunk
 
         # 流结束后，将最终内容存入数据库
-        from sqlalchemy import update
+
         await db.execute(
             update(Paragraph)
             .where(Paragraph.paragraph_id == paragraph_id)
@@ -224,7 +228,7 @@ async def ai_assist_paragraph(db, paragraph_id, assist_request):
         if used_summary_ids:
             for summary_id_str in used_summary_ids:
                 try:
-                    from db.mappers.summary_mapper import SummaryMapper
+
                     summary_id = uuid.UUID(summary_id_str)
                     summary = await SummaryMapper.get_summary_by_id(db, summary_id)
                     if summary:
@@ -249,7 +253,7 @@ async def ai_assist_paragraph(db, paragraph_id, assist_request):
                 try:
                     keyword_id = uuid.UUID(keyword_id_str)
                     
-                    from db.mappers.keyword_mapper import KeywordMapper
+
                     keyword = await KeywordMapper.get_keyword_by_id(db, keyword_id)
                     if keyword:
                         await DependencyService.create_dependency_edge(
@@ -264,7 +268,6 @@ async def ai_assist_paragraph(db, paragraph_id, assist_request):
     except Exception as e:
         print(f"AI 帮填失败: {e}")
         yield f"data: {{\"error\": \"AI 帮填失败\"}}\n\n"
-
 
 # 检查内容是否发生实质性变更
 async def is_substantial_change(old_content: str, new_content: str) -> bool:
@@ -482,7 +485,7 @@ async def generate_chapter_content_stream(db, chapter_id):
         summary_info += f"摘要标题：{summary.title}\n摘要内容：{summary.content}\n\n"
     
     # 获取文档模板
-    from db.mappers.template_mapper import TemplateMapper
+
     templates = await TemplateMapper.list_templates(
         db, 
         purpose=document.purpose,
@@ -568,7 +571,7 @@ async def generate_chapter_content_stream(db, chapter_id):
             para_type=section['type'],
             order_index=paragraph_order
         )
-        from db.models import Paragraph
+
         section_paragraph_obj = Paragraph(
             chapter_id=chapter_id,
             content=section_paragraph_in.content,
@@ -754,7 +757,6 @@ async def generate_all_summaries(db, document_id):
     
     if document.purpose:
         # 查询数据库中对应目的的模板
-        from db.mappers.template_mapper import TemplateMapper
         templates = await TemplateMapper.list_templates(
             db, 
             purpose=document.purpose,
@@ -879,7 +881,6 @@ async def generate_all_summaries(db, document_id):
                 "content": response.strip(),
                 "version": existing_summary.version + 1
             }
-            from db.mappers.summary_mapper import SummaryMapper
             updated_summary = await SummaryMapper.update_summary(db, existing_summary.summary_id, update_data)
             summary_ids.append(updated_summary.summary_id)
         else:
@@ -893,7 +894,7 @@ async def generate_all_summaries(db, document_id):
             # 计算order_index
             order_index = summary_in.order_index
             if order_index is None:
-                from sqlalchemy import func, select
+
                 count_result = await db.execute(
                     select(func.count(DocumentSummary.summary_id))
                     .where(DocumentSummary.document_id == summary_in.document_id)
@@ -902,7 +903,6 @@ async def generate_all_summaries(db, document_id):
                 order_index = count
             
             # 创建新摘要对象
-            from db.models import DocumentSummary
             new_summary = DocumentSummary(
                 document_id=summary_in.document_id,
                 title=summary_in.title,
@@ -912,13 +912,11 @@ async def generate_all_summaries(db, document_id):
             )
             
             # 保存到数据库
-            from db.mappers.summary_mapper import SummaryMapper
             updated_summary = await SummaryMapper.create_summary(db, new_summary)
             summary_ids.append(updated_summary.summary_id)
     
     # 统一更新所有摘要的order_index
-    from sqlalchemy import update
-    from db.models import DocumentSummary
+
     for i, summary_id in enumerate(summary_ids):
         await db.execute(
             update(DocumentSummary)
@@ -939,16 +937,13 @@ async def generate_all_summaries(db, document_id):
     for summary in updated_summaries:
         # 建立摘要与关键词的关联 - 根据摘要内容与关键词进行字符串匹配
         if used_keyword_ids:
-            from services.keyword_service import KeywordService
-            from uuid import UUID
-            from db.mappers.keyword_mapper import KeywordMapper
             
             # 获取摘要内容
             summary_content = summary.content.lower() if summary.content else ""
             
             for keyword_id_str in used_keyword_ids:
                 try:
-                    keyword_id = UUID(keyword_id_str)
+                    keyword_id = uuid.UUID(keyword_id_str)
                     # 获取关键词信息
                     keyword = await KeywordMapper.get_keyword_by_id(db, keyword_id)
                     if keyword:
@@ -977,9 +972,21 @@ async def generate_all_summaries(db, document_id):
     return generated_summaries
 
 # AI帮填单个摘要
-async def assist_single_summary(db, summary_id):
+async def assist_single_summary(db, summary_id, downstream_paragraph: dict = None):
     """
     帮填单个摘要
+    
+    Args:
+        db: 数据库会话
+        summary_id: 摘要ID
+        downstream_paragraph: 下游被依赖的段落信息（可选），当段落发生变动时传入
+            格式: {
+                "paragraph_id": str,
+                "content": str,
+                "chapter_title": str,
+                "hierarchy_titles": list
+            }
+    
     根据摘要状态自动判断帮填场景：
     - 场景1：无标题无内容 → AI帮填标题和内容
     - 场景2：有标题无内容 → AI只填内容
@@ -1025,6 +1032,15 @@ async def assist_single_summary(db, summary_id):
         }
     }
     
+    # 如果传入了下游变动段落信息，添加到数据中
+    if downstream_paragraph:
+        summary_data["downstream_paragraph"] = {
+            "paragraph_id": downstream_paragraph.get("paragraph_id"),
+            "content": downstream_paragraph.get("content", ""),
+            "chapter_title": downstream_paragraph.get("chapter_title", ""),
+            "hierarchy_titles": downstream_paragraph.get("hierarchy_titles", [])
+        }
+    
     # 构建统一的提示词
     prompt = render_prompt(
         "assist_summary",
@@ -1033,7 +1049,6 @@ async def assist_single_summary(db, summary_id):
     
     # 调用AI生成内容
     response = ""
-    from services.prompt_templates import system_prompts
     async for chunk in call_qwen_stream(
         system_prompts["generate_summary"],
         [],
@@ -1076,8 +1091,7 @@ async def assist_single_summary(db, summary_id):
     
     # 建立摘要与关键词的关联 - 根据摘要内容与关键词进行字符串匹配
     if document.keywords:
-        from services.keyword_service import KeywordService
-        from db.mappers.keyword_mapper import KeywordMapper
+
         
         # 获取摘要内容（使用ai_generate，因为这是最新生成的内容）
         summary_content = updated_summary.ai_generate.lower() if updated_summary.ai_generate else ""

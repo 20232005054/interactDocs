@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
-from schemas.schemas import DocumentCreate, DocumentUpdate, SnapshotUpdate
+from schemas.schemas import DocumentCreate, DocumentUpdate, SnapshotUpdate, GlobalVariablesUpdate, GlobalVariable
 from core.response import success_response
 from db.session import get_db
 
@@ -124,12 +124,41 @@ async def get_global_variables(document_id: UUID, db: AsyncSession = Depends(get
     return success_response(data=variables)
 
 @router.put("/{document_id}/global-variables", summary="更新文档全局变量")
-async def update_global_variables(document_id: UUID, variables: list, db: AsyncSession = Depends(get_db)):
-    updated_variables = await DocumentService.update_global_variables(db, document_id, variables)
+async def update_global_variables(document_id: UUID, update_data: GlobalVariablesUpdate, db: AsyncSession = Depends(get_db)):
+    """
+    更新文档全局变量
+    
+    请求体示例：
+    {
+        "variables": [
+            {
+                "key": "研究名称",
+                "value": "临床试验A",
+                "type": "string",
+                "description": "研究项目名称",
+                "is_locked": false,
+                "order_index": 0
+            }
+        ]
+    }
+    """
+    updated_variables = await DocumentService.update_global_variables(db, document_id, update_data.variables)
     return success_response(data=updated_variables)
 
 @router.post("/{document_id}/global-variables", summary="添加全局变量")
-async def add_global_variable(document_id: UUID, variable: dict, db: AsyncSession = Depends(get_db)):
+async def add_global_variable(document_id: UUID, variable: GlobalVariable, db: AsyncSession = Depends(get_db)):
+    """
+    添加全局变量
+    
+    请求体示例：
+    {
+        "key": "研究名称",
+        "value": "临床试验A",
+        "type": "string",
+        "description": "研究项目名称",
+        "is_locked": false
+    }
+    """
     updated_variables = await DocumentService.add_global_variable(db, document_id, variable)
     return success_response(data=updated_variables)
 

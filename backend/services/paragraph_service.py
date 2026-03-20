@@ -7,6 +7,8 @@ from db.models import Paragraph
 from schemas.schemas import ParagraphCreate, ParagraphUpdate
 from uuid import UUID
 from fastapi import HTTPException
+from sqlalchemy import select
+from db.models import Chapter, Document
 
 class ParagraphService:
     @staticmethod
@@ -45,9 +47,10 @@ class ParagraphService:
             raise HTTPException(status_code=404, detail="段落不存在")
         
         # 检查内容是否发生实质性变更
-        is_substantial_change = False
+        is_change = False
+        from services.ai_service import is_substantial_change
         if paragraph_in.content is not None:
-            is_substantial_change = await is_substantial_change(
+            is_change = await is_substantial_change(
                 paragraph.content, paragraph_in.content
             )
         
@@ -65,13 +68,13 @@ class ParagraphService:
             update_data["ai_suggestion"] = paragraph_in.ai_suggestion
         
         # 如果发生实质性变更，更新ischange字段
-        if is_substantial_change:
+        if is_change:
             update_data["ischange"] = 1
         
         await ParagraphMapper.update_paragraph(db, paragraph_id, update_data)
         
         # 处理段落变更时的摘要更新
-        await ParagraphService._handle_paragraph_change(db, paragraph_id, is_substantial_change)
+        await ParagraphService._handle_paragraph_change(db, paragraph_id, is_change)
         
         return await ParagraphMapper.get_paragraph_by_id(db, paragraph_id)
 
@@ -150,6 +153,7 @@ class ParagraphService:
     async def _handle_paragraph_change(db: AsyncSession, paragraph_id: UUID, is_substantial_change):
         """
         处理段落变更时的摘要更新
+        当段落发生实质变更时，调用AI重新生成依赖该段落的摘要内容
         """
         if not is_substantial_change:
             return
@@ -159,12 +163,59 @@ class ParagraphService:
             db, "paragraph", paragraph_id, "summary"
         )
         
+        # 获取段落信息及其所属章节和文档的元数据
+        result = await db.execute(
+            select(Paragraph, Chapter, Document)
+            .join(Chapter, Paragraph.chapter_id == Chapter.chapter_id)
+            .join(Document, Chapter.document_id == Document.document_id)
+            .where(Paragraph.paragraph_id == paragraph_id)
+        )
+        data = result.first()
+        if not data:
+            return
+        
+        target_paragraph, chapter, _ = data
+        
+        # 提取当前段落的所有层级标题
+        hierarchy_titles = []
+        para_result = await db.execute(
+            select(Paragraph).where(Paragraph.chapter_id == chapter.chapter_id).order_by(Paragraph.order_index)
+        )
+        paragraphs = para_result.scalars().all()
+        
+        for para in paragraphs:
+            if para.para_type in ['heading-1', 'heading-2', 'heading-3']:
+                hierarchy_titles.append({
+                    "type": para.para_type,
+                    "content": para.content
+                })
+            if para.paragraph_id == paragraph_id:
+                break
+        
+        # 构建下游段落信息
+        downstream_paragraph = {
+            "paragraph_id": str(target_paragraph.paragraph_id),
+            "content": target_paragraph.content,
+            "chapter_title": chapter.title,
+            "hierarchy_titles": hierarchy_titles
+        }
+        
         for edge in edges:
-            # 获取摘要详情
-            summary = await SummaryMapper.get_summary_by_id(db, edge.target_id)
-            if summary:
-                # 更新摘要的is_change字段为1，表示关联段落发生了实质变更
-                await SummaryMapper.update_summary(db, summary.summary_id, {"is_change": 1})
+            summary_id = edge.target_id
+            
+            try:
+                # 调用AI帮填摘要，传入变更的段落信息作为下游依赖
+                from services.ai_service import assist_single_summary
+                
+                await assist_single_summary(db, summary_id, downstream_paragraph)
+                
+                # 更新摘要的is_change字段为3，表示因下游段落变更而需要更新
+                await SummaryMapper.update_summary(db, summary_id, {"is_change": 3})
+                
+            except Exception as e:
+                print(f"处理段落变更时更新摘要失败: {e}")
+                # 即使AI生成失败，也要标记摘要需要更新
+                await SummaryMapper.update_summary(db, summary_id, {"is_change": 3})
     
     @staticmethod
     async def apply_ai_assist_result(db: AsyncSession, paragraph_id: UUID):
@@ -179,23 +230,14 @@ class ParagraphService:
         if not paragraph.ai_generate:
             raise HTTPException(status_code=400, detail="AI帮填结果不存在")
         
-        # 检查内容是否发生实质性变更
-        from services.ai_service import is_substantial_change
-        is_schange = await is_substantial_change(
-            paragraph.content, paragraph.ai_generate
-        )
-        
-        # 构建更新数据
+        # 构建更新数据：将ai_generate内容填充到content，ischange置0
         update_data = {
             "content": paragraph.ai_generate,
-            "ischange": 1  # 标记为已变更
+            "ischange": 0  # 重置为无变更状态
         }
         
         # 更新段落
         await ParagraphMapper.update_paragraph(db, paragraph_id, update_data)
-        
-        # 处理段落变更时的摘要更新
-        await ParagraphService._handle_paragraph_change(db, paragraph_id, is_schange)
         
         # 返回更新后的段落
         return await ParagraphMapper.get_paragraph_by_id(db, paragraph_id)

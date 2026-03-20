@@ -6,6 +6,7 @@ from schemas.schemas import DocumentSummaryUpdate
 from uuid import UUID
 from sqlalchemy import func, select, update
 from fastapi import HTTPException
+from db.mappers.paragraph_mapper import ParagraphMapper
 
 
 class SummaryService:
@@ -148,7 +149,7 @@ class SummaryService:
         # 构建更新数据
         update_data = {
             "content": summary.ai_generate,
-            "is_change": 1  # 标记为已变更
+            "is_change": 0  # 标记为已变更
         }
         
         # 更新摘要
@@ -163,25 +164,64 @@ class SummaryService:
     async def _handle_summary_change(db: AsyncSession, old_summary: DocumentSummary, new_summary: DocumentSummary, is_substantial_change):
         """
         处理摘要变更时的段落更新
+        当摘要发生实质变更时，调用AI重新生成依赖该摘要的段落内容
         """
         if not is_substantial_change:
             return
         
-        # 获取与旧摘要关联的段落（通过DependencyEdge表）
+        # 获取与摘要关联的段落（通过DependencyEdge表）
         edges = await DependencyEdgeMapper.get_edges_by_target(
             db, "summary", old_summary.summary_id
         )
         
+        # 在函数内部导入，避免循环导入
+        from services.ai_service import ai_assist_paragraph
+        from schemas.schemas import AIAssistRequest
+        
         for edge in edges:
-            # 更新依赖边的目标ID和版本
-            await DependencyEdgeMapper.update_edge(db, edge.edge_id, {
-                "target_id": new_summary.summary_id,
-                "target_version": new_summary.version
-            })
+            paragraph_id = edge.source_id
             
-            # 更新段落的ischange字段为1，表示关联摘要发生了实质变更
-            from db.mappers.paragraph_mapper import ParagraphMapper
-            await ParagraphMapper.update_paragraph(db, edge.source_id, {"ischange": 1})
+            # 调用AI帮填段落，传入变更的摘要信息作为上游依赖
+            # 构建上游摘要信息
+            upstream_summary = {
+                "summary_id": str(new_summary.summary_id),
+                "title": new_summary.title,
+                "content": new_summary.content
+            }
+            
+            # 创建帮填请求（不指定特定摘要，让AI使用upstream_summary）
+            assist_request = AIAssistRequest()
+            
+            try:
+                # 调用AI生成段落内容
+                full_content = ""
+                async for chunk in ai_assist_paragraph(db, paragraph_id, assist_request, upstream_summary):
+                    # 解析SSE格式的数据
+                    if chunk.startswith("data: "):
+                        import json
+                        data_str = chunk[6:].strip()
+                        if data_str == "[DONE]":
+                            break
+                        try:
+                            data = json.loads(data_str)
+                            if "content" in data:
+                                full_content += data["content"]
+                        except json.JSONDecodeError:
+                            pass
+                
+                # 更新段落的ai_generate和ischange字段
+                # ischange=2 表示因上游摘要变更而需要更新
+
+                await ParagraphMapper.update_paragraph(db, paragraph_id, {
+                    "ai_generate": full_content,
+                    "ischange": 2
+                })
+                
+            except Exception as e:
+                print(f"处理摘要变更时更新段落失败: {e}")
+                # 即使AI生成失败，也要标记段落需要更新
+
+                await ParagraphMapper.update_paragraph(db, paragraph_id, {"ischange": 2})
     @staticmethod
     async def get_summary_related_paragraphs(db: AsyncSession, summary_id: UUID):
         """
