@@ -121,16 +121,6 @@ class ChatRecord(Base):
     document = relationship("Document", back_populates="chat_records")
     chapter = relationship("Chapter")
 
-class AIEvaluation(Base):
-    __tablename__ = "ai_evaluations"
-    evaluation_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    chapter_id = Column(UUID(as_uuid=True), ForeignKey("chapters.chapter_id"))
-    evaluation_result = Column(Text, nullable=False)
-    suggestions = Column(ARRAY(Text), nullable=False)
-    created_at = Column(TIMESTAMP, server_default=func.now())
-
-    chapter = relationship("Chapter")
-
 class DocumentSummary(Base):
     __tablename__ = "document_summaries"
     summary_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

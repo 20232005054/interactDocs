@@ -1,179 +1,203 @@
-# 方案生成系统后端
+# InteractiveDocs Backend
 
-基于 FastAPI 的方案生成系统后端服务，提供文档管理、章节管理、段落管理、摘要管理、关键词管理、模板管理等功能，并集成 AI 辅助写作能力。
+基于 FastAPI 的交互式文档写作系统后端服务，提供文档管理、AI 辅助写作、依赖关系追踪等能力。
 
-## 项目简介
+## 功能特性
 
-方案生成系统是一款面向文档写作场景的智能化工具，通过 AI 技术辅助用户生成方案框架、填写段落内容、评估文本质量、修订文档内容。系统采用 RESTful API 架构，支持异步操作，提供完整的 CRUD 接口和 AI 智能交互功能。
+- **文档管理**: 创建、查询、更新、删除文档，支持全局变量和快照
+- **章节管理**: 章节层级结构、目录提取、内容生成
+- **段落管理**: 富文本编辑、AI 帮填、AI 评估、变更追踪
+- **摘要管理**: 文档摘要维护、AI 一键生成、关联追踪
+- **关键词管理**: 关键词维护、AI 智能提取
+- **模板管理**: 系统模板与用户模板、版本控制、回滚
+- **AI 对话**: 基于文档上下文的智能聊天助手
+- **依赖追踪**: 段落-摘要-关键词之间的依赖关系图谱
 
 ## 技术栈
 
-- **Web 框架**: FastAPI
-- **数据库 ORM**: SQLAlchemy (异步)
-- **数据库**: 支持 MySQL/PostgreSQL
-- **认证**: JWT Token
-- **AI 集成**: 通义千问 (Qwen) API
-
-## 主要功能模块
-
-### 1. 文档管理
-- 创建、获取、更新、删除文档
-- 生成方案结构
-- 文档快照管理
-- 操作历史记录
-
-### 2. 章节管理
-- 章节的增删改查
-- 批量创建章节
-- 章节内容目录 (TOC) 获取
-- 从摘要生成正文章节
-
-### 3. 段落管理
-- 段落的增删改查
-- 批量创建段落
-- 批量更新段落顺序
-
-### 4. 摘要管理
-- 摘要的增删改查
-- 摘要与段落关联管理
-- 批量创建摘要
-- 批量更新摘要顺序
-- 在指定摘要后插入新摘要
-
-### 5. 关键词管理
-- 关键词的增删改查
-- 关键词与摘要/段落关联管理
-- 批量创建关键词
-
-### 6. 模板管理
-- 模板的增删改查
-- 系统模板与用户模板管理
-- 模板版本控制
-- 模板回滚功能
-
-### 7. AI 智能功能
-- **AI 帮填**: 根据上下文智能填写段落、摘要、关键词内容
-- **AI 评估**: 评估段落内容的质量和适配度
-- **AI 修订**: 对选定内容进行智能修订
-- **AI 对话**: 与 AI 助理实时对话，获取写作建议
-- **AI 生成**: 基于模板生成摘要和段落内容
-
-### 8. 辅助功能
-- 获取生成方案元数据
-- 获取使用教程
-- 获取操作历史记录
-- 文档快照管理
+| 组件 | 技术 |
+|------|------|
+| Web 框架 | FastAPI |
+| 数据库 | PostgreSQL |
+| ORM | SQLAlchemy (Async) |
+| 数据验证 | Pydantic |
+| AI 服务 | DashScope (Qwen) |
+| 服务器 | Uvicorn |
 
 ## 项目结构
 
 ```
 backend/
-├── api/v1/                    # API 路由层
-│   ├── ai.py                  # AI 功能接口
-│   ├── chapters.py            # 章节管理接口
-│   ├── documents.py           # 文档管理接口
-│   ├── endpoints.py           # 辅助功能接口
-│   ├── keywords.py            # 关键词管理接口
-│   ├── paragraphs.py          # 段落管理接口
-│   ├── summaries.py           # 摘要管理接口
-│   └── templates.py           # 模板管理接口
-├── core/                      # 核心功能
-│   └── response.py            # 响应格式化
-├── db/                        # 数据库层
-│   ├── mappers/               # 数据映射器
-│   │   ├── chapter_mapper.py
-│   │   ├── dependency_edge_mapper.py
-│   │   ├── document_mapper.py
-│   │   ├── keyword_mapper.py
-│   │   ├── operation_history_mapper.py
-│   │   ├── paragraph_mapper.py
-│   │   ├── summary_mapper.py
-│   │   └── template_mapper.py
-│   ├── models.py              # SQLAlchemy 模型
-│   └── session.py             # 数据库会话
-├── schemas/                   # Pydantic 数据模型
-│   └── schemas.py
-├── services/                  # 业务逻辑层
-│   ├── ai_service.py          # AI 服务
-│   ├── chapter_service.py     # 章节服务
-│   ├── document_service.py    # 文档服务
-│   ├── endpoint_service.py    # 端点服务
-│   ├── keyword_service.py     # 关键词服务
-│   ├── paragraph_service.py   # 段落服务
-│   ├── prompt_templates.py    # 提示词模板
-│   ├── summary_service.py     # 摘要服务
-│   └── template_service.py    # 模板服务
-├── .trae/documents/           # 项目文档
-│   ├── api.md                 # API 文档
-│   └── database.md            # 数据库文档
-├── main.py                    # 应用入口
-└── requirements.txt           # 依赖文件
+├── api/v1/                 # API 路由层
+│   ├── documents.py        # 文档接口
+│   ├── chapters.py         # 章节接口
+│   ├── paragraphs.py       # 段落接口
+│   ├── summaries.py        # 摘要接口
+│   ├── keywords.py         # 关键词接口
+│   ├── templates.py        # 模板接口
+│   ├── ai.py               # AI 对话接口
+│   └── endpoints.py        # 辅助接口
+├── core/                   # 核心组件
+│   └── response.py         # 统一响应格式
+├── db/                     # 数据层
+│   ├── models.py           # SQLAlchemy 模型
+│   ├── session.py          # 数据库会话
+│   └── mappers/            # 数据访问层
+├── schemas/                # Pydantic 模型
+│   └── schemas.py          # 请求/响应模型
+├── services/               # 业务逻辑层
+│   ├── document_service.py
+│   ├── chapter_service.py
+│   ├── paragraph_service.py
+│   ├── summary_service.py
+│   ├── keyword_service.py
+│   ├── template_service.py
+│   ├── ai_service.py       # AI 生成服务
+│   ├── ai_chat_service.py  # AI 对话服务
+│   ├── dependency_service.py
+│   └── endpoint_service.py
+├── .trae/documents/        # 项目文档
+│   ├── api.md              # API 文档
+│   └── database.md         # 数据库文档
+├── main.py                 # 应用入口
+└── README.md               # 本文件
 ```
 
 ## 快速开始
 
 ### 环境要求
 
-- Python 3.8+
-- MySQL 5.7+ 或 PostgreSQL 12+
+- Python 3.9+
+- PostgreSQL 12+
 
 ### 安装依赖
 
 ```bash
-pip install -r requirements.txt
+pip install fastapi uvicorn sqlalchemy asyncpg pydantic email-validator dashscope
 ```
 
-### 配置数据库
+### 数据库配置
 
-在项目根目录创建 `.env` 文件，配置数据库连接信息：
-
-```env
-DATABASE_URL=mysql+aiomysql://username:password@host:port/database
-# 或使用 PostgreSQL
-# DATABASE_URL=postgresql+asyncpg://username:password@host:port/database
-```
-
-### 初始化数据库
-
-```bash
-python check_db.py
-```
+1. 创建 PostgreSQL 数据库
+2. 修改 `db/session.py` 中的连接字符串（默认: `postgresql+asyncpg://postgres:123456@localhost:5432/agent01`）
 
 ### 启动服务
 
 ```bash
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+# 开发模式
+uvicorn main:app --reload --host 0.0.0.0 --port 8001
+
+# 或直接运行
+python main.py
 ```
 
-服务启动后，访问 `http://localhost:8000/docs` 查看 API 文档（Swagger UI）。
+服务启动后访问:
+- 根路径: http://localhost:8001/
+- API 文档: http://localhost:8001/docs
 
-## API 文档
+## API 概览
 
-详细的接口规范请参考 `.trae/documents/api.md`。
+### 文档管理
 
-主要接口包括：
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/v1/documents` | 创建文档 |
+| GET | `/api/v1/documents` | 文档列表 |
+| GET | `/api/v1/documents/{id}` | 文档详情 |
+| PUT | `/api/v1/documents/{id}` | 更新文档 |
+| DELETE | `/api/v1/documents/{id}` | 删除文档 |
 
-| 模块 | 接口路径 | 说明 |
-|------|----------|------|
-| 文档 | POST /api/v1/documents | 创建文档 |
-| 文档 | GET /api/v1/documents/{id} | 获取文档详情 |
-| 章节 | POST /api/v1/chapters | 创建章节 |
-| 章节 | GET /api/v1/chapters/{id} | 获取章节详情 |
-| 段落 | POST /api/v1/paragraphs | 创建段落 |
-| 段落 | PUT /api/v1/paragraphs/{id} | 更新段落 |
-| 摘要 | POST /api/v1/summaries | 创建摘要 |
-| 摘要 | POST /api/v1/summaries/generate | AI 生成摘要 |
-| 摘要 | POST /api/v1/summaries/{id}/insert-after | 在摘要后插入新摘要 |
-| 关键词 | POST /api/v1/keywords | 创建关键词 |
-| 关键词 | GET /api/v1/keywords/document/{id} | 获取文档关键词 |
-| 模板 | POST /api/v1/templates | 创建模板 |
-| 模板 | GET /api/v1/templates | 获取模板列表 |
-| 模板 | PUT /api/v1/templates/{id} | 管理员更新模板 |
-| 模板 | PUT /api/v1/templates/{id}/content | 用户更新模板内容 |
-| 模板 | POST /api/v1/templates/{id}/rollback | 回退模板 |
-| AI | POST /api/v1/ai/assist-paragraph/{id} | AI 帮填段落 |
-| AI | GET /api/v1/ai/evaluate-paragraph/{id} | AI 评估段落 |
+### 章节管理
 
-## 许可证
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/v1/chapters/{id}` | 章节详情 |
+| POST | `/api/v1/chapters/{document_id}` | 创建章节 |
+| PUT | `/api/v1/chapters/{id}` | 更新章节 |
+| DELETE | `/api/v1/chapters/{id}` | 删除章节 |
+| GET | `/api/v1/chapters/{id}/toc` | 章节目录 |
 
-本项目仅供学习交流使用。
+### 段落管理
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/v1/paragraphs/{id}` | 段落详情 |
+| POST | `/api/v1/chapters/{id}/paragraphs` | 创建段落 |
+| PUT | `/api/v1/paragraphs/{id}` | 更新段落 |
+| DELETE | `/api/v1/paragraphs/{id}` | 删除段落 |
+| POST | `/api/v1/paragraphs/{id}/ai/assist` | AI 帮填 |
+| POST | `/api/v1/paragraphs/{id}/ai/evaluate` | AI 评估 |
+
+### AI 对话
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/v1/ai/chat` | AI 聊天 (SSE) |
+
+完整 API 文档见 [.trae/documents/api.md](.trae/documents/api.md)
+
+## 响应格式
+
+### 成功响应
+
+```json
+{
+  "code": 200,
+  "message": "成功",
+  "data": {}
+}
+```
+
+### 错误响应
+
+```json
+{
+  "code": 404,
+  "message": "资源不存在",
+  "data": null
+}
+```
+
+### 流式响应 (SSE)
+
+```
+data: {"content":"..."}
+
+data: {"response":"..."}
+
+data: [DONE]
+```
+
+## 核心概念
+
+### 模板复制机制
+
+创建文档时，系统会复制选定的模板生成新的用户模板，文档绑定到新模板而非直接引用原模板。
+
+### 依赖关系追踪
+
+通过 `dependency_edges` 表维护实体间关系:
+- 段落生成时记录使用的摘要和关键词
+- 支持上游变更通知下游
+
+### 变更状态标记
+
+| 实体 | 字段 | 值 | 含义 |
+|------|------|-----|------|
+| 段落 | `ischange` | 0 | 无变更 |
+| 段落 | `ischange` | 1 | 自身修改 |
+| 段落 | `ischange` | 2 | 上游变更待刷新 |
+| 摘要 | `is_change` | 0 | 无变更 |
+| 摘要 | `is_change` | 1 | 自身修改 |
+| 摘要 | `is_change` | 3 | 下游变更待审视 |
+
+## 文档
+
+- [API 文档](.trae/documents/api.md) - 完整接口说明
+- [数据库文档](.trae/documents/database.md) - 表结构和关系
+
+## 注意事项
+
+1. 数据库连接字符串在 `db/session.py` 中硬编码，生产环境建议改为环境变量
+2. AI 功能需要配置 DashScope API Key
+3. 当前无数据库迁移脚本，建议使用 SQL 直接建表
