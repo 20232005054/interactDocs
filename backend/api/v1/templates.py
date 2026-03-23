@@ -11,7 +11,7 @@ router = APIRouter(prefix="/api/v1/templates", tags=["模板管理"])
 
 # 模板管理通用接口
 
-@router.post("/", summary="创建模板")
+@router.post("", summary="创建模板")
 async def create_template(
     purpose: str,
     display_name: str,
@@ -66,7 +66,7 @@ async def get_template(
         "updated_at": template.updated_at
     })
 
-@router.get("/", summary="获取模板列表")
+@router.get("", summary="获取模板列表")
 async def list_templates(
     purpose: Optional[str] = None,
     is_system: Optional[bool] = None,
