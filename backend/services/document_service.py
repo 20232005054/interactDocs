@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import func
 from db.mappers.document_mapper import DocumentMapper
 from db.mappers.template_mapper import TemplateMapper
 from db.models import Document,Chapter,Paragraph,DocumentVersion,Template
@@ -39,17 +40,15 @@ class DocumentService:
         return await DocumentMapper.create_document(db, new_document)
 
     @staticmethod
-    async def list_documents(db: AsyncSession, page: int = 1, page_size: int = 10):
-        
-        
+    async def list_documents(db: AsyncSession, page: int = 1, page_size: int = 9):
         # 查询文档总数
-        count_result = await db.execute(select(Document))
-        total = len(count_result.scalars().all())
+        count_result = await db.execute(select(func.count()).select_from(Document))
+        total = count_result.scalar_one()
         
-        # 分页查询文档
+        # 分页查询文档，按更新时间倒序排列（最新的在前）
         offset = (page - 1) * page_size
         result = await db.execute(
-            select(Document).offset(offset).limit(page_size)
+            select(Document).order_by(Document.updated_at.desc()).offset(offset).limit(page_size)
         )
         documents = result.scalars().all()
         

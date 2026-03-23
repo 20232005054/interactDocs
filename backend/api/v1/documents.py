@@ -1,6 +1,6 @@
 from services.chapter_service import ChapterService
 from services.document_service import DocumentService
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
@@ -27,7 +27,11 @@ async def create_document(doc_in: DocumentCreate, db: AsyncSession = Depends(get
     return success_response(data=result)
 
 @router.get("", summary="获取文档列表")
-async def list_documents(page: int = 1, page_size: int = 10, db: AsyncSession = Depends(get_db)):
+async def list_documents(
+    page: int = Query(1, ge=1, description="页码，从 1 开始"),
+    page_size: int = Query(10, ge=1, le=100, description="每页数量"),
+    db: AsyncSession = Depends(get_db)
+):
     total, documents = await DocumentService.list_documents(db, page, page_size)
     
     # 构建返回数据
@@ -40,7 +44,12 @@ async def list_documents(page: int = 1, page_size: int = 10, db: AsyncSession = 
             "updated_at": doc.updated_at
         })
     
-    return success_response(data={"total": total, "items": items})
+    return success_response(data={
+        "page": page,
+        "page_size": page_size,
+        "total": total,
+        "items": items
+    })
 
 @router.get("/{document_id}", summary="获取文档详情")
 async def get_document(document_id: UUID, db: AsyncSession = Depends(get_db)):
