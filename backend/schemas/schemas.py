@@ -86,6 +86,12 @@ class ParagraphBase(BaseModel):
     ischange: int = Field(0, description="关联摘要是否发生实质变更：0-否，1-是")
 
 class ParagraphCreate(BaseModel):
+    para_type: Optional[str] = None
+    order_index: Optional[int] = None
+    ai_eval: Optional[str] = None
+    ai_suggestion: Optional[str] = None
+    ai_generate: Optional[str] = None
+    ischange: Optional[int] = None
     content: str = Field(..., description="文本内容")
 
 class ParagraphUpdate(BaseModel):

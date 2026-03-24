@@ -13,13 +13,13 @@ import {
 } from "@/components/ui/card";
 import { ContentHeader } from "@/components/document/ContentHeader";
 import {
+  Check,
   Loader2,
   Plus,
+  RefreshCcw,
   Sparkles,
   Trash2,
   Wand2,
-  Check,
-  RefreshCcw,
 } from "lucide-react";
 
 interface ParagraphItem {
@@ -59,6 +59,10 @@ const paraTypeOptions = [
   { value: "heading-2", label: "二级标题" },
   { value: "heading-3", label: "三级标题" },
 ];
+
+function hasDisplayContent(value?: string | null) {
+  return Boolean(value?.trim());
+}
 
 async function consumeSSE(response: Response) {
   if (!response.body) {
@@ -126,9 +130,8 @@ export default function ChapterPage() {
 
   const selectedParagraph = useMemo(
     () =>
-      sortedParagraphs.find(
-        (item) => item.paragraph_id === selectedParagraphId
-      ) || null,
+      sortedParagraphs.find((item) => item.paragraph_id === selectedParagraphId) ||
+      null,
     [selectedParagraphId, sortedParagraphs]
   );
 
@@ -142,19 +145,16 @@ export default function ChapterPage() {
 
       const result = await response.json();
       const chapterData: ChapterDetail = result.data;
+      const nextParagraphs = chapterData.paragraphs || [];
+
       setChapter(chapterData);
-      setParagraphs(chapterData.paragraphs || []);
+      setParagraphs(nextParagraphs);
       setSelectedParagraphId((current) => {
-        if (
-          current &&
-          chapterData.paragraphs?.some(
-            (item) => item.paragraph_id === current
-          )
-        ) {
+        if (current && nextParagraphs.some((item) => item.paragraph_id === current)) {
           return current;
         }
 
-        return chapterData.paragraphs?.[0]?.paragraph_id || null;
+        return nextParagraphs[0]?.paragraph_id || null;
       });
       setError(null);
     } catch (loadError) {
@@ -188,9 +188,7 @@ export default function ChapterPage() {
       return;
     }
 
-    updateLocalParagraph(selectedParagraphId, {
-      para_type: paraType,
-    });
+    updateLocalParagraph(selectedParagraphId, { para_type: paraType });
   };
 
   const withParagraphBusy = async (
@@ -311,9 +309,7 @@ export default function ChapterPage() {
     await withParagraphBusy(paragraphId, "evaluate", async () => {
       const response = await fetch(
         `/api/v1/paragraphs/${paragraphId}/ai/evaluate`,
-        {
-          method: "POST",
-        }
+        { method: "POST" }
       );
 
       if (!response.ok) {
@@ -349,7 +345,7 @@ export default function ChapterPage() {
 
   const handleGenerateChapterContent = async () => {
     setIsGeneratingChapter(true);
-    setMessage(null);
+    setMessage("正在初始化...");
     setError(null);
 
     try {
@@ -361,7 +357,88 @@ export default function ChapterPage() {
         throw new Error("生成章节内容失败");
       }
 
-      await consumeSSE(response);
+      // 实时处理 SSE 流，显示生成进度并更新段落列表
+      if (response.body) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let generatedParagraphs: ParagraphItem[] = [];
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const chunks = buffer.split("\n\n");
+          buffer = chunks.pop() || "";
+
+          for (const chunk of chunks) {
+            const line = chunk
+              .split("\n")
+              .find((item) => item.trim().startsWith("data:"));
+
+            if (!line) continue;
+
+            const raw = line.replace(/^data:\s*/, "").trim();
+            if (!raw || raw === "[DONE]") continue;
+
+            try {
+              const event = JSON.parse(raw);
+              
+              switch (event.type) {
+                case "start":
+                  setMessage(`开始生成章节内容，共 ${event.template_blocks || 0} 个模块...`);
+                  break;
+                  
+                case "heading":
+                  setMessage(`正在生成: ${event.content}...`);
+                  break;
+                  
+                case "content_chunk":
+                  // 实时累积内容，但不频繁更新UI
+                  break;
+                  
+                case "paragraph_created":
+                  // 新段落创建成功，实时添加到列表
+                  if (event.paragraph) {
+                    const newParagraph: ParagraphItem = {
+                      paragraph_id: event.paragraph.paragraph_id,
+                      chapter_id: chapterId,
+                      content: event.paragraph.content || "",
+                      para_type: event.paragraph.para_type || "paragraph",
+                      order_index: event.paragraph.order_index || 0,
+                    };
+                    generatedParagraphs.push(newParagraph);
+                    // 实时更新UI显示新段落
+                    setParagraphs((current) => {
+                      const exists = current.some(
+                        (p) => p.paragraph_id === newParagraph.paragraph_id
+                      );
+                      if (exists) return current;
+                      return [...current, newParagraph].sort(
+                        (a, b) => a.order_index - b.order_index
+                      );
+                    });
+                    setMessage(`已生成: ${event.paragraph.content?.slice(0, 20) || "新段落"}...`);
+                  }
+                  break;
+                  
+                case "completed":
+                  setMessage("章节内容生成完成！");
+                  break;
+                  
+                case "error":
+                  setError(event.error || "生成过程中发生错误");
+                  break;
+              }
+            } catch (e) {
+              // 忽略解析错误
+            }
+          }
+        }
+      }
+
+      // 最后刷新确保数据同步
       await loadChapter();
       setMessage("章节内容已生成");
     } catch (generateError) {
@@ -419,7 +496,7 @@ export default function ChapterPage() {
               <CardHeader>
                 <CardTitle>段落类型</CardTitle>
                 <CardDescription>
-                  先点击下方某个段落，再在这里切换当前段落的类型。
+                  先点击下方某一个段落，再在这里切换当前段落的类型。
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -483,7 +560,7 @@ export default function ChapterPage() {
                       {isGeneratingChapter ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          生成中
+                          生成中...
                         </>
                       ) : (
                         <>
@@ -498,9 +575,9 @@ export default function ChapterPage() {
                     <label className="text-sm font-medium">新建首个段落</label>
                     <Textarea
                       value={emptyParagraphContent}
-                      onChange={(e) => setEmptyParagraphContent(e.target.value)}
+                      onChange={(event) => setEmptyParagraphContent(event.target.value)}
                       rows={4}
-                      placeholder="输入段落内容，可留空创建空段落"
+                      placeholder="输入段落内容，也可以留空创建空段落"
                     />
                     <Button
                       variant="outline"
@@ -510,7 +587,7 @@ export default function ChapterPage() {
                       {isCreatingParagraph ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          创建中
+                          创建中...
                         </>
                       ) : (
                         <>
@@ -526,25 +603,25 @@ export default function ChapterPage() {
                   const isBusy = busyParagraphId === paragraph.paragraph_id;
                   const isSelected =
                     selectedParagraphId === paragraph.paragraph_id;
+                  const isParagraphType = paragraph.para_type === "paragraph";
+                  const hasAIGenerate = hasDisplayContent(paragraph.ai_generate);
+                  const hasAIEval = hasDisplayContent(paragraph.ai_eval);
+                  const hasAISuggestion = hasDisplayContent(paragraph.ai_suggestion);
+                  const showAIResultModules =
+                    isSelected &&
+                    isParagraphType &&
+                    (hasAIGenerate || hasAIEval || hasAISuggestion);
 
                   return (
                     <Card
                       key={paragraph.paragraph_id}
-                      className={
-                        isSelected
-                          ? "border-2 border-primary"
-                          : "border-dashed"
-                      }
-                      onClick={() =>
-                        setSelectedParagraphId(paragraph.paragraph_id)
-                      }
+                      className={isSelected ? "border-2 border-primary" : "border-dashed"}
+                      onClick={() => setSelectedParagraphId(paragraph.paragraph_id)}
                     >
                       <CardHeader>
                         <div className="flex items-center justify-between gap-3">
                           <div>
-                            <CardTitle className="text-base">
-                              段落 {index + 1}
-                            </CardTitle>
+                            <CardTitle className="text-base">段落 {index + 1}</CardTitle>
                             <CardDescription>
                               排序 {paragraph.order_index + 1} | 类型 {paragraph.para_type}
                             </CardDescription>
@@ -577,15 +654,16 @@ export default function ChapterPage() {
                           </div>
                         </div>
                       </CardHeader>
+
                       <CardContent className="space-y-4">
                         <div className="space-y-2">
                           <label className="text-sm font-medium">段落内容</label>
                           <Textarea
                             value={paragraph.content}
                             onClick={(event) => event.stopPropagation()}
-                            onChange={(e) =>
+                            onChange={(event) =>
                               updateLocalParagraph(paragraph.paragraph_id, {
-                                content: e.target.value,
+                                content: event.target.value,
                               })
                             }
                             rows={6}
@@ -606,7 +684,7 @@ export default function ChapterPage() {
                             {isBusy && busyAction === "save" ? (
                               <>
                                 <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                                保存中
+                                保存中...
                               </>
                             ) : (
                               "保存段落"
@@ -619,12 +697,12 @@ export default function ChapterPage() {
                               event.stopPropagation();
                               void handleAIAssist(paragraph.paragraph_id);
                             }}
-                            disabled={isBusy || paragraph.para_type !== "paragraph"}
+                            disabled={isBusy || !isParagraphType}
                           >
                             {isBusy && busyAction === "assist" ? (
                               <>
                                 <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                                帮填中
+                                帮填中...
                               </>
                             ) : (
                               <>
@@ -640,12 +718,12 @@ export default function ChapterPage() {
                               event.stopPropagation();
                               void handleAIEvaluate(paragraph.paragraph_id);
                             }}
-                            disabled={isBusy}
+                            disabled={isBusy || !isParagraphType}
                           >
                             {isBusy && busyAction === "evaluate" ? (
                               <>
                                 <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                                评估中
+                                评估中...
                               </>
                             ) : (
                               <>
@@ -661,12 +739,12 @@ export default function ChapterPage() {
                               event.stopPropagation();
                               void handleApplyAI(paragraph.paragraph_id);
                             }}
-                            disabled={isBusy || !paragraph.ai_generate}
+                            disabled={isBusy || !isParagraphType || !hasAIGenerate}
                           >
                             {isBusy && busyAction === "apply" ? (
                               <>
                                 <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                                应用中
+                                应用中...
                               </>
                             ) : (
                               <>
@@ -677,54 +755,36 @@ export default function ChapterPage() {
                           </Button>
                         </div>
 
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium">AI 帮填结果</label>
-                            <Textarea
-                              value={paragraph.ai_generate || ""}
-                              onClick={(event) => event.stopPropagation()}
-                              onChange={(e) =>
-                                updateLocalParagraph(paragraph.paragraph_id, {
-                                  ai_generate: e.target.value,
-                                })
-                              }
-                              rows={5}
-                              disabled={isBusy}
-                              placeholder="AI 帮填结果会显示在这里"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium">AI 评估结果</label>
-                            <Textarea
-                              value={paragraph.ai_eval || ""}
-                              onClick={(event) => event.stopPropagation()}
-                              onChange={(e) =>
-                                updateLocalParagraph(paragraph.paragraph_id, {
-                                  ai_eval: e.target.value,
-                                })
-                              }
-                              rows={5}
-                              disabled={isBusy}
-                              placeholder="AI 评估结果会显示在这里"
-                            />
-                          </div>
-                        </div>
+                        {showAIResultModules && (hasAIGenerate || hasAIEval) && (
+                          <div className="grid gap-4 md:grid-cols-2">
+                            {hasAIGenerate && (
+                              <div className="space-y-2 rounded-lg border border-primary/40 p-4">
+                                <label className="text-sm font-medium">AI 帮填结果</label>
+                                <div className="whitespace-pre-wrap rounded-md bg-muted p-3 text-sm leading-6">
+                                  {paragraph.ai_generate}
+                                </div>
+                              </div>
+                            )}
 
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">AI 修改建议</label>
-                          <Textarea
-                            value={paragraph.ai_suggestion || ""}
-                            onClick={(event) => event.stopPropagation()}
-                            onChange={(e) =>
-                              updateLocalParagraph(paragraph.paragraph_id, {
-                                ai_suggestion: e.target.value,
-                              })
-                            }
-                            rows={4}
-                            disabled={isBusy}
-                            placeholder="AI 建议会显示在这里"
-                          />
-                        </div>
+                            {hasAIEval && (
+                              <div className="space-y-2 rounded-lg border p-4">
+                                <label className="text-sm font-medium">AI 评估结果</label>
+                                <div className="whitespace-pre-wrap rounded-md bg-muted p-3 text-sm leading-6">
+                                  {paragraph.ai_eval}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {showAIResultModules && hasAISuggestion && (
+                          <div className="space-y-2 rounded-lg border p-4">
+                            <label className="text-sm font-medium">AI 修改建议</label>
+                            <div className="whitespace-pre-wrap rounded-md bg-muted p-3 text-sm leading-6">
+                              {paragraph.ai_suggestion}
+                            </div>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   );

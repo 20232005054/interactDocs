@@ -9,6 +9,7 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy import select
 from db.models import Chapter, Document
+from services.dependency_service import DependencyService
 
 class ParagraphService:
     @staticmethod
@@ -39,6 +40,72 @@ class ParagraphService:
         )
         
         return await ParagraphMapper.create_paragraph(db, new_paragraph)
+
+    @staticmethod
+    async def create_complete_paragraph(
+        db: AsyncSession,
+        chapter_id: UUID,
+        paragraph_in: ParagraphCreate,
+        matched_summary_id: UUID = None,
+        matched_summary_version: int = None,
+        relevance_score: float = 1.0,
+        keyword_ids: list[UUID] | None = None,
+    ):
+        chapter = await ChapterMapper.get_chapter_by_id(db, chapter_id)
+        if not chapter:
+            raise HTTPException(status_code=404, detail="章节不存在")
+
+        paragraphs = await ParagraphMapper.get_paragraphs_by_chapter_id(db, chapter_id)
+
+        order_index = paragraph_in.order_index
+        if order_index is None:
+            if paragraphs:
+                order_index = max(p.order_index for p in paragraphs) + 1
+            else:
+                order_index = 0
+        else:
+            for para in reversed(paragraphs):
+                if para.order_index >= order_index:
+                    await ParagraphMapper.update_paragraph(
+                        db,
+                        para.paragraph_id,
+                        {"order_index": para.order_index + 1},
+                    )
+
+        new_paragraph = Paragraph(
+            chapter_id=chapter_id,
+            content=paragraph_in.content,
+            para_type=paragraph_in.para_type or "paragraph",
+            order_index=order_index,
+            ai_eval=paragraph_in.ai_eval,
+            ai_suggestion=paragraph_in.ai_suggestion,
+            ai_generate=paragraph_in.ai_generate,
+            ischange=paragraph_in.ischange if paragraph_in.ischange is not None else 0,
+        )
+
+        created_paragraph = await ParagraphMapper.create_paragraph(db, new_paragraph)
+
+        if matched_summary_id:
+            await DependencyService.create_dependency_edge(
+                db,
+                "paragraph",
+                created_paragraph.paragraph_id,
+                "summary",
+                matched_summary_id,
+                target_version=matched_summary_version,
+                relevance_score=relevance_score,
+            )
+
+        for keyword_id in keyword_ids or []:
+            await DependencyService.create_dependency_edge(
+                db,
+                "paragraph",
+                created_paragraph.paragraph_id,
+                "keyword",
+                keyword_id,
+            )
+
+        return created_paragraph
 
     @staticmethod
     async def update_paragraph(db: AsyncSession, paragraph_id: UUID, paragraph_in: ParagraphUpdate):

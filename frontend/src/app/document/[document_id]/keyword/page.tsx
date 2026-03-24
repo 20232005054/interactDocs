@@ -1,90 +1,147 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { Plus, Sparkles, Trash2 } from "lucide-react";
+import { ContentHeader } from "@/components/document/ContentHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ContentHeader } from "@/components/document/ContentHeader";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 import { useDocumentStore } from "@/store/documentStore";
 import { useEditorStore } from "@/store/editorStore";
-import { Plus, Trash2, Sparkles } from "lucide-react";
-import { cn } from "@/lib/utils";
+
+interface KeywordResponseItem {
+  keyword_id: string;
+  document_id: string;
+  keyword: string;
+}
+
+function mapKeywords(items: KeywordResponseItem[]) {
+  return items.map((item) => ({
+    id: item.keyword_id,
+    documentId: item.document_id,
+    word: item.keyword,
+  }));
+}
 
 export default function KeywordPage() {
   const params = useParams();
   const documentId = params.document_id as string;
   const { keywords, setKeywords, addKeyword, removeKeyword } = useDocumentStore();
   const { setActiveContext } = useEditorStore();
+
   const [isLoading, setIsLoading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [newKeyword, setNewKeyword] = useState("");
   const [selectedKeyword, setSelectedKeyword] = useState<string | null>(null);
 
   useEffect(() => {
     setActiveContext("keyword");
+  }, [setActiveContext]);
+
+  useEffect(() => {
     const loadKeywords = async () => {
       setIsLoading(true);
+
       try {
         const response = await fetch(`/api/v1/documents/${documentId}/keywords`);
-        if (response.ok) {
-          const data = await response.json();
-          setKeywords(data);
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result?.message || "加载关键词失败");
         }
+
+        const items: KeywordResponseItem[] = Array.isArray(result?.data?.keywords)
+          ? result.data.keywords
+          : [];
+
+        setKeywords(mapKeywords(items));
       } catch (error) {
-        console.error("加载关键词失败:", error);
+        console.error("加载关键词失败", error);
+        setKeywords([]);
       } finally {
         setIsLoading(false);
       }
     };
-    loadKeywords();
-  }, [setActiveContext, documentId, setKeywords]);
+
+    void loadKeywords();
+  }, [documentId, setKeywords]);
+
+  useEffect(() => {
+    if (selectedKeyword && !keywords.some((keyword) => keyword.id === selectedKeyword)) {
+      setSelectedKeyword(keywords[0]?.id ?? null);
+    }
+
+    if (!selectedKeyword && keywords.length > 0) {
+      setSelectedKeyword(keywords[0].id);
+    }
+  }, [keywords, selectedKeyword]);
 
   const handleAddKeyword = () => {
-    if (!newKeyword.trim()) return;
+    const value = newKeyword.trim();
+
+    if (!value) {
+      return;
+    }
+
     addKeyword({
       documentId,
-      word: newKeyword.trim(),
+      word: value,
     });
     setNewKeyword("");
   };
 
   const handleGenerateKeywords = async () => {
+    setIsGenerating(true);
+
     try {
-      const response = await fetch(`/api/v1/documents/${documentId}/keywords/generate`, {
+      const response = await fetch(`/api/v1/documents/${documentId}/keywords/ai/assist`, {
         method: "POST",
       });
-      if (response.ok) {
-        const data = await response.json();
-        setKeywords([...keywords, ...data]);
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result?.message || "生成关键词失败");
       }
+
+      const items: KeywordResponseItem[] = Array.isArray(result?.data?.keywords)
+        ? result.data.keywords
+        : [];
+
+      setKeywords(mapKeywords(items));
     } catch (error) {
-      console.error("生成关键词失败:", error);
+      console.error("生成关键词失败", error);
+    } finally {
+      setIsGenerating(false);
     }
   };
 
   const handleSave = async () => {
-    // 保存所有关键词
     console.log("保存关键词", keywords);
   };
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="flex h-full flex-col">
       <ContentHeader
         title="关键词管理"
         onSave={handleSave}
         onAIAssist={handleGenerateKeywords}
       />
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* 左侧关键词列表 */}
+      <div className="flex flex-1 overflow-hidden">
         <div className="w-80 border-r bg-card">
-          <div className="p-4 border-b">
+          <div className="border-b p-4">
             <div className="flex gap-2">
               <Input
                 value={newKeyword}
-                onChange={(e) => setNewKeyword(e.target.value)}
+                onChange={(event) => setNewKeyword(event.target.value)}
                 placeholder="添加关键词..."
-                onKeyDown={(e) => e.key === "Enter" && handleAddKeyword()}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    handleAddKeyword();
+                  }
+                }}
               />
               <Button size="icon" onClick={handleAddKeyword}>
                 <Plus className="h-4 w-4" />
@@ -95,20 +152,16 @@ export default function KeywordPage() {
           <ScrollArea className="h-[calc(100%-73px)]">
             <div className="p-2">
               {isLoading ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  加载中...
-                </div>
+                <div className="py-8 text-center text-muted-foreground">加载中...</div>
               ) : keywords.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  暂无关键词
-                </div>
+                <div className="py-8 text-center text-muted-foreground">暂无关键词</div>
               ) : (
                 keywords.map((keyword) => (
                   <div
                     key={keyword.id}
                     onClick={() => setSelectedKeyword(keyword.id)}
                     className={cn(
-                      "flex items-center justify-between p-3 rounded-md cursor-pointer mb-1",
+                      "group mb-1 flex cursor-pointer items-center justify-between rounded-md p-3",
                       selectedKeyword === keyword.id
                         ? "bg-primary/10 text-primary"
                         : "hover:bg-muted"
@@ -118,9 +171,9 @@ export default function KeywordPage() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                      onClick={(e) => {
-                        e.stopPropagation();
+                      className="h-6 w-6 opacity-0 transition-opacity group-hover:opacity-100"
+                      onClick={(event) => {
+                        event.stopPropagation();
                         removeKeyword(keyword.id);
                       }}
                     >
@@ -131,37 +184,6 @@ export default function KeywordPage() {
               )}
             </div>
           </ScrollArea>
-        </div>
-
-        {/* 右侧详情 */}
-        <div className="flex-1 p-6">
-          {selectedKeyword ? (
-            <div className="max-w-2xl">
-              <h3 className="text-lg font-semibold mb-4">
-                {keywords.find((k) => k.id === selectedKeyword)?.word}
-              </h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium mb-2 block">描述</label>
-                  <textarea
-                    className="w-full h-32 p-3 rounded-md border bg-transparent"
-                    placeholder="添加关键词描述..."
-                    defaultValue={
-                      keywords.find((k) => k.id === selectedKeyword)?.description || ""
-                    }
-                  />
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="h-full flex items-center justify-center text-muted-foreground">
-              <div className="text-center">
-                <Sparkles className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>选择一个关键词查看详情</p>
-                <p className="text-sm mt-1">或点击 AI 帮填一键生成关键词</p>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>

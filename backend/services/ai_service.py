@@ -1,4 +1,4 @@
-import dashscope
+﻿﻿import dashscope
 from http import HTTPStatus
 import json
 import uuid
@@ -25,6 +25,7 @@ import re
 
 from services.dependency_service import DependencyService
 from db.mappers.template_mapper import TemplateMapper
+from services.paragraph_service import ParagraphService
 
 # 配置您的百炼 API Key
 # dashscope.api_key = "您的阿里云百炼API_KEY"
@@ -460,273 +461,283 @@ def ai_evaluate_paragraph(paragraph_id):
 
     return evaluate_and_save
 
-# AI生成章节内容
 async def generate_chapter_content_stream(db, chapter_id):
     """
-    从摘要生成章节内容（流式响应）
-    """  
-    # 获取章节信息
-    chapter_obj, _ = await ChapterMapper.get_chapter_with_paragraphs(db, chapter_id)
-    document = await DocumentMapper.get_document_by_id(db, chapter_obj.document_id) if chapter_obj else None
-    
-    if not chapter_obj or not document:
-        raise HTTPException(status_code=404, detail="章节或文档不存在")
-    
-    # 获取文档的所有摘要
-    summaries = await SummaryMapper.get_summaries_by_document_id(db, chapter_obj.document_id)
-    
-    # 获取文档的所有关键词
-    keywords = await KeywordMapper.get_keywords_by_document_id(db, chapter_obj.document_id)
-    keyword_list = [keyword.keyword for keyword in keywords]
-    
-    # 构建摘要信息
-    summary_info = ""
-    for summary in summaries:
-        summary_info += f"摘要标题：{summary.title}\n摘要内容：{summary.content}\n\n"
-    
-    # 获取文档模板
+    从摘要和模板生成章节内容（流式响应）
+    """
+    def _sse(payload: dict):
+        return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
-    templates = await TemplateMapper.list_templates(
-        db, 
-        purpose=document.purpose,
-        is_system=True,
-        is_active=True
-    )
-    
-    # 初始化sections列表
-    sections = []
-    
-    if templates:
-        # 使用模板的schema部分作为章节结构
-        template = templates[0]
-        schema_json = template.content.get('schema', {}).get('schema_json', [])
-        
-        # 解析文档结构模板
-        for item in schema_json:
-            section = {
-                'title': item['title'],
-                'type': item.get('type', 'heading-1'),  # 优先使用模板中的类型，默认一级标题
-                'content': item['title'],
-                'subsections': []
-            }
-            sections.append(section)
-    else:
-        # 渲染提示词，要求生成章节结构
-        prompt = render_prompt(
-            "generate_chapter_structure",
-            summary_info=f"文档标题：{document.title}\n文档摘要：无\n文档目的：{document.purpose}\n文档关键词：{', '.join(keyword_list) if keyword_list else '无'}\n\n摘要信息：\n{summary_info}"
-        )
-        
-        # 调用AI生成章节结构
-        response = ""
-        async for chunk in call_qwen_stream(
-            system_prompts["generate_chapter_structure"],
-            [],
-            prompt
-        ):
-            response += chunk
-        
-        # 解析章节结构
-        current_section = None
-        
-        for line in response.strip().split('\n'):
-            line = line.strip()
-            if not line:
+    def _extract_json_payload(text: str):
+        if not text:
+            raise ValueError("AI returned empty content")
+
+        cleaned = text.strip()
+        if cleaned.startswith("```"):
+            cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
+            cleaned = re.sub(r"\s*```$", "", cleaned)
+
+        try:
+            return json.loads(cleaned)
+        except json.JSONDecodeError:
+            match = re.search(r"\{[\s\S]*\}", cleaned)
+            if not match:
+                raise
+            return json.loads(match.group(0))
+
+    def _normalize_relevance_score(value):
+        try:
+            score = float(value)
+        except (TypeError, ValueError):
+            return 0.0
+        return max(0.0, min(1.0, score))
+
+    def _resolve_keyword_ids(matched_keywords, keyword_lookup):
+        keyword_ids = []
+        matched_keyword_names = []
+        seen_keyword_ids = set()
+
+        for item in matched_keywords or []:
+            if not item:
                 continue
-            
-            # 解析Markdown格式的标题
-            if line.startswith('# '):
-                # 一级标题
-                current_section = {
-                    'title': line[2:].strip(),
-                    'type': 'heading-1',
-                    'content': line[2:].strip(),
-                    'subsections': []
-                }
-                sections.append(current_section)
-            elif line.startswith('## '):
-                # 二级标题
-                if current_section:
-                    subsection = {
-                        'title': line[3:].strip(),
-                        'type': 'heading-2',
-                        'content': line[3:].strip()
-                    }
-                    current_section['subsections'].append(subsection)
-            elif line.startswith('### '):
-                # 三级标题
-                if current_section and current_section['subsections']:
-                    # 将三级标题作为二级标题的内容
-                    pass
-    
-    # 获取章节现有的段落，确定起始order_index
-    existing_paragraphs = await ParagraphMapper.get_paragraphs_by_chapter_id(db, chapter_id)
-    paragraph_order = len(existing_paragraphs) + 1
-    
-    # 添加所有生成的章节内容作为段落
-    for section in sections:
-        # 创建一级标题段落
-        section_paragraph_in = ParagraphCreate(
-            content=section['title'],
-            para_type=section['type'],
-            order_index=paragraph_order
+
+            keyword_name = str(item).strip()
+            if not keyword_name:
+                continue
+
+            matched_keyword_names.append(keyword_name)
+            keyword_id = keyword_lookup.get(keyword_name.lower())
+            if keyword_id and keyword_id not in seen_keyword_ids:
+                keyword_ids.append(keyword_id)
+                seen_keyword_ids.add(keyword_id)
+
+        return keyword_ids, matched_keyword_names
+
+    try:
+        result = await db.execute(
+            select(Chapter, Document)
+            .join(Document, Chapter.document_id == Document.document_id)
+            .options(
+                joinedload(Document.summaries),
+                joinedload(Document.keywords),
+                joinedload(Document.template),
+            )
+            .where(Chapter.chapter_id == chapter_id)
+        )
+        data = result.first()
+        if not data:
+            yield _sse({"error": "章节或文档不存在"})
+            yield "data: [DONE]\n\n"
+            return
+
+        chapter, document = data
+        summaries = sorted(document.summaries or [], key=lambda item: item.order_index)
+        if not summaries:
+            yield _sse({"error": "当前文档没有可用摘要，无法生成章节内容"})
+            yield "data: [DONE]\n\n"
+            return
+
+        template = None
+        if document.template_id:
+            template = await TemplateMapper.get_template(db, document.template_id)
+
+        schema_json = []
+        if template and isinstance(template.content, dict):
+            schema_json = (
+                template.content.get("content", {})
+                .get("schema", {})
+                .get("schema_json", [])
+            )
+
+        if not isinstance(schema_json, list) or not schema_json:
+            schema_json = [{"type": "heading-1", "title": chapter.title or "章节内容"}]
+            for summary in summaries:
+                schema_json.append({"type": "heading-1", "title": summary.title})
+
+        summary_payload = []
+        summary_lookup = {}
+        for summary in summaries:
+            summary_info = {
+                "summary_id": str(summary.summary_id),
+                "title": summary.title,
+                "content": summary.content,
+                "version": summary.version,
+                "order_index": summary.order_index,
+            }
+            summary_payload.append(summary_info)
+            summary_lookup[str(summary.summary_id)] = summary
+
+        existing_paragraphs = await ParagraphMapper.get_paragraphs_by_chapter_id(db, chapter_id)
+        next_order_index = max((para.order_index for para in existing_paragraphs), default=-1) + 1
+
+        yield _sse(
+            {
+                "type": "start",
+                "chapter_id": str(chapter.chapter_id),
+                "chapter_title": chapter.title,
+                "template_blocks": len(schema_json),
+            }
         )
 
-        section_paragraph_obj = Paragraph(
-            chapter_id=chapter_id,
-            content=section_paragraph_in.content,
-            para_type=section_paragraph_in.para_type,
-            order_index=section_paragraph_in.order_index
-        )
-        section_paragraph = await ParagraphMapper.create_paragraph(db, section_paragraph_obj)
-        paragraph_order += 1
-        
-        # 发送标题信息
-        yield f"data: {{\"type\": \"heading\", \"content\": \"{section['title']}\", \"paragraph_id\": \"{section_paragraph.paragraph_id}\"}}\n\n"
-        
-        # 构建层级标题信息
-        hierarchy_titles = []
-        for i, s in enumerate(sections):
-            if i <= sections.index(section):
-                hierarchy_titles.append({
-                    'type': s['type'],
-                    'content': s['title']
-                })
-        
-        # 为一级标题生成内容
-        section_content_prompt = f"""
-        请根据以下文档信息和摘要内容，为{section['title']}生成详细的内容：
-        
-        文档标题：{document.title}
-        文档摘要：无
-        文档目的：{document.purpose}
-        文档关键词：{', '.join(keyword_list) if keyword_list else '无'}
-        
-        层级标题：
-        {chr(10).join([f"{t['type'].replace('heading-', 'H')}: {t['content']}" for t in hierarchy_titles])}
-        
-        摘要信息：
-        {summary_info}
-        
-        要求：
-        1. 生成与{section['title']}相关的详细内容
-        2. 内容要专业、准确，符合临床研究规范
-        3. 直接输出内容，使用纯文本格式
-        4. 不要使用任何标题符号或格式标记
-        """
-        
-        # 调用AI生成内容
-        section_content = ""
-        async for chunk in call_qwen_stream(
-            "你是一个专业的临床研究方案内容撰写助手",
-            [],
-            section_content_prompt
-        ):
-            section_content += chunk
-            # 发送内容片段
-            yield f"data: {{\"type\": \"content_chunk\", \"content\": \"{chunk.replace('\"', '\\\"')}\"}}\n\n"
-        
-        # 创建内容段落
-        content_paragraph_in = ParagraphCreate(
-            content=section_content.strip(),
-            para_type='paragraph',
-            order_index=paragraph_order
-        )
-        content_paragraph_obj = Paragraph(
-            chapter_id=chapter_id,
-            content=content_paragraph_in.content,
-            para_type=content_paragraph_in.para_type,
-            order_index=content_paragraph_in.order_index
-        )
-        content_paragraph = await ParagraphMapper.create_paragraph(db, content_paragraph_obj)
-        paragraph_order += 1
-        
-        # 发送完整内容信息
-        yield f"data: {{\"type\": \"content\", \"content\": \"{section_content.strip().replace('\"', '\\\"')}\", \"paragraph_id\": \"{content_paragraph.paragraph_id}\"}}\n\n"
-        
-        # 建立段落与所有摘要的关联
-        for summary in summaries:
-            
-            await DependencyService.create_dependency_edge(
-                db, "paragraph", content_paragraph.paragraph_id, "summary", summary.summary_id, target_version=summary.version
-            )
-        
-        # 处理子章节
-        for subsection in section.get('subsections', []):
-            # 创建二级标题段落
-            subsection_paragraph_in = ParagraphCreate(
-                content=subsection['title'],
-                para_type=subsection['type'],
-                order_index=paragraph_order
-            )
-            subsection_paragraph_obj = Paragraph(
-                chapter_id=chapter_id,
-                content=subsection_paragraph_in.content,
-                para_type=subsection_paragraph_in.para_type,
-                order_index=subsection_paragraph_in.order_index
-            )
-            subsection_paragraph = await ParagraphMapper.create_paragraph(db, subsection_paragraph_obj)
-            paragraph_order += 1
-            
-            # 发送标题信息
-            yield f"data: {{\"type\": \"heading\", \"content\": \"{subsection['title']}\", \"paragraph_id\": \"{subsection_paragraph.paragraph_id}\"}}\n\n"
-            
-            # 为子章节生成内容
-            subsection_content_prompt = f"""
-            请根据以下文档信息和摘要内容，为{subsection['title']}生成详细的内容：
-            
-            文档标题：{document.title}
-            文档摘要：无
-            文档目的：{document.purpose}
-            文档关键词：{', '.join(keyword_list) if keyword_list else '无'}
-            
-            摘要信息：
-            {summary_info}
-            
-            要求：
-            1. 生成与{subsection['title']}相关的详细内容
-            2. 内容要专业、准确，符合临床研究规范
-            3. 直接输出内容，使用纯文本格式
-            4. 不要使用任何标题符号或格式标记
-            """
-            
-            subsection_content = ""
-            async for chunk in call_qwen_stream(
-                "你是一个专业的临床研究方案内容撰写助手",
-                [],
-                subsection_content_prompt
-            ):
-                subsection_content += chunk
-                # 发送内容片段
-                yield f"data: {{\"type\": \"content_chunk\", \"content\": \"{chunk.replace('\"', '\\\"')}\"}}\n\n"
-            
-            # 创建内容段落
-            subsection_content_paragraph_in = ParagraphCreate(
-                content=subsection_content.strip(),
-                para_type='paragraph',
-                order_index=paragraph_order
-            )
-            subsection_content_paragraph_obj = Paragraph(
-                chapter_id=chapter_id,
-                content=subsection_content_paragraph_in.content,
-                para_type=subsection_content_paragraph_in.para_type,
-                order_index=subsection_content_paragraph_in.order_index
-            )
-            subsection_content_paragraph = await ParagraphMapper.create_paragraph(db, subsection_content_paragraph_obj)
-            paragraph_order += 1
-            
-            # 发送完整内容信息
-            yield f"data: {{\"type\": \"content\", \"content\": \"{subsection_content.strip().replace('\"', '\\\"')}\", \"paragraph_id\": \"{subsection_content_paragraph.paragraph_id}\"}}\n\n"
-            
-            # 建立段落与所有摘要的关联
-            for summary in summaries:
-                
-                await DependencyService.create_dependency_edge(
-                    db, "paragraph", subsection_content_paragraph.paragraph_id, "summary", summary.summary_id, target_version=summary.version
+        chapter_heading_created = False
+
+        for block_index, block in enumerate(schema_json):
+            block_type = block.get("type") or "paragraph"
+            block_title = (block.get("title") or "").strip()
+
+            if not chapter_heading_created:
+                heading_title = chapter.title or block_title or "章节内容"
+                heading_paragraph = await ParagraphService.create_complete_paragraph(
+                    db,
+                    chapter_id,
+                    ParagraphCreate(
+                        content=heading_title,
+                        para_type="heading-1",
+                        order_index=next_order_index,
+                    ),
                 )
-    
-    # 发送结束标识
-    yield "data: {\"type\": \"end\"}\n\n"
+                yield _sse(
+                    {
+                        "type": "paragraph_created",
+                        "paragraph": {
+                            "paragraph_id": str(heading_paragraph.paragraph_id),
+                            "content": heading_paragraph.content,
+                            "para_type": heading_paragraph.para_type,
+                            "order_index": heading_paragraph.order_index,
+                            "matched_summary_id": None,
+                            "relevance_score": None,
+                            "matched_keywords": [],
+                        },
+                    }
+                )
+                next_order_index += 1
+                chapter_heading_created = True
+
+            if not block_type.startswith("heading"):
+                continue
+
+            if block_title and block_title != chapter.title:
+                heading_paragraph = await ParagraphService.create_complete_paragraph(
+                    db,
+                    chapter_id,
+                    ParagraphCreate(
+                        content=block_title,
+                        para_type=block_type,
+                        order_index=next_order_index,
+                    ),
+                )
+                yield _sse(
+                    {
+                        "type": "paragraph_created",
+                        "paragraph": {
+                            "paragraph_id": str(heading_paragraph.paragraph_id),
+                            "content": heading_paragraph.content,
+                            "para_type": heading_paragraph.para_type,
+                            "order_index": heading_paragraph.order_index,
+                            "matched_summary_id": None,
+                            "relevance_score": None,
+                            "matched_keywords": [],
+                        },
+                    }
+                )
+                next_order_index += 1
+
+            prompt = (
+                "请基于给定章节模板和摘要信息，只生成当前标题下的一个正文段落。\n"
+                "你必须返回 JSON 对象，不要输出 Markdown 代码块，不要输出额外解释。\n"
+                "JSON 结构如下：\n"
+                "{\n"
+                '  "content": "生成的正文段落内容",\n'
+                '  "para_type": "paragraph",\n'
+                '  "matched_summary_id": "最相关摘要ID",\n'
+                '  "relevance_score": 0.0\n'
+                "}\n\n"
+                f"文档标题：{document.title}\n"
+                f"文档用途：{document.purpose or ''}\n"
+                f"章节标题：{chapter.title or ''}\n"
+                f"当前模板块：{json.dumps(block, ensure_ascii=False)}\n"
+                f"全部章节模板：{json.dumps(schema_json, ensure_ascii=False)}\n"
+                f"可用摘要列表：{json.dumps(summary_payload, ensure_ascii=False)}\n\n"
+                "要求：\n"
+                "1. 内容必须紧扣当前模板标题。\n"
+                "2. matched_summary_id 必须从可用摘要列表中选一个最相关的 ID。\n"
+                "3. relevance_score 为 0 到 1 之间的小数，表示该段与所选摘要的相关度。\n"
+                "4. content 只写一个完整正文段落，不要再带标题。"
+            )
+
+            yield _sse(
+                {
+                    "type": "heading",
+                    "content": block_title or f"模板块 {block_index + 1}",
+                    "order_index": next_order_index,
+                }
+            )
+
+            raw_response = ""
+            async for chunk in call_qwen_stream(
+                system_prompts["generate_chapters"],
+                [],
+                prompt,
+            ):
+                raw_response += chunk
+                yield _sse(
+                    {
+                        "type": "content_chunk",
+                        "block_index": block_index,
+                        "content": chunk,
+                    }
+                )
+
+            parsed = _extract_json_payload(raw_response)
+            paragraph_content = str(parsed.get("content", "")).strip()
+            if not paragraph_content:
+                raise ValueError("AI 未返回正文内容")
+
+            paragraph_type = str(parsed.get("para_type") or "paragraph").strip() or "paragraph"
+            matched_summary_id_str = str(parsed.get("matched_summary_id") or "").strip()
+            matched_summary = summary_lookup.get(matched_summary_id_str)
+            if matched_summary is None and summaries:
+                matched_summary = summaries[0]
+                matched_summary_id_str = str(matched_summary.summary_id)
+
+            relevance_score = _normalize_relevance_score(parsed.get("relevance_score"))
+
+            created_paragraph = await ParagraphService.create_complete_paragraph(
+                db,
+                chapter_id,
+                ParagraphCreate(
+                    content=paragraph_content,
+                    para_type=paragraph_type,
+                    order_index=next_order_index,
+                ),
+                matched_summary_id=matched_summary.summary_id if matched_summary else None,
+                matched_summary_version=matched_summary.version if matched_summary else None,
+                relevance_score=relevance_score,
+                keyword_ids=[],  # 移除关键词匹配
+            )
+
+            yield _sse(
+                {
+                    "type": "paragraph_created",
+                    "paragraph": {
+                        "paragraph_id": str(created_paragraph.paragraph_id),
+                        "content": created_paragraph.content,
+                        "para_type": created_paragraph.para_type,
+                        "order_index": created_paragraph.order_index,
+                        "matched_summary_id": matched_summary_id_str or None,
+                        "relevance_score": relevance_score,
+                        "matched_keywords": [],
+                    },
+                }
+            )
+            next_order_index += 1
+
+        yield _sse({"type": "completed", "chapter_id": str(chapter.chapter_id)})
+        yield "data: [DONE]\n\n"
+    except Exception as e:
+        print(f"生成章节内容失败: {e}")
+        yield _sse({"error": "生成章节内容失败"})
+        yield "data: [DONE]\n\n"
 
 # AI一键生成所有摘要
 async def generate_all_summaries(db, document_id):

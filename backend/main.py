@@ -2,11 +2,23 @@ from fastapi import FastAPI
 from api.v1 import documents, chapters, paragraphs, ai, endpoints, summaries, keywords, templates
 from core.response import generic_exception_handler
 import uvicorn
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="方案生成系统", version="1.0.0",timeout=300)
 
 # 注册异常处理器
 app.add_exception_handler(Exception, generic_exception_handler)
+
+# 配置CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 
 # 注册路由
 app.include_router(documents.router)
