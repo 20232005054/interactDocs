@@ -6,3 +6,4 @@ from . import endpoints
 from . import summaries
 from . import keywords
 from . import templates
+from . import core_info

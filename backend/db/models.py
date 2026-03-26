@@ -56,6 +56,7 @@ class Chapter(Base):
 
     chapter_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     document_id = Column(UUID(as_uuid=True), ForeignKey("documents.document_id", ondelete="CASCADE"), nullable=False)
+    parent_id = Column(UUID(as_uuid=True), ForeignKey("chapters.chapter_id", ondelete="CASCADE"), nullable=True)
     title = Column(String(200), nullable=False, default="")
     status = Column(Integer, default=0)  # 0-编辑中，1-已完成
     order_index = Column(Integer, nullable=False, default=0) # 排序索引
@@ -63,6 +64,7 @@ class Chapter(Base):
 
     # 关系
     document = relationship("Document", back_populates="chapters")
+    parent = relationship("Chapter", remote_side=[chapter_id], backref="children")
     paragraphs = relationship("Paragraph", back_populates="chapter", cascade="all, delete-orphan")
     operation_history = relationship("OperationHistory", back_populates="chapter", cascade="all, delete-orphan")
 
@@ -173,6 +175,21 @@ class DocumentKeywordHistory(Base):
 
     # 关系
     document_keyword = relationship("DocumentKeyword", back_populates="history")
+
+class DocumentCoreInfo(Base):
+    __tablename__ = "document_core_info"
+    core_info_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.document_id", ondelete="CASCADE"), nullable=False)
+    title = Column(String(200), nullable=False)
+    content = Column(Text, nullable=False)
+    order_index = Column(Integer, nullable=False, default=0)
+    is_locked = Column(Boolean, nullable=False, default=False)
+    is_change = Column(Integer, nullable=False, default=0)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+    
+    # 关系
+    document = relationship("Document", backref="core_info")
 
 class Template(Base):
     __tablename__ = "templates"

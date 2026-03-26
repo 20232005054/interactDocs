@@ -9,8 +9,6 @@ from db.mappers.document_mapper import DocumentMapper
 from sqlalchemy.orm import joinedload
 
 from services.summary_service import SummaryService
-from db.mappers.keyword_mapper import KeywordMapper
-from db.mappers.chapter_mapper import ChapterMapper
 from db.mappers.paragraph_mapper import ParagraphMapper
 from services.prompt_templates import render_prompt, system_prompts
 from fastapi import HTTPException
@@ -30,62 +28,7 @@ from services.paragraph_service import ParagraphService
 # 配置您的百炼 API Key
 # dashscope.api_key = "您的阿里云百炼API_KEY"
 
-# AI帮填关键词
-async def ai_assist_keyword(db, document_id):
-    # 获取文档信息
-    document = await DocumentMapper.get_document_by_id(db, document_id)
-    if not document:
-        return []
-    # 渲染提示词
-    prompt = render_prompt(
-        "extract_keywords",
-        title=document.title,
-        purpose=document.purpose
-    )
-    
-    response = ""
-    async for chunk in call_qwen_stream(
-        system_prompts["extract_keywords"],
-        [],
-        prompt
-    ):
-        response += chunk
-    
-    print("------------------------------\n"+response+"\n------------------------------")
 
-    # 解析关键词列表
-    keywords = []
-    for line in response.strip().split('\n'):
-        line = line.strip()
-        if line and not line.startswith('===') and not line.startswith('---'):
-            # 移除可能的序号和标点
-            if any(line.startswith(str(i) + '.') for i in range(1, 10)):
-                line = line.split('.', 1)[1].strip()
-            elif any(line.startswith(str(i) + ')') for i in range(1, 10)):
-                line = line.split(')', 1)[1].strip()
-            keywords.append(line)
-    
-    # 保存生成的关键词
-    saved_keywords = []
-    for keyword in keywords[:10]:  # 最多保存10个关键词
-        keyword_in = DocumentKeywordUpdate(
-            keyword=keyword
-        )
-        # 直接使用KeywordMapper.create_keyword方法
-        new_keyword_obj = DocumentKeyword(
-            document_id=document_id,
-            keyword=keyword_in.keyword
-        )
-        new_keyword = await KeywordMapper.create_keyword(db, new_keyword_obj)
-        saved_keywords.append({
-            "keyword_id": new_keyword.keyword_id,
-            "document_id": new_keyword.document_id,
-            "keyword": new_keyword.keyword,
-            "created_at": new_keyword.created_at,
-            "updated_at": new_keyword.updated_at
-        })
-    
-    return saved_keywords
 
 # AI帮填段落
 async def ai_assist_paragraph(db, paragraph_id, assist_request, upstream_summary: dict = None):
@@ -158,24 +101,6 @@ async def ai_assist_paragraph(db, paragraph_id, assist_request, upstream_summary
                 if summaries:
                     summary_sections = "\n\n".join(summaries)
 
-        # 4. 处理关键词
-        document_keywords = []
-        used_keyword_ids = []
-        all_keywords = []
-        
-        if assist_request.keywords:
-            # 根据用户传入的关键词ID列表获取对应的关键词内容
-            for keyword_id in assist_request.keywords:
-                keyword = await KeywordMapper.get_keyword_by_id(db, keyword_id)
-                if keyword:
-                    document_keywords.append(keyword.keyword)
-                    used_keyword_ids.append(keyword_id)
-        else:
-            # 不指定关键词时，收集所有关键词用于AI生成和后续匹配
-            if document.keywords:
-                for keyword in document.keywords:
-                    document_keywords.append(keyword.keyword)
-                    all_keywords.append((keyword.keyword, str(keyword.keyword_id)))
 
         # 获取流式输出内容
         chapter_title = chapter.title
@@ -185,7 +110,6 @@ async def ai_assist_paragraph(db, paragraph_id, assist_request, upstream_summary
         prompt = render_prompt(
             "assist",
             title=document.title,
-            keywords=", ".join(document_keywords),
             chapter_title=chapter_title,
             hierarchy_titles=hierarchy_titles,
             summary_sections=summary_sections,
@@ -240,29 +164,6 @@ async def ai_assist_paragraph(db, paragraph_id, assist_request, upstream_summary
                     print(f"创建摘要关联失败: {e}")
                     pass
 
-        # 建立段落与关键词的关联
-        local_used_keyword_ids = used_keyword_ids.copy()
-        
-        # 如果用户未指定关键词，根据生成的内容进行字符串匹配
-        if not assist_request.keywords and all_keywords:
-            for keyword, keyword_id_str in all_keywords:
-                if keyword in full_content:
-                    local_used_keyword_ids.append(keyword_id_str)
-        
-        if local_used_keyword_ids:
-            for keyword_id_str in local_used_keyword_ids:
-                try:
-                    keyword_id = uuid.UUID(keyword_id_str)
-                    
-
-                    keyword = await KeywordMapper.get_keyword_by_id(db, keyword_id)
-                    if keyword:
-                        await DependencyService.create_dependency_edge(
-                            db, "paragraph", paragraph_id, "keyword", keyword_id, target_version=keyword.version
-                        )
-                except Exception as e:
-                    print(f"创建关键词关联失败: {e}")
-                    pass
 
         # 发送结束标识
         yield "data: [DONE]\n\n"
@@ -946,28 +847,7 @@ async def generate_all_summaries(db, document_id):
     
     # 构建返回数据
     for summary in updated_summaries:
-        # 建立摘要与关键词的关联 - 根据摘要内容与关键词进行字符串匹配
-        if used_keyword_ids:
-            
-            # 获取摘要内容
-            summary_content = summary.content.lower() if summary.content else ""
-            
-            for keyword_id_str in used_keyword_ids:
-                try:
-                    keyword_id = uuid.UUID(keyword_id_str)
-                    # 获取关键词信息
-                    keyword = await KeywordMapper.get_keyword_by_id(db, keyword_id)
-                    if keyword:
-                        # 检查关键词是否出现在摘要内容中
-                        if keyword.keyword.lower() in summary_content:
-                            
-                            await DependencyService.create_dependency_edge(
-                                db, "summary", summary.summary_id, "keyword", keyword_id
-                            )
-                except Exception as e:
-                    print(f"创建关键词摘要关联失败: {e}")
-                    pass
-        
+
         result = {
             "summary_id": summary.summary_id,
             "document_id": summary.document_id,
@@ -1133,3 +1013,4 @@ async def assist_single_summary(db, summary_id, downstream_paragraph: dict = Non
     }
     
     return result
+

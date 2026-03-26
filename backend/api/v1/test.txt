@@ -1,0 +1,429 @@
+{
+  /* 1. 核心信息定义 (CoreInfo Schema) */
+  "core_info_schema": [
+    { "key": "trial_title", "title": "试验全称", "type": "string"},
+    { "key": "protocol_no", "title": "方案编号", "type": "string"},
+    { "key": "study_objective", "title": "试验目的", "type": "text" },
+    { "key": "study_design", "title": "试验设计", "type": "text" },
+    { "key": "treatment_arm", "title": "试验组", "type": "text" },
+    { "key": "control_arm", "title": "对照组", "type": "text" },
+    { "key": "inclusion_criteria", "title": "入选标准", "type": "text" },
+    { "key": "exclusion_criteria", "title": "排除标准", "type": "text" },
+    { "key": "primary_endpoint", "title": "主要评价指标", "type": "text" },
+    { "key": "secondary_endpoint", "title": "次要评价指标", "type": "text" },
+    { "key": "sponsor_name", "title": "申办单位", "type": "string"},
+    { "key": "sample_size", "title": "样本量", "type": "text" },
+    { "key": "patient_selection", "title": "病例选择", "type": "text" },
+    { "key": "treatment_followup", "title": "治疗与随访", "type": "text" },
+    { "key": "assessment_indices", "title": "评价指标", "type": "text" },
+    { "key": "safety_indices", "title": "安全性指标", "type": "text" },
+    { "key": "ethics_committee", "title": "伦理委员会", "type": "text" },
+    { "key": "ethics_implementation", "title": "伦理实施", "type": "text" },
+    { "key": "informed_consent", "title": "知情同意", "type": "text" },
+    { "key": "investigators", "title": "研究者信息", "type": "text" },
+    { "key": "trial_management", "title": "试验管理机构", "type": "text" }
+  ],
+
+  /* 2. 摘要生成逻辑 (Summary Template) */
+  "summary_template": {
+    "sections": [
+      {
+        "title": "试验名称",
+        "generate_mode": "copy",
+        "generate_mode_display": "复制",
+        "source_info": {
+          "source_type": "Protocol",
+          "match_type": "关键信息匹配",
+          "match_keys": ["trial_title"],
+          "match_keys_display": ["试验全称"]
+        },
+        "prompt": "",
+        "content_template": "{{trial_title}}",
+        "input_keys": ["trial_title"]
+      },
+      {
+        "title": "试验目的",
+        "generate_mode": "copy",
+        "generate_mode_display": "复制",
+        "source_info": {
+          "source_type": "Protocol",
+          "match_type": "关键信息匹配",
+          "match_keys": ["study_objective"],
+          "match_keys_display": ["试验目的"]
+        },
+        "prompt": "",
+        "content_template": "{{study_objective}}",
+        "input_keys": ["study_objective"]
+      },
+      {
+        "title": "研究设计",
+        "generate_mode": "copy",
+        "generate_mode_display": "复制",
+        "source_info": {
+          "source_type": "Protocol",
+          "match_type": "关键信息匹配",
+          "match_keys": ["study_design"],
+          "match_keys_display": ["试验设计"]
+        },
+        "prompt": "",
+        "content_template": "{{study_design}}",
+        "input_keys": ["study_design"]
+      },
+      {
+        "title": "试验组",
+        "generate_mode": "copy",
+        "generate_mode_display": "复制",
+        "source_info": {
+          "source_type": "Protocol",
+          "match_type": "关键信息匹配",
+          "match_keys": ["treatment_arm"],
+          "match_keys_display": ["试验组"]
+        },
+        "prompt": "",
+        "content_template": "{{treatment_arm}}",
+        "input_keys": ["treatment_arm"]
+      },
+      {
+        "title": "对照组",
+        "generate_mode": "copy",
+        "generate_mode_display": "复制",
+        "source_info": {
+          "source_type": "Protocol",
+          "match_type": "关键信息匹配",
+          "match_keys": ["control_arm"],
+          "match_keys_display": ["对照组"]
+        },
+        "prompt": "",
+        "content_template": "{{control_arm}}",
+        "input_keys": ["control_arm"]
+      },
+      {
+        "title": "样本量",
+        "generate_mode": "direct",
+        "generate_mode_display": "直接使用",
+        "source_info": {
+          "source_type": "",
+          "match_type": "",
+          "match_keys": [],
+          "match_keys_display": []
+        },
+        "prompt": "直接使用预定义的样本量计算内容",
+        "content_template": "样本量计算主要基于主要指标治疗后VAS评分相对基线变化。假设试验组与对照组治疗后VAS评分相对基线变化（基线-治疗后）的均值差（试验组-对照组）为8，根据既往相关文献汇总研究结果估算参数，标准差预计为15，在检验水准单侧0.025的情况下，统计效能取0.8，试验组和对照组按2:1比例分配例数，优效性界值△=0，根据样本量计算公式，试验组需85例，对照组需43例，样本量为128例，考虑10%脱落率，试验组需96例，对照组需48例，所需样本量为144例。",
+        "input_keys": []
+      },
+      {
+        "title": "病例选择",
+        "generate_mode": "ai_summary",
+        "generate_mode_display": "AI总结",
+        "source_info": {
+          "source_type": "Protocol",
+          "match_type": "关键信息匹配",
+          "match_keys": ["inclusion_criteria", "exclusion_criteria"],
+          "match_keys_display": ["入选标准", "排除标准"]
+        },
+        "prompt": "请基于以下信息生成病例选择摘要：入选标准:{{inclusion_criteria}}，排除标准:{{exclusion_criteria}}。",
+        "content_template": "",
+        "input_keys": ["inclusion_criteria", "exclusion_criteria"]
+      },
+      {
+        "title": "治疗与随访",
+        "generate_mode": "copy",
+        "generate_mode_display": "复制",
+        "source_info": {
+          "source_type": "Protocol",
+          "match_type": "关键信息匹配",
+          "match_keys": ["treatment_followup"],
+          "match_keys_display": ["治疗与随访"]
+        },
+        "prompt": "",
+        "content_template": "{{treatment_followup}}",
+        "input_keys": ["treatment_followup"]
+      },
+      {
+        "title": "评价指标",
+        "generate_mode": "ai_summary",
+        "generate_mode_display": "AI总结",
+        "source_info": {
+          "source_type": "Protocol",
+          "match_type": "关键信息匹配",
+          "match_keys": ["primary_endpoint", "secondary_endpoint"],
+          "match_keys_display": ["主要评价指标", "次要评价指标"]
+        },
+        "prompt": "请基于以下信息生成评价指标摘要：主要评价指标:{{primary_endpoint}}，次要评价指标:{{secondary_endpoint}}。",
+        "content_template": "",
+        "input_keys": ["primary_endpoint", "secondary_endpoint"]
+      },
+      {
+        "title": "安全性指标",
+        "generate_mode": "copy",
+        "generate_mode_display": "复制",
+        "source_info": {
+          "source_type": "Protocol",
+          "match_type": "关键信息匹配",
+          "match_keys": ["safety_indices"],
+          "match_keys_display": ["安全性指标"]
+        },
+        "prompt": "直接复制安全性指标：{{safety_indices}}",
+        "content_template": "{{safety_indices}}",
+        "input_keys": ["safety_indices"]
+      }
+    ]
+  },
+
+  /* 3. 文档章节结构 (Structure) */
+  "structure": [
+    {
+      "title": "1. 标题页",
+      "type": "chapter",
+      "order_index": 1,
+      "children": [],
+      "paragraphs": [
+        {
+          "para_type": "metadata_block",
+          "generate_mode": "copy",
+          "generate_mode_display": "复制",
+          "source_info": {
+            "source_type": "Protocol",
+            "match_type": "关键信息匹配",
+            "match_keys": ["trial_title", "protocol_no", "sponsor_name"],
+            "match_keys_display": ["试验全称", "方案编号", "申办单位"]
+          },
+          "prompt": "直接同步关键信息到标题页",
+          "content_template": [
+            { "type": "text", "content": "临床试验报告" },
+            { "type": "heading-1", "content": "试验题目：{{trial_title}}", "key": "trial_title" },
+            { "type": "heading-1", "content": "方案号：{{protocol_no}}", "key": "protocol_no" },
+            { "type": "heading-1", "content": "申办方：{{sponsor_name}}", "key": "sponsor_name" }
+          ],
+          "input_keys": ["trial_title", "protocol_no", "sponsor_name"],
+          "sync_back": true 
+        }
+      ]
+    },
+    {
+      "title": "2. 摘要",
+      "type": "chapter",
+      "order_index": 2,
+      "children": [],
+      "paragraphs": [
+        {
+          "para_type": "text",
+          "generate_mode": "copy",
+          "generate_mode_display": "复制",
+          "source_info": {
+            "source_type": "Summary",
+            "match_type": "摘要内容",
+            "match_keys": ["content"],
+            "match_keys_display": ["摘要内容"]
+          },
+          "prompt": "直接复制摘要内容",
+          "content_template": "{{summary_content}}",
+          "input_keys": ["summary_content"],
+          "rules": {
+            "summary_content": { "mode": "copy", "source": "Summary", "match_key": "content" }
+          }
+        }
+      ]
+    },
+    {
+      "title": "3. 目录",
+      "type": "chapter",
+      "order_index": 3,
+      "children": [
+        {
+          "title": "3.1 正文中表目录",
+          "type": "chapter",
+          "order_index": 1,
+          "children": [],
+          "paragraphs": [
+            {
+              "para_type": "text",
+              "generate_mode": "ai_summary",
+              "generate_mode_display": "AI总结",
+              "source_info": {
+                "source_type": "Protocol",
+                "match_type": "关键信息匹配",
+                "match_keys": ["trial_title", "study_objective"],
+                "match_keys_display": ["试验全称", "试验目的"]
+              },
+              "prompt": "基于试验信息生成正文中表目录，包含主要表格清单。",
+              "content_template": "",
+              "input_keys": ["trial_title", "study_objective"]
+            }
+          ]
+        },
+        {
+          "title": "3.2 正文中图目录",
+          "type": "chapter",
+          "order_index": 2,
+          "children": [],
+          "paragraphs": [
+            {
+              "para_type": "text",
+              "generate_mode": "ai_summary",
+              "generate_mode_display": "AI总结",
+              "source_info": {
+                "source_type": "Protocol",
+                "match_type": "关键信息匹配",
+                "match_keys": ["study_design"],
+                "match_keys_display": ["试验设计"]
+              },
+              "prompt": "基于试验设计生成正文中图目录，包含主要图表清单。",
+              "content_template": "",
+              "input_keys": ["study_design"]
+            }
+          ]
+        }
+      ],
+      "paragraphs": [
+        {
+          "para_type": "text",
+          "generate_mode": "ai_summary",
+          "generate_mode_display": "AI总结",
+          "source_info": {
+            "source_type": "Protocol",
+            "match_type": "关键信息匹配",
+            "match_keys": ["trial_title"],
+            "match_keys_display": ["试验全称"]
+          },
+          "prompt": "基于试验信息生成目录结构，包含所有章节标题。",
+          "content_template": "",
+          "input_keys": ["trial_title"]
+        }
+      ]
+    },
+    {
+      "title": "4. 缩略语和术语定义表",
+      "type": "chapter",
+      "order_index": 4,
+      "children": [],
+      "paragraphs": [
+        {
+          "para_type": "text",
+          "generate_mode": "ai_summary",
+          "generate_mode_display": "AI总结",
+          "source_info": {
+            "source_type": "Protocol",
+            "match_type": "关键信息匹配",
+            "match_keys": ["study_design", "primary_endpoint"],
+            "match_keys_display": ["试验设计", "主要评价指标"]
+          },
+          "prompt": "基于试验设计和评价指标生成缩略语和术语定义表，包括常用医学术语和试验相关术语。",
+          "content_template": "",
+          "input_keys": ["study_design", "primary_endpoint"]
+        }
+      ]
+    },
+    {
+      "title": "5. 伦理学",
+      "type": "chapter",
+      "order_index": 5,
+      "children": [
+        {
+          "title": "5.1 (独立)伦理委员会或机构",
+          "type": "chapter",
+          "order_index": 1,
+          "children": [],
+          "paragraphs": [
+            {
+              "para_type": "text",
+              "generate_mode": "ai_summary",
+              "generate_mode_display": "AI总结",
+              "source_info": {
+                "source_type": "Protocol",
+                "match_type": "关键信息匹配",
+                "match_keys": ["ethics_committee"],
+                "match_keys_display": ["伦理委员会"]
+              },
+              "prompt": "基于伦理委员会信息生成伦理委员会或机构相关内容。",
+              "content_template": "",
+              "input_keys": ["ethics_committee"]
+            }
+          ]
+        },
+        {
+          "title": "5.2 试验伦理的实施",
+          "type": "chapter",
+          "order_index": 2,
+          "children": [],
+          "paragraphs": [
+            {
+              "para_type": "text",
+              "generate_mode": "ai_summary",
+              "generate_mode_display": "AI总结",
+              "source_info": {
+                "source_type": "Protocol",
+                "match_type": "关键信息匹配",
+                "match_keys": ["ethics_implementation"],
+                "match_keys_display": ["伦理实施"]
+              },
+              "prompt": "基于伦理实施信息生成试验伦理实施相关内容。",
+              "content_template": "",
+              "input_keys": ["ethics_implementation"]
+            }
+          ]
+        },
+        {
+          "title": "5.3 研究参与者知情与同意",
+          "type": "chapter",
+          "order_index": 3,
+          "children": [],
+          "paragraphs": [
+            {
+              "para_type": "text",
+              "generate_mode": "ai_summary",
+              "generate_mode_display": "AI总结",
+              "source_info": {
+                "source_type": "Protocol",
+                "match_type": "关键信息匹配",
+                "match_keys": ["informed_consent"],
+                "match_keys_display": ["知情同意"]
+              },
+              "prompt": "基于知情同意信息生成研究参与者知情与同意相关内容。",
+              "content_template": "",
+              "input_keys": ["informed_consent"]
+            }
+          ]
+        }
+      ],
+      "paragraphs": [
+        {
+          "para_type": "text",
+          "generate_mode": "ai_summary",
+          "generate_mode_display": "AI总结",
+          "source_info": {
+            "source_type": "Protocol",
+            "match_type": "关键信息匹配",
+            "match_keys": ["ethics_committee", "ethics_implementation"],
+            "match_keys_display": ["伦理委员会", "伦理实施"]
+          },
+          "prompt": "基于伦理相关信息生成伦理学章节概述。",
+          "content_template": "",
+          "input_keys": ["ethics_committee", "ethics_implementation"]
+        }
+      ]
+    },
+    {
+      "title": "6. 研究者和试验管理机构",
+      "type": "chapter",
+      "order_index": 6,
+      "children": [],
+      "paragraphs": [
+        {
+          "para_type": "text",
+          "generate_mode": "ai_summary",
+          "generate_mode_display": "AI总结",
+          "source_info": {
+            "source_type": "Protocol",
+            "match_type": "关键信息匹配",
+            "match_keys": ["investigators", "trial_management"],
+            "match_keys_display": ["研究者信息", "试验管理机构"]
+          },
+          "prompt": "基于研究者信息和试验管理机构信息生成研究者和试验管理机构章节内容。",
+          "content_template": "",
+          "input_keys": ["investigators", "trial_management"]
+        }
+      ]
+    }
+  ]
+}

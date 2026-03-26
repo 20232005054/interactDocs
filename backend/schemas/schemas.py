@@ -31,18 +31,7 @@ class Token(BaseModel):
     token_type: str = Field(..., description="令牌类型")
     user_id: UUID = Field(..., description="用户 ID")
 
-# --- 元数据相关 ---
-class FieldConfig(BaseModel):
-    field: str
-    label: str
-    type: str
-    required: bool
-    options: Optional[List[str]] = None
 
-class MetadataConfig(BaseModel):
-    generateType: str
-    title: str
-    fields: List[FieldConfig]
 
 # --- 文档相关 (Document) ---
 class DocumentBase(BaseModel):
@@ -217,6 +206,38 @@ class DocumentSummaryUpdate(BaseModel):
 # --- 关键词相关 (DocumentKeyword) ---
 class DocumentKeywordUpdate(BaseModel):
     keyword: str = Field(..., description="关键词")
+
+
+# --- 核心信息相关 (DocumentCoreInfo) ---
+class CoreInfoBase(BaseModel):
+    title: str = Field(..., description="核心信息标题")
+    content: str = Field(..., description="核心信息内容")
+
+class CoreInfoCreate(CoreInfoBase):
+    document_id: UUID = Field(..., description="文档ID")
+    order_index: Optional[int] = Field(None, description="排序索引")
+    is_locked: Optional[bool] = Field(False, description="是否锁定")
+
+class CoreInfoUpdate(BaseModel):
+    title: Optional[str] = Field(None, description="核心信息标题")
+    content: Optional[str] = Field(None, description="核心信息内容")
+    is_locked: Optional[bool] = Field(None, description="是否锁定")
+    is_change: Optional[int] = Field(None, description="变更标记")
+
+class CoreInfoOrderUpdate(BaseModel):
+    new_order: int = Field(..., description="新的排序索引")
+
+class CoreInfo(CoreInfoBase):
+    core_info_id: UUID
+    document_id: UUID
+    order_index: int
+    is_locked: bool
+    is_change: int
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
 
 
 # --- AI帮填请求相关 ---

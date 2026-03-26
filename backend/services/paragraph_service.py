@@ -1,6 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.mappers.paragraph_mapper import ParagraphMapper
-from db.mappers.chapter_mapper import ChapterMapper
 from db.mappers.dependency_edge_mapper import DependencyEdgeMapper
 from db.mappers.summary_mapper import SummaryMapper
 from db.models import Paragraph
@@ -14,10 +13,7 @@ from services.dependency_service import DependencyService
 class ParagraphService:
     @staticmethod
     async def create_paragraph(db: AsyncSession, chapter_id: UUID, paragraph_in: ParagraphCreate):
-        # 检查章节是否存在
-        chapter = await ChapterMapper.get_chapter_by_id(db, chapter_id)
-        if not chapter:
-            raise HTTPException(status_code=404, detail="章节不存在")
+
         
         # 获取章节的所有段落，确定最大order_index
         paragraphs = await ParagraphMapper.get_paragraphs_by_chapter_id(db, chapter_id)
@@ -51,9 +47,6 @@ class ParagraphService:
         relevance_score: float = 1.0,
         keyword_ids: list[UUID] | None = None,
     ):
-        chapter = await ChapterMapper.get_chapter_by_id(db, chapter_id)
-        if not chapter:
-            raise HTTPException(status_code=404, detail="章节不存在")
 
         paragraphs = await ParagraphMapper.get_paragraphs_by_chapter_id(db, chapter_id)
 

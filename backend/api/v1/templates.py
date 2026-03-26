@@ -54,13 +54,12 @@ async def get_template(
     return success_response(data={
         "template_id": template.template_id,
         "group_id": template.group_id,
-
+        "document_id": template.document_id,
         "purpose": template.purpose,
         "display_name": template.display_name,
         "content": template.content,
         "version": template.version,
         "is_system": template.is_system,
-        "user_id": template.user_id,
         "is_active": template.is_active,
         "created_at": template.created_at,
         "updated_at": template.updated_at

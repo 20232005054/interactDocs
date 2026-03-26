@@ -1,4 +1,4 @@
-from services.chapter_service import ChapterService
+
 from services.document_service import DocumentService
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -88,10 +88,6 @@ async def delete_document(document_id: UUID, db: AsyncSession = Depends(get_db))
     result = await DocumentService.delete_document(db, document_id)
     return success_response(message=result["message"])
 
-@router.get("/documents/{document_id}/chapters", summary="获取文档章节列表")
-async def get_chapters(document_id: UUID, db: AsyncSession = Depends(get_db)):
-    chapters = await ChapterService.get_chapters_by_document_id(db, document_id)
-    return success_response(data={"chapters": chapters})
 
 @router.get("/{document_id}/snapshots", summary="获取文档快照列表")
 async def get_document_snapshots(document_id: UUID, db: AsyncSession = Depends(get_db)):

@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from api.v1 import documents, chapters, paragraphs, ai, endpoints, summaries, keywords, templates
+from api.v1 import documents, chapters, paragraphs, ai, endpoints, summaries, keywords, templates, core_info
 from core.response import generic_exception_handler
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,6 +29,7 @@ app.include_router(endpoints.router)
 app.include_router(summaries.router)
 app.include_router(keywords.router)
 app.include_router(templates.router)
+app.include_router(core_info.router)
 
 @app.get("/")
 async def root():
