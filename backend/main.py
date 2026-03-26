@@ -1,15 +1,13 @@
 from fastapi import FastAPI
-from api.v1 import documents, chapters, paragraphs, ai, endpoints, summaries, keywords, templates, core_info
+from api.v1 import documents, chapters, paragraphs, ai, endpoints, summaries, keywords, templates, core_info, core_info_templates, summary_templates, structure_templates
 from core.response import generic_exception_handler
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="方案生成系统", version="1.0.0",timeout=300)
 
-# 注册异常处理器
 app.add_exception_handler(Exception, generic_exception_handler)
 
-# 配置CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,7 +18,6 @@ app.add_middleware(
 
 
 
-# 注册路由
 app.include_router(documents.router)
 app.include_router(chapters.router)
 app.include_router(paragraphs.router)
@@ -30,6 +27,9 @@ app.include_router(summaries.router)
 app.include_router(keywords.router)
 app.include_router(templates.router)
 app.include_router(core_info.router)
+app.include_router(core_info_templates.router)
+app.include_router(summary_templates.router)
+app.include_router(structure_templates.router)
 
 @app.get("/")
 async def root():

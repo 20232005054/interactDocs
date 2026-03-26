@@ -3,10 +3,15 @@ from sqlalchemy.future import select
 from sqlalchemy import func
 from db.mappers.document_mapper import DocumentMapper
 from db.mappers.template_mapper import TemplateMapper
-from db.models import Document,Chapter,Paragraph,DocumentVersion,Template
+from db.mappers.core_info_template_mapper import CoreInfoTemplateMapper
+from db.mappers.summary_template_mapper import SummaryTemplateMapper
+from db.mappers.structure_template_mapper import StructureTemplateMapper
+from db.models import Document,Chapter,Paragraph,DocumentVersion,Template,CoreInfoTemplate,SummaryTemplate,StructureTemplate,DocumentCoreInfo,DocumentSummary
 from schemas.schemas import DocumentCreate, DocumentUpdate
-from uuid import UUID
+from uuid import UUID, uuid4
 from fastapi import HTTPException
+from services.summary_template_service import SummaryTemplateService
+from services.structure_template_service import StructureTemplateService
 
 class DocumentService:
     @staticmethod
@@ -272,6 +277,188 @@ class DocumentService:
         }
         
         return result_data
+
+    @staticmethod
+    async def apply_core_info_template(db: AsyncSession, document_id: UUID):
+        """
+        应用核心信息模板：根据模板创建文档的核心信息字段
+        """
+        document = await DocumentMapper.get_document_by_id(db, document_id)
+        if not document:
+            raise HTTPException(status_code=404, detail="文档不存在")
+        
+        core_info_templates = await CoreInfoTemplateMapper.get_by_template_id(db, document.template_id)
+        
+        created_items = []
+        for idx, template in enumerate(core_info_templates):
+            core_info = DocumentCoreInfo(
+                document_id=document_id,
+                title=template.field_name,
+                content=template.default_value or "",
+                order_index=idx,
+                is_locked=False,
+                is_change=0
+            )
+            db.add(core_info)
+            created_items.append(core_info)
+        
+        await db.commit()
+        return created_items
+
+    @staticmethod
+    async def apply_summary_template(db: AsyncSession, document_id: UUID):
+        """
+        应用摘要模板：根据模板创建文档的摘要
+        """
+        document = await DocumentMapper.get_document_by_id(db, document_id)
+        if not document:
+            raise HTTPException(status_code=404, detail="文档不存在")
+        
+        summary_templates = await SummaryTemplateMapper.get_by_template_id(db, document.template_id)
+        
+        core_info_map = await DocumentService._get_core_info_map(db, document_id)
+        
+        created_items = []
+        for idx, template in enumerate(summary_templates):
+            content = ""
+            generation_mode = template.generation_mode
+            
+            if generation_mode == 0:
+                content = SummaryTemplateService.generate_content_copy_mode(
+                    template.content_template, template.sources, core_info_map
+                )
+            
+            summary = DocumentSummary(
+                document_id=document_id,
+                title=template.title,
+                content=content,
+                version=1,
+                is_change=0,
+                order_index=idx
+            )
+            db.add(summary)
+            created_items.append({
+                "summary": summary,
+                "template_id": str(template.summary_template_id),
+                "generation_mode": generation_mode,
+                "sources": template.sources
+            })
+        
+        await db.commit()
+        return created_items
+
+    @staticmethod
+    async def apply_structure_template(db: AsyncSession, document_id: UUID):
+        """
+        应用文章结构模板：根据模板创建文档的章节结构
+        """
+        document = await DocumentMapper.get_document_by_id(db, document_id)
+        if not document:
+            raise HTTPException(status_code=404, detail="文档不存在")
+        
+        structure_templates = await StructureTemplateMapper.get_by_template_id(db, document.template_id)
+        
+        template_id_map = {}
+        created_chapters = []
+        
+        sorted_templates = sorted(structure_templates, key=lambda x: (x.level, x.order_index))
+        
+        for template in sorted_templates:
+            chapter = Chapter(
+                document_id=document_id,
+                parent_id=template_id_map.get(template.parent_id) if template.parent_id else None,
+                title=template.title,
+                status=0,
+                order_index=template.order_index
+            )
+            db.add(chapter)
+            await db.flush()
+            
+            template_id_map[template.structure_template_id] = chapter.chapter_id
+            
+            created_chapters.append({
+                "chapter": chapter,
+                "template_id": str(template.structure_template_id),
+                "content_template": template.content_template,
+                "sources": template.sources,
+                "default_prompt": template.default_prompt,
+                "custom_prompt": template.custom_prompt
+            })
+        
+        await db.commit()
+        return created_chapters
+
+    @staticmethod
+    async def _get_core_info_map(db: AsyncSession, document_id: UUID) -> dict:
+        """
+        获取文档核心信息的键值对映射
+        key为field_key，value为content
+        """
+        result = await db.execute(
+            select(DocumentCoreInfo).where(DocumentCoreInfo.document_id == document_id)
+        )
+        core_infos = result.scalars().all()
+        
+        core_info_templates = await db.execute(
+            select(CoreInfoTemplate).join(
+                DocumentCoreInfo, 
+                CoreInfoTemplate.field_name == DocumentCoreInfo.title
+            ).where(DocumentCoreInfo.document_id == document_id)
+        )
+        templates = core_info_templates.scalars().all()
+        
+        template_map = {t.field_name: t.field_key for t in templates}
+        
+        core_info_map = {}
+        for info in core_infos:
+            field_key = template_map.get(info.title, info.title)
+            core_info_map[field_key] = info.content
+        
+        return core_info_map
+
+    @staticmethod
+    async def get_template_info(db: AsyncSession, document_id: UUID):
+        """
+        获取文档关联的模板完整信息（包含核心信息模板、摘要模板、结构模板）
+        """
+        document = await DocumentMapper.get_document_by_id(db, document_id)
+        if not document:
+            raise HTTPException(status_code=404, detail="文档不存在")
+        
+        core_info_templates = await CoreInfoTemplateMapper.get_by_template_id(db, document.template_id)
+        summary_templates = await SummaryTemplateMapper.get_by_template_id(db, document.template_id)
+        structure_tree = await StructureTemplateService.get_structure_tree(db, document.template_id)
+        
+        return {
+            "template_id": str(document.template_id),
+            "core_info_templates": [
+                {
+                    "core_template_id": str(t.core_template_id),
+                    "field_name": t.field_name,
+                    "field_key": t.field_key,
+                    "field_type": t.field_type,
+                    "default_value": t.default_value,
+                    "options": t.options,
+                    "is_required": t.is_required,
+                    "order_index": t.order_index
+                }
+                for t in core_info_templates
+            ],
+            "summary_templates": [
+                {
+                    "summary_template_id": str(t.summary_template_id),
+                    "title": t.title,
+                    "generation_mode": t.generation_mode,
+                    "content_template": t.content_template,
+                    "sources": t.sources,
+                    "default_prompt": t.default_prompt,
+                    "custom_prompt": t.custom_prompt,
+                    "order_index": t.order_index
+                }
+                for t in summary_templates
+            ],
+            "structure_templates": structure_tree
+        }
     
     @staticmethod
     async def create_document_snapshot(db: AsyncSession, document_id: UUID):

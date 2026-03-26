@@ -246,3 +246,80 @@ class AIAssistRequest(BaseModel):
     keywords: Optional[List[str]] = Field(None, description="选择的关键词ID列表，不指定则使用所有关键词")
 
 
+# --- 核心信息模板相关 (CoreInfoTemplate) ---
+class SourceInfo(BaseModel):
+    source: str = Field(..., description="来源类型：keyinfo/summary/chapter")
+    match_type: str = Field(..., description="匹配方式描述")
+    match_key: str = Field(..., description="具体匹配的标识")
+    target_field: str = Field(..., description="目标字段名，对应content_template中的{{变量名}}")
+
+
+class CoreInfoTemplateCreate(BaseModel):
+    template_id: UUID = Field(..., description="关联的主模板ID")
+    field_name: str = Field(..., description="字段名称")
+    field_key: str = Field(..., description="字段标识")
+    field_type: str = Field(default="text", description="字段类型")
+    default_value: Optional[str] = Field(None, description="默认值")
+    options: Optional[List[str]] = Field(None, description="select类型的选项列表")
+    is_required: bool = Field(default=True, description="是否必填")
+    order_index: int = Field(default=0, description="排序")
+
+
+class CoreInfoTemplateUpdate(BaseModel):
+    field_name: Optional[str] = Field(None, description="字段名称")
+    field_key: Optional[str] = Field(None, description="字段标识")
+    field_type: Optional[str] = Field(None, description="字段类型")
+    default_value: Optional[str] = Field(None, description="默认值")
+    options: Optional[List[str]] = Field(None, description="select类型的选项列表")
+    is_required: Optional[bool] = Field(None, description="是否必填")
+    order_index: Optional[int] = Field(None, description="排序")
+
+
+# --- 摘要模板相关 (SummaryTemplate) ---
+class SummaryTemplateCreate(BaseModel):
+    template_id: UUID = Field(..., description="关联的主模板ID")
+    title: str = Field(..., description="摘要标题")
+    generation_mode: int = Field(default=0, description="生成方式：0=复制，1=AI总结")
+    content_template: Optional[str] = Field(None, description="内容模板，支持{{变量名}}替换")
+    sources: Optional[List[SourceInfo]] = Field(None, description="来源信息数组")
+    default_prompt: Optional[str] = Field(None, description="默认AI提示词")
+    custom_prompt: Optional[str] = Field(None, description="专属AI提示词")
+    order_index: int = Field(default=0, description="排序")
+
+
+class SummaryTemplateUpdate(BaseModel):
+    title: Optional[str] = Field(None, description="摘要标题")
+    generation_mode: Optional[int] = Field(None, description="生成方式：0=复制，1=AI总结")
+    content_template: Optional[str] = Field(None, description="内容模板")
+    sources: Optional[List[SourceInfo]] = Field(None, description="来源信息数组")
+    default_prompt: Optional[str] = Field(None, description="默认AI提示词")
+    custom_prompt: Optional[str] = Field(None, description="专属AI提示词")
+    order_index: Optional[int] = Field(None, description="排序")
+
+
+# --- 文章结构模板相关 (StructureTemplate) ---
+class StructureTemplateCreate(BaseModel):
+    template_id: UUID = Field(..., description="关联的主模板ID")
+    parent_id: Optional[UUID] = Field(None, description="父章节ID")
+    title: str = Field(..., description="章节标题")
+    level: int = Field(..., description="层级")
+    generation_mode: int = Field(default=0, description="生成方式：0=复制，1=AI总结")
+    content_template: Optional[str] = Field(None, description="内容模板")
+    sources: Optional[List[SourceInfo]] = Field(None, description="来源信息数组")
+    default_prompt: Optional[str] = Field(None, description="默认AI提示词")
+    custom_prompt: Optional[str] = Field(None, description="专属AI提示词")
+    order_index: int = Field(default=0, description="排序")
+
+
+class StructureTemplateUpdate(BaseModel):
+    parent_id: Optional[UUID] = Field(None, description="父章节ID")
+    title: Optional[str] = Field(None, description="章节标题")
+    level: Optional[int] = Field(None, description="层级")
+    generation_mode: Optional[int] = Field(None, description="生成方式：0=复制，1=AI总结")
+    content_template: Optional[str] = Field(None, description="内容模板")
+    sources: Optional[List[SourceInfo]] = Field(None, description="来源信息数组")
+    default_prompt: Optional[str] = Field(None, description="默认AI提示词")
+    custom_prompt: Optional[str] = Field(None, description="专属AI提示词")
+    order_index: Optional[int] = Field(None, description="排序")
+
+

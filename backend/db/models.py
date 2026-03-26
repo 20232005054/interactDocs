@@ -194,16 +194,123 @@ class DocumentCoreInfo(Base):
 class Template(Base):
     __tablename__ = "templates"
     template_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    group_id = Column(UUID(as_uuid=True), nullable=False)  # 逻辑分组ID，同一套模板的不同版本group_id相同
-    purpose = Column(String(50), nullable=False)  # 用途大类，用于第一级下拉
-    display_name = Column(String(100), nullable=False)  # 具体模板名，用于第二级下拉
-    content = Column(JSONB, nullable=False)  # 核心载体，包含提示词模板、结构模板、摘要模板
-    version = Column(Integer, nullable=False, default=1)  # 版本号
-    is_system = Column(Boolean, nullable=False, default=False)  # 是否为官方系统模板
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=True)  # 所属用户，系统模板此项为空
-    is_active = Column(Boolean, nullable=False, default=True)  # 是否为当前该组模板的生效/推荐版本
+    group_id = Column(UUID(as_uuid=True), nullable=False)
+    purpose = Column(String(50), nullable=False)
+    display_name = Column(String(100), nullable=False)
+    content = Column(JSONB, nullable=False)
+    """
+    content字段结构：
+    {
+        "description": "模板描述",
+        "default_prompt": "默认章节生成提示词模板"
+    }
+    """
+    version = Column(Integer, nullable=False, default=1)
+    is_system = Column(Boolean, nullable=False, default=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+
+    core_info_templates = relationship("CoreInfoTemplate", back_populates="template", cascade="all, delete-orphan")
+    summary_templates = relationship("SummaryTemplate", back_populates="template", cascade="all, delete-orphan")
+    structure_templates = relationship("StructureTemplate", back_populates="template", cascade="all, delete-orphan")
+
+
+class CoreInfoTemplate(Base):
+    __tablename__ = "core_info_templates"
+    core_template_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    template_id = Column(UUID(as_uuid=True), ForeignKey("templates.template_id", ondelete="CASCADE"), nullable=False)
+    field_name = Column(String(100), nullable=False)
+    field_key = Column(String(50), nullable=False)
+    field_type = Column(String(20), default="text")
+    default_value = Column(Text, nullable=True)
+    options = Column(JSONB, nullable=True)
+    is_required = Column(Boolean, default=True)
+    order_index = Column(Integer, default=0)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+
+    template = relationship("Template", back_populates="core_info_templates")
+
+
+class SummaryTemplate(Base):
+    __tablename__ = "summary_templates"
+    summary_template_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    template_id = Column(UUID(as_uuid=True), ForeignKey("templates.template_id", ondelete="CASCADE"), nullable=False)
+    title = Column(String(200), nullable=False)
+    generation_mode = Column(Integer, default=0)
+    content_template = Column(Text, nullable=True)
+    sources = Column(JSONB, nullable=True)
+    """
+    sources字段结构（数组）：
+    [
+        {
+            "source": "keyinfo", 
+            "match_type": "关键信息匹配", 
+            "match_key": "trial_name",
+            "target_field": "trial_name"
+        },
+        {
+            "source": "summary", 
+            "match_type": "摘要信息匹配", 
+            "match_key": "summary_template_id_1",
+            "target_field": "summary_content"
+        }
+    ]
+    - source: 来源类型（keyinfo/summary/chapter）
+    - match_type: 匹配方式描述
+    - match_key: 具体匹配的标识
+    - target_field: 目标字段名，对应content_template中的{{变量名}}
+    """
+    default_prompt = Column(Text, nullable=True)
+    custom_prompt = Column(Text, nullable=True)
+    order_index = Column(Integer, default=0)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+
+    template = relationship("Template", back_populates="summary_templates")
+
+
+class StructureTemplate(Base):
+    __tablename__ = "structure_templates"
+    structure_template_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    template_id = Column(UUID(as_uuid=True), ForeignKey("templates.template_id", ondelete="CASCADE"), nullable=False)
+    parent_id = Column(UUID(as_uuid=True), ForeignKey("structure_templates.structure_template_id", ondelete="CASCADE"), nullable=True)
+    title = Column(String(200), nullable=False)
+    level = Column(Integer, nullable=False)
+    generation_mode = Column(Integer, default=0)
+    content_template = Column(Text, nullable=True)
+    sources = Column(JSONB, nullable=True)
+    """
+    sources字段结构（数组）：
+    [
+        {
+            "source": "keyinfo", 
+            "match_type": "关键信息匹配", 
+            "match_key": "trial_name",
+            "target_field": "trial_name"
+        },
+        {
+            "source": "chapter", 
+            "match_type": "章节信息匹配", 
+            "match_key": "structure_template_id_1",
+            "target_field": "chapter_content"
+        }
+    ]
+    - source: 来源类型（keyinfo/summary/chapter）
+    - match_type: 匹配方式描述
+    - match_key: 具体匹配的标识
+    - target_field: 目标字段名，对应content_template中的{{变量名}}
+    """
+    default_prompt = Column(Text, nullable=True)
+    custom_prompt = Column(Text, nullable=True)
+    order_index = Column(Integer, default=0)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+
+    template = relationship("Template", back_populates="structure_templates")
+    parent = relationship("StructureTemplate", remote_side=[structure_template_id], backref="children")
 
 # 统一的依赖边表 (构建文档知识图谱的核心)
 class DependencyEdge(Base):
