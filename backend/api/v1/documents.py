@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
-from schemas.schemas import DocumentCreate, DocumentUpdate, SnapshotUpdate, GlobalVariablesUpdate, GlobalVariable
+from schemas.schemas import DocumentCreate, DocumentUpdate, SnapshotUpdate, PaginationParams
 from core.response import success_response
 from db.session import get_db
 
@@ -27,12 +27,11 @@ async def create_document(doc_in: DocumentCreate, db: AsyncSession = Depends(get
     return success_response(data=result)
 
 @router.get("", summary="获取文档列表")
-async def list_documents(
-    page: int = Query(1, ge=1, description="页码，从 1 开始"),
-    page_size: int = Query(10, ge=1, le=100, description="每页数量"),
-    db: AsyncSession = Depends(get_db)
-):
-    total, documents = await DocumentService.list_documents(db, page, page_size)
+async def list_documents(pagination: PaginationParams = Depends(),db: AsyncSession = Depends(get_db)):
+    page = pagination.page
+    page_size = pagination.page_size
+    
+    total, documents = await DocumentService.list_documents(db, pagination)
     
     # 构建返回数据
     items = []
@@ -59,7 +58,6 @@ async def get_document(document_id: UUID, db: AsyncSession = Depends(get_db)):
     result = {
         "document_id": document.document_id,
         "title": document.title,
-        "content": document.content,
         "purpose": document.purpose,
         "template_id": document.template_id,
         "created_at": document.created_at,
@@ -121,64 +119,6 @@ async def update_snapshot(snapshot_id: UUID, snapshot_in: SnapshotUpdate, db: As
     """
     snapshot = await DocumentService.update_snapshot(db, snapshot_id, snapshot_in.description)
     return success_response(data=snapshot)
-
-
-@router.get("/{document_id}/global-variables", summary="获取文档全局变量")
-async def get_global_variables(document_id: UUID, db: AsyncSession = Depends(get_db)):
-    variables = await DocumentService.get_global_variables(db, document_id)
-    return success_response(data=variables)
-
-@router.put("/{document_id}/global-variables", summary="更新文档全局变量")
-async def update_global_variables(document_id: UUID, update_data: GlobalVariablesUpdate, db: AsyncSession = Depends(get_db)):
-    """
-    更新文档全局变量
-    
-    请求体示例：
-    {
-        "variables": [
-            {
-                "key": "研究名称",
-                "value": "临床试验A",
-                "type": "string",
-                "description": "研究项目名称",
-                "is_locked": false,
-                "order_index": 0
-            }
-        ]
-    }
-    """
-    updated_variables = await DocumentService.update_global_variables(db, document_id, update_data.variables)
-    return success_response(data=updated_variables)
-
-@router.post("/{document_id}/global-variables", summary="添加全局变量")
-async def add_global_variable(document_id: UUID, variable: GlobalVariable, db: AsyncSession = Depends(get_db)):
-    """
-    添加全局变量
-    
-    请求体示例：
-    {
-        "key": "研究名称",
-        "value": "临床试验A",
-        "type": "string",
-        "description": "研究项目名称",
-        "is_locked": false
-    }
-    """
-    updated_variables = await DocumentService.add_global_variable(db, document_id, variable)
-    return success_response(data=updated_variables)
-
-@router.put("/{document_id}/global-variables/{order_index}", summary="更新单个全局变量")
-async def update_global_variable(document_id: UUID, order_index: int, variable_data: dict, db: AsyncSession = Depends(get_db)):
-    """
-    更新单个全局变量
-    """
-    updated_variables = await DocumentService.update_global_variable(db, document_id, order_index, variable_data)
-    return success_response(data=updated_variables)
-
-@router.delete("/{document_id}/global-variables/{order_index}", summary="删除全局变量")
-async def delete_global_variable(document_id: UUID, order_index: int, db: AsyncSession = Depends(get_db)):
-    result = await DocumentService.delete_global_variable(db, document_id, order_index)
-    return success_response(message=result["message"])
 
 
 @router.get("/{document_id}/template-info", summary="获取文档关联的模板完整信息")

@@ -7,7 +7,7 @@ from db.mappers.core_info_template_mapper import CoreInfoTemplateMapper
 from db.mappers.summary_template_mapper import SummaryTemplateMapper
 from db.mappers.structure_template_mapper import StructureTemplateMapper
 from db.models import Document,Chapter,Paragraph,DocumentVersion,Template,CoreInfoTemplate,SummaryTemplate,StructureTemplate,DocumentCoreInfo,DocumentSummary
-from schemas.schemas import DocumentCreate, DocumentUpdate
+from schemas.schemas import DocumentCreate, DocumentUpdate, PaginationParams
 from uuid import UUID, uuid4
 from fastapi import HTTPException
 from services.summary_template_service import SummaryTemplateService
@@ -21,8 +21,7 @@ class DocumentService:
         if not system_template:
             raise HTTPException(status_code=404, detail="模板不存在")
         
-        # 创建新模板，使用系统模板的数据和group_id
-        
+        # 1. 创建新模板 (主表浅拷贝)
         new_template_obj = Template(
             group_id=system_template.group_id,
             purpose=system_template.purpose,
@@ -35,17 +34,97 @@ class DocumentService:
         )
         new_template = await TemplateMapper.create_template(db, new_template_obj)
         
-        # 创建新文档，关联新创建的模板
+        # 2. 深拷贝 CoreInfoTemplate
+        old_core_infos = await CoreInfoTemplateMapper.get_by_template_id(db, system_template.template_id)
+        if old_core_infos:
+            new_core_infos = []
+            for old_ci in old_core_infos:
+                new_ci = CoreInfoTemplate(
+                    template_id=new_template.template_id,
+                    field_name=old_ci.field_name,
+                    field_key=old_ci.field_key,
+                    field_type=old_ci.field_type,
+                    default_value=old_ci.default_value,
+                    options=old_ci.options,
+                    is_required=old_ci.is_required,
+                    order_index=old_ci.order_index
+                )
+                new_core_infos.append(new_ci)
+            await CoreInfoTemplateMapper.batch_create(db, new_core_infos)
+
+        # 3. 深拷贝 SummaryTemplate
+        old_summaries = await SummaryTemplateMapper.get_by_template_id(db, system_template.template_id)
+        if old_summaries:
+            new_summaries = []
+            for old_sum in old_summaries:
+                new_sum = SummaryTemplate(
+                    template_id=new_template.template_id,
+                    title=old_sum.title,
+                    generation_mode=old_sum.generation_mode,
+                    content_template=old_sum.content_template,
+                    sources=old_sum.sources,
+                    default_prompt=old_sum.default_prompt,
+                    custom_prompt=old_sum.custom_prompt,
+                    order_index=old_sum.order_index
+                )
+                new_summaries.append(new_sum)
+            await SummaryTemplateMapper.batch_create(db, new_summaries)
+
+        # 4. 深拷贝 StructureTemplate (使用排序+哈希表映射算法处理树形结构)
+        old_structures = await StructureTemplateMapper.get_by_template_id(db, system_template.template_id)
+        if old_structures:
+            # 按层级排序，确保父节点先于子节点处理
+            sorted_old_structures = sorted(old_structures, key=lambda x: x.level)
+            
+            id_mapping = {}  # 用于记录 旧structure_template_id -> 新structure_template_id
+            new_structures = []
+            
+            for old_struct in sorted_old_structures:
+                new_struct_id = uuid4()
+                id_mapping[old_struct.structure_template_id] = new_struct_id
+                
+                # 确定新的 parent_id
+                new_parent_id = None
+                if old_struct.parent_id:
+                    new_parent_id = id_mapping.get(old_struct.parent_id)
+                
+                new_struct = StructureTemplate(
+                    structure_template_id=new_struct_id,
+                    template_id=new_template.template_id,
+                    parent_id=new_parent_id,
+                    title=old_struct.title,
+                    level=old_struct.level,
+                    generation_mode=old_struct.generation_mode,
+                    content_template=old_struct.content_template,
+                    sources=old_struct.sources,
+                    default_prompt=old_struct.default_prompt,
+                    custom_prompt=old_struct.custom_prompt,
+                    order_index=old_struct.order_index
+                )
+                new_structures.append(new_struct)
+            
+            await StructureTemplateMapper.batch_create(db, new_structures)
+        
+        # 5. 创建新文档，关联新创建的模板
         new_document = Document(
             title=doc_in.title,
             purpose=doc_in.purpose,
             template_id=new_template.template_id
         )
         
-        return await DocumentMapper.create_document(db, new_document)
+        created_document = await DocumentMapper.create_document(db, new_document)
+        
+        # 6. 将新文档的 ID 回填到模板的冗余字段 document_id 中
+        new_template.document_id = created_document.document_id
+        await db.commit()
+        await db.refresh(created_document)
+        
+        return created_document
 
     @staticmethod
-    async def list_documents(db: AsyncSession, page: int = 1, page_size: int = 9):
+    async def list_documents(db: AsyncSession, pagination: PaginationParams):
+        page = pagination.page
+        page_size = pagination.page_size
         # 查询文档总数
         count_result = await db.execute(select(func.count()).select_from(Document))
         total = count_result.scalar_one()
@@ -91,135 +170,6 @@ class DocumentService:
             raise HTTPException(status_code=404, detail="文档不存在")
         
         await DocumentMapper.delete_document(db, document)
-        return {"message": "删除成功"}
-    
-    @staticmethod
-    async def get_global_variables(db: AsyncSession, document_id: UUID):
-        """获取文档的全局变量"""
-        document = await DocumentMapper.get_document_by_id(db, document_id)
-        if not document:
-            raise HTTPException(status_code=404, detail="文档不存在")
-        variables = document.content.get("global_variables", []) if document.content else []
-        # 按 order_index 排序
-        variables.sort(key=lambda x: x.get("order_index", 0))
-        return variables
-    
-    @staticmethod
-    async def update_global_variables(db: AsyncSession, document_id: UUID, global_variables):
-        """更新文档的全局变量"""
-        document = await DocumentMapper.get_document_by_id(db, document_id)
-        if not document:
-            raise HTTPException(status_code=404, detail="文档不存在")
-        
-        # 将 Pydantic 模型转换为字典列表
-        variables_dict = []
-        for i, var in enumerate(global_variables):
-            var_dict = var.dict() if hasattr(var, 'dict') else var
-            # 确保每个变量都有 order_index
-            if var_dict.get("order_index") is None:
-                var_dict["order_index"] = i
-            variables_dict.append(var_dict)
-        
-        # 更新 content 字段
-        content = document.content or {}
-        content["global_variables"] = variables_dict
-        
-        await DocumentMapper.update_document(db, document_id, {"content": content})
-        updated_document = await DocumentMapper.get_document_by_id(db, document_id)
-        variables = updated_document.content.get("global_variables", []) if updated_document.content else []
-        # 按 order_index 排序
-        variables.sort(key=lambda x: x.get("order_index", 0))
-        return variables
-    
-    @staticmethod
-    async def add_global_variable(db: AsyncSession, document_id: UUID, variable):
-        """添加全局变量"""
-        document = await DocumentMapper.get_document_by_id(db, document_id)
-        if not document:
-            raise HTTPException(status_code=404, detail="文档不存在")
-        
-        # 将 Pydantic 模型转换为字典
-        var_dict = variable.dict() if hasattr(variable, 'dict') else variable
-        
-        # 获取现有全局变量
-        content = document.content or {}
-        global_variables = content.get("global_variables", [])
-        
-        # 计算新变量的 order_index
-        if global_variables:
-            max_order = max(var.get("order_index", 0) for var in global_variables)
-            var_dict["order_index"] = max_order + 1
-        else:
-            var_dict["order_index"] = 0
-        
-        # 添加新变量
-        global_variables.append(var_dict)
-        content["global_variables"] = global_variables
-        
-        # 更新文档
-        await DocumentMapper.update_document(db, document_id, {"content": content})
-        updated_document = await DocumentMapper.get_document_by_id(db, document_id)
-        variables = updated_document.content.get("global_variables", []) if updated_document.content else []
-        # 按 order_index 排序
-        variables.sort(key=lambda x: x.get("order_index", 0))
-        return variables
-    
-    @staticmethod
-    async def update_global_variable(db: AsyncSession, document_id: UUID, order_index: int, variable_data):
-        """更新单个全局变量"""
-        document = await DocumentMapper.get_document_by_id(db, document_id)
-        if not document:
-            raise HTTPException(status_code=404, detail="文档不存在")
-        
-        # 获取现有全局变量
-        content = document.content or {}
-        global_variables = content.get("global_variables", [])
-        
-        # 查找并更新变量
-        updated = False
-        for i, var in enumerate(global_variables):
-            if var.get("order_index") == order_index:
-                global_variables[i].update(variable_data)
-                updated = True
-                break
-        
-        if not updated:
-            raise HTTPException(status_code=404, detail="全局变量不存在")
-        
-        # 更新文档
-        content["global_variables"] = global_variables
-        await DocumentMapper.update_document(db, document_id, {"content": content})
-        updated_document = await DocumentMapper.get_document_by_id(db, document_id)
-        variables = updated_document.content.get("global_variables", []) if updated_document.content else []
-        # 按 order_index 排序
-        variables.sort(key=lambda x: x.get("order_index", 0))
-        return variables
-    
-    @staticmethod
-    async def delete_global_variable(db: AsyncSession, document_id: UUID, order_index: int):
-        """删除全局变量"""
-        document = await DocumentMapper.get_document_by_id(db, document_id)
-        if not document:
-            raise HTTPException(status_code=404, detail="文档不存在")
-        
-        # 获取现有全局变量
-        content = document.content or {}
-        global_variables = content.get("global_variables", [])
-        
-        # 查找并删除变量
-        original_length = len(global_variables)
-        global_variables = [var for var in global_variables if var.get("order_index") != order_index]
-        
-        if len(global_variables) == original_length:
-            raise HTTPException(status_code=404, detail="全局变量不存在")
-        
-        # 重新计算 order_index
-        for i, var in enumerate(global_variables):
-            var["order_index"] = i
-        
-        # 更新文档
-        content["global_variables"] = global_variables
-        await DocumentMapper.update_document(db, document_id, {"content": content})
         return {"message": "删除成功"}
     
     @staticmethod

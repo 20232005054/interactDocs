@@ -1,4 +1,4 @@
-﻿﻿import dashscope
+﻿import dashscope
 from http import HTTPStatus
 import json
 import uuid
@@ -14,7 +14,7 @@ from services.prompt_templates import render_prompt, system_prompts
 from fastapi import HTTPException
 
 from sqlalchemy import select, update, func
-from db.models import Paragraph, Chapter, Document, DocumentKeyword, DocumentSummary
+from db.models import Paragraph, Chapter, Document, DocumentSummary
 
 from services.ai_client import call_qwen_stream
 

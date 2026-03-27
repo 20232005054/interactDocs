@@ -18,8 +18,7 @@ async def create_template(
     content: dict,
     is_system: bool = False,
     user_id: Optional[UUID] = None,
-    db: AsyncSession = Depends(get_db)
-):
+    db: AsyncSession = Depends(get_db)):
     """
     创建模板
     """
@@ -43,8 +42,7 @@ async def create_template(
 @router.get("/{template_id}", summary="获取模板详情")
 async def get_template(
     template_id: UUID,
-    db: AsyncSession = Depends(get_db)
-):
+    db: AsyncSession = Depends(get_db)):
     """
     获取模板详情
     """
@@ -70,8 +68,7 @@ async def list_templates(
     purpose: Optional[str] = None,
     is_system: Optional[bool] = None,
     is_active: Optional[bool] = None,
-    db: AsyncSession = Depends(get_db)
-):
+    db: AsyncSession = Depends(get_db)):
     """
     获取模板列表
     """
@@ -102,8 +99,7 @@ async def update_template(
     content: Optional[dict] = None,
     is_system: Optional[bool] = None,
     is_active: Optional[bool] = None,
-    db: AsyncSession = Depends(get_db)
-):
+    db: AsyncSession = Depends(get_db)):
     """
     管理员更新模板
     """
@@ -137,13 +133,10 @@ async def update_template(
         "updated_at": template.updated_at
     })
 
-
-
 @router.delete("/{template_id}", summary="删除模板")
 async def delete_template(
     template_id: UUID,
-    db: AsyncSession = Depends(get_db)
-):
+    db: AsyncSession = Depends(get_db)):
     """
     删除模板
     """
@@ -156,8 +149,7 @@ async def delete_template(
 async def update_template_content(
     template_id: UUID,
     content: dict,
-    db: AsyncSession = Depends(get_db)
-):
+    db: AsyncSession = Depends(get_db)):
     """
     用户更新模板（仅修改content字段，不更新版本）
     """
@@ -191,8 +183,7 @@ async def update_template_content(
 @router.get("/purposes/list", summary="获取所有用途")
 async def list_purposes(
     is_system: bool = True,
-    db: AsyncSession = Depends(get_db)
-):
+    db: AsyncSession = Depends(get_db)):
     """
     获取所有不同的用途
     """
@@ -204,8 +195,7 @@ async def get_templates_by_purpose(
     purpose: str,
     is_system: Optional[bool] = None,
     is_active: Optional[bool] = None,
-    db: AsyncSession = Depends(get_db)
-):
+    db: AsyncSession = Depends(get_db)):
     """
     根据用途获取模板列表
     """
@@ -231,8 +221,7 @@ async def get_templates_by_purpose(
 @router.post("/rollback/{template_id}", summary="回退官方模板")
 async def rollback_template(
     template_id: UUID,
-    db: AsyncSession = Depends(get_db)
-):
+    db: AsyncSession = Depends(get_db)):
     """
     回退官方模板（根据模板id查找对应的官方模板并回退内容）
     """

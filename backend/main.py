@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from api.v1 import documents, chapters, paragraphs, ai, endpoints, summaries, keywords, templates, core_info, core_info_templates, summary_templates, structure_templates
+from api.v1 import documents, chapters, paragraphs, ai, endpoints, summaries, templates, core_info, core_info_templates, summary_templates, structure_templates
 from core.response import generic_exception_handler
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,7 +24,6 @@ app.include_router(paragraphs.router)
 app.include_router(ai.router)
 app.include_router(endpoints.router)
 app.include_router(summaries.router)
-app.include_router(keywords.router)
 app.include_router(templates.router)
 app.include_router(core_info.router)
 app.include_router(core_info_templates.router)
@@ -37,7 +36,8 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    # uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=True)
 # from fastapi import FastAPI
 # from api.v1 import documents, chapters, paragraphs, ai, endpoints, summaries, keywords, templates
 # from core.response import generic_exception_handler
@@ -56,7 +56,6 @@ if __name__ == "__main__":
 # app.include_router(ai.router)
 # app.include_router(endpoints.router)
 # app.include_router(summaries.router)
-# app.include_router(keywords.router)
 # app.include_router(templates.router)
 
 # @app.get("/")

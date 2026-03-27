@@ -48,22 +48,6 @@ class DocumentUpdate(BaseModel):
     template_id: Optional[UUID] = Field(None, description="模板ID")
 
 
-# --- 全局变量相关 (GlobalVariable) ---
-class GlobalVariable(BaseModel):
-    """全局变量模型"""
-    key: str = Field(..., description="变量名")
-    value: str = Field(..., description="变量值")
-    type: Optional[str] = Field(None, description="变量类型")
-    description: Optional[str] = Field(None, description="变量描述")
-    is_locked: Optional[bool] = Field(False, description="是否锁定")
-    order_index: Optional[int] = Field(None, description="排序索引")
-
-
-class GlobalVariablesUpdate(BaseModel):
-    """更新全局变量请求模型"""
-    variables: List[GlobalVariable] = Field(..., description="全局变量列表")
-
-
 # --- 章节相关 (Chapter) ---
 class ParagraphBase(BaseModel):
     content: str = Field(..., description="文本内容")
@@ -124,7 +108,12 @@ class DocumentVersionList(BaseModel):
     snapshots: List[DocumentVersion]
 
 class SnapshotUpdate(BaseModel):
-    description: str
+    description: str = Field(..., description="快照描述")
+
+class PaginationParams(BaseModel):
+    """通用分页查询参数"""
+    page: int = Field(1, ge=1, description="页码，从 1 开始")
+    page_size: int = Field(10, ge=1, le=100, description="每页数量")
 
 # --- 操作历史相关 (OperationHistory) ---
 class OperationHistory(BaseModel):

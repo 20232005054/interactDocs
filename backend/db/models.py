@@ -20,26 +20,9 @@ class Document(Base):
     __tablename__ = "documents"
     document_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"))
-    template_id = Column(UUID(as_uuid=True), ForeignKey("templates.template_id"), nullable=True)
-    title = Column(String(80), nullable=False)
-    content = Column(JSONB, nullable=True)  # 记录全局变量
-
-    """
-    {
-        "global_variables": [
-            {
-                "key": "变量名",
-                "value": "变量值",
-                "type": "变量类型",
-                "description": "变量描述",
-                "is_locked": true/false,
-                "order_index": 0  # 排序索引
-            }
-        ]
-    }
-    """
-
-    purpose = Column(String(50), nullable=True)  # 使用目的
+    template_id = Column(UUID(as_uuid=True), nullable=True)
+    title = Column(String(200), nullable=False)
+    purpose = Column(String(100), nullable=True)  # 文档用途
     snapshot_cursor = Column(Integer, default=0)  # 快照计数器
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
@@ -48,8 +31,7 @@ class Document(Base):
     versions = relationship("DocumentVersion", back_populates="document", cascade="all, delete-orphan")
     chat_records = relationship("ChatRecord", back_populates="document", cascade="all, delete-orphan")
     summaries = relationship("DocumentSummary", back_populates="document", cascade="all, delete-orphan")
-    keywords = relationship("DocumentKeyword", back_populates="document", cascade="all, delete-orphan")
-    template = relationship("Template", backref="documents")
+
 
 class Chapter(Base):
     __tablename__ = "chapters"
@@ -87,7 +69,7 @@ class Paragraph(Base):
 class DocumentVersion(Base):
     __tablename__ = "document_versions"
     version_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.document_id"))
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.document_id", ondelete="CASCADE"))
     description = Column(String(255), nullable=False)
     snapshot_data = Column(JSONB, nullable=False)
     created_at = Column(TIMESTAMP, server_default=func.now())
@@ -98,8 +80,8 @@ class DocumentVersion(Base):
 class OperationHistory(Base):
     __tablename__ = "operation_history"
     history_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    chapter_id = Column(UUID(as_uuid=True), ForeignKey("chapters.chapter_id"))
-    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.document_id"))
+    chapter_id = Column(UUID(as_uuid=True), ForeignKey("chapters.chapter_id", ondelete="CASCADE"))
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.document_id", ondelete="CASCADE"))
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"))
     action = Column(String(50), nullable=False)
     content_before = Column(Text, nullable=True)
@@ -140,18 +122,6 @@ class DocumentSummary(Base):
     document = relationship("Document", back_populates="summaries")
     history = relationship("DocumentSummaryHistory", back_populates="summary", cascade="all, delete-orphan")
 
-class DocumentKeyword(Base):
-    __tablename__ = "document_keywords"
-    keyword_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.document_id", ondelete="CASCADE"), nullable=False)
-    keyword = Column(Text, nullable=False)
-    version = Column(Integer, nullable=False, default=1)
-    created_at = Column(TIMESTAMP, server_default=func.now())
-    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
-
-    # 关系
-    document = relationship("Document", back_populates="keywords")
-    history = relationship("DocumentKeywordHistory", back_populates="document_keyword", cascade="all, delete-orphan")
 
 class DocumentSummaryHistory(Base):
     __tablename__ = "document_summary_history"
@@ -165,16 +135,6 @@ class DocumentSummaryHistory(Base):
     # 关系
     summary = relationship("DocumentSummary", back_populates="history")
 
-class DocumentKeywordHistory(Base):
-    __tablename__ = "document_keyword_history"
-    history_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    keyword_id = Column(UUID(as_uuid=True), ForeignKey("document_keywords.keyword_id", ondelete="CASCADE"), nullable=False)
-    version = Column(Integer, nullable=False)
-    keyword = Column(Text, nullable=False)
-    created_at = Column(TIMESTAMP, server_default=func.now())
-
-    # 关系
-    document_keyword = relationship("DocumentKeyword", back_populates="history")
 
 class DocumentCoreInfo(Base):
     __tablename__ = "document_core_info"
@@ -208,6 +168,7 @@ class Template(Base):
     version = Column(Integer, nullable=False, default=1)
     is_system = Column(Boolean, nullable=False, default=False)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=True)
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.document_id", ondelete="CASCADE"), nullable=True)
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
@@ -331,4 +292,6 @@ class DependencyEdge(Base):
     
     relevance_score = Column(Float, default=1.0)  # 关联权重
     created_at = Column(TIMESTAMP, server_default=func.now())
+
+
 

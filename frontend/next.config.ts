@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // reactCompiler: true,
   trailingSlash: false,
-  allowedDevOrigins: ["192.168.104.44"],
+  allowedDevOrigins: ["192.168.104.49"],
   async rewrites() {
     return [
       {

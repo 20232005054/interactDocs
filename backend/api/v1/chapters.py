@@ -21,6 +21,7 @@ async def get_chapter_detail(chapter_id: UUID, db: AsyncSession = Depends(get_db
     result = {
         "chapter_id": chapter_data["chapter_id"],
         "document_id": chapter_data["document_id"],
+        "parent_id": chapter_data.get("parent_id"),
         "title": chapter_data["title"],
         "status": chapter_data["status"],
         "order_index": chapter_data["order_index"],
@@ -39,6 +40,7 @@ async def update_chapter(chapter_id: UUID, chapter_in: ChapterUpdate, db: AsyncS
     result = {
         "chapter_id": chapter_data["chapter_id"],
         "document_id": chapter_data["document_id"],
+        "parent_id": chapter_data.get("parent_id"),
         "title": chapter_data["title"],
         "status": chapter_data["status"],
         "order_index": chapter_data["order_index"],
@@ -54,6 +56,24 @@ async def create_chapter(document_id: UUID, db: AsyncSession = Depends(get_db)):
     chapter_data = {
         "chapter_id": new_chapter.chapter_id,
         "document_id": new_chapter.document_id,
+        "parent_id": new_chapter.parent_id,
+        "title": new_chapter.title,
+        "status": new_chapter.status,
+        "order_index": new_chapter.order_index,
+        "updated_at": new_chapter.updated_at,
+        "paragraphs": []
+    }
+    return success_response(data=chapter_data)
+
+@router.post("/chapters/{document_id}/sub/{parent_id}", summary="新增子章节")
+async def create_sub_chapter(document_id: UUID, parent_id: UUID, db: AsyncSession = Depends(get_db)):
+    # 使用默认值创建子章节
+    new_chapter = await ChapterService.create_sub_chapter(db, document_id, parent_id)
+    # 构建返回数据
+    chapter_data = {
+        "chapter_id": new_chapter.chapter_id,
+        "document_id": new_chapter.document_id,
+        "parent_id": new_chapter.parent_id,
         "title": new_chapter.title,
         "status": new_chapter.status,
         "order_index": new_chapter.order_index,

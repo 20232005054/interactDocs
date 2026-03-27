@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from db.models import Chapter, Document
 from services.dependency_service import DependencyService
+from typing import Optional
 
 class ParagraphService:
     @staticmethod
@@ -45,7 +46,7 @@ class ParagraphService:
         matched_summary_id: UUID = None,
         matched_summary_version: int = None,
         relevance_score: float = 1.0,
-        keyword_ids: list[UUID] | None = None,
+        keyword_ids: Optional[list[UUID]] = None,
     ):
 
         paragraphs = await ParagraphMapper.get_paragraphs_by_chapter_id(db, chapter_id)

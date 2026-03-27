@@ -6,7 +6,7 @@ from services.core_info_service import CoreInfoService
 import uuid
 from core.response import success_response
 
-router = APIRouter()
+router = APIRouter(prefix="/api/v1", tags=["核心信息管理"])
 
 @router.post("/", response_model=CoreInfo, summary="创建核心信息")
 async def create_core_info(core_info: CoreInfoCreate, db: AsyncSession = Depends(get_db)):

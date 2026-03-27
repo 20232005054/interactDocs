@@ -1,0 +1,2 @@
+- [x] `Document` 模型中的 `template` 关系已显式指定 `foreign_keys=[template_id]`
+- [x] 后端服务能够正常启动，不再抛出 `AmbiguousForeignKeysError` 异常

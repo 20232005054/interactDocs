@@ -1,0 +1,11 @@
+# Tasks
+- [x] Task 1: 移除数据库模型与 Schema
+  - [x] SubTask 1.1: 从 `backend/db/models.py` 中删除 `Document.content` 字段及其注释。
+  - [x] SubTask 1.2: 从 `backend/schemas/schemas.py` 中删除 `GlobalVariable` 和 `GlobalVariablesUpdate` 模型。
+- [x] Task 2: 移除 API 路由
+  - [x] SubTask 2.1: 在 `backend/api/v1/documents.py` 中删除所有包含 `/global-variables` 路径的路由定义。
+  - [x] SubTask 2.2: 在 `documents.py` 的导入部分移除相关的 Schema 导入。
+- [x] Task 3: 移除服务层逻辑
+  - [x] SubTask 3.1: 从 `backend/services/document_service.py` 中删除与全局变量相关的所有方法（如 `get_global_variables`, `update_global_variables`, `add_global_variable`, `update_global_variable`, `delete_global_variable`）。
+- [x] Task 4: 编译验证
+  - [x] SubTask 4.1: 运行脚本检查语法和导入是否正常，确保没有遗漏的引用。

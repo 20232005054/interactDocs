@@ -14,8 +14,7 @@ router = APIRouter(prefix="/api/v1/core-info-templates", tags=["核心信息模�
 @router.get("/template/{template_id}", summary="获取模板的核心信息字段列表")
 async def get_by_template_id(
     template_id: UUID,
-    db: AsyncSession = Depends(get_db)
-):
+    db: AsyncSession = Depends(get_db)):
     templates = await CoreInfoTemplateService.get_by_template_id(db, template_id)
     items = []
     for t in templates:
@@ -38,8 +37,7 @@ async def get_by_template_id(
 @router.get("/{core_template_id}", summary="获取核心信息模板详情")
 async def get_by_id(
     core_template_id: UUID,
-    db: AsyncSession = Depends(get_db)
-):
+    db: AsyncSession = Depends(get_db)):
     template = await CoreInfoTemplateService.get_by_id(db, core_template_id)
     if not template:
         raise HTTPException(status_code=404, detail="核心信息模板不存在")
@@ -61,8 +59,7 @@ async def get_by_id(
 @router.post("", summary="创建核心信息模板")
 async def create(
     data: CoreInfoTemplateCreate,
-    db: AsyncSession = Depends(get_db)
-):
+    db: AsyncSession = Depends(get_db)):
     template = await CoreInfoTemplateService.create(
         db,
         template_id=data.template_id,
@@ -91,8 +88,7 @@ async def create(
 async def update(
     core_template_id: UUID,
     data: CoreInfoTemplateUpdate,
-    db: AsyncSession = Depends(get_db)
-):
+    db: AsyncSession = Depends(get_db)):
     update_data = data.dict(exclude_unset=True)
     if not update_data:
         raise HTTPException(status_code=400, detail="没有要更新的数据")
@@ -118,7 +114,6 @@ async def update(
 @router.delete("/{core_template_id}", summary="删除核心信息模板")
 async def delete(
     core_template_id: UUID,
-    db: AsyncSession = Depends(get_db)
-):
+    db: AsyncSession = Depends(get_db)):
     await CoreInfoTemplateService.delete(db, core_template_id)
     return success_response(message="删除成功")

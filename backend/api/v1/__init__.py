@@ -4,6 +4,8 @@ from . import paragraphs
 from . import ai
 from . import endpoints
 from . import summaries
-from . import keywords
 from . import templates
 from . import core_info
+from . import core_info_templates
+from . import summary_templates
+from . import structure_templates

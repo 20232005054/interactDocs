@@ -17,6 +17,7 @@ class ChapterService:
             chapter_dict = {
                 "chapter_id": chapter.chapter_id,
                 "document_id": chapter.document_id,
+                "parent_id": chapter.parent_id,
                 "title": chapter.title,
                 "status": chapter.status,
                 "order_index": chapter.order_index,
@@ -52,6 +53,7 @@ class ChapterService:
         chapter_dict = {
             "chapter_id": chapter.chapter_id,
             "document_id": chapter.document_id,
+            "parent_id": chapter.parent_id,
             "title": chapter.title,
             "status": chapter.status,
             "order_index": chapter.order_index,
@@ -83,6 +85,34 @@ class ChapterService:
         return await ChapterMapper.create_chapter(db, new_chapter)
 
     @staticmethod
+    async def create_sub_chapter(db: AsyncSession, document_id: UUID, parent_id: UUID):
+        # 检查文档是否存在
+        document = await DocumentMapper.get_document_by_id(db, document_id)
+        if not document:
+            raise HTTPException(status_code=404, detail="文档不存在")
+        
+        # 检查父章节是否存在
+        parent_chapter = await ChapterMapper.get_chapter_by_id(db, parent_id)
+        if not parent_chapter:
+            raise HTTPException(status_code=404, detail="父章节不存在")
+        
+        # 计算默认的 order_index：当前文档最大 order_index + 1
+        chapters = await ChapterMapper.get_chapters_by_document_id(db, document_id)
+        max_order_index = max([chapter.order_index for chapter in chapters], default=-1)
+        order_index = max_order_index + 1
+        
+        # 创建新子章节，使用默认值
+        new_chapter = Chapter(
+            document_id=document_id,
+            parent_id=parent_id,
+            title=f"新子章节",  # 默认标题
+            status=0,  # 默认状态：0-编辑中
+            order_index=order_index
+        )
+        
+        return await ChapterMapper.create_chapter(db, new_chapter)
+
+    @staticmethod
     async def update_chapter(db: AsyncSession, chapter_id: UUID, chapter_in: ChapterUpdate):
         chapter = await ChapterMapper.get_chapter_by_id(db, chapter_id)
         if not chapter:
@@ -102,6 +132,7 @@ class ChapterService:
         chapter_dict = {
             "chapter_id": updated_chapter.chapter_id,
             "document_id": updated_chapter.document_id,
+            "parent_id": updated_chapter.parent_id,
             "title": updated_chapter.title,
             "status": updated_chapter.status,
             "order_index": updated_chapter.order_index,

@@ -3,6 +3,10 @@ from sqlalchemy.future import select
 from uuid import UUID, uuid4
 from db.models import Template
 from db.mappers.template_mapper import TemplateMapper
+from db.mappers.core_info_template_mapper import CoreInfoTemplateMapper
+from db.mappers.summary_template_mapper import SummaryTemplateMapper
+from db.mappers.structure_template_mapper import StructureTemplateMapper
+from db.models import Template, CoreInfoTemplate, SummaryTemplate, StructureTemplate
 
 class TemplateService:
     @staticmethod
@@ -153,7 +157,82 @@ class TemplateService:
         if not official_template:
             return None
         
-        # 直接修改原模板的内容
+        # 1. 清空当前用户模板的旧子表数据
+        await CoreInfoTemplateMapper.delete_by_template_id(db, source_template.template_id)
+        await SummaryTemplateMapper.delete_by_template_id(db, source_template.template_id)
+        await StructureTemplateMapper.delete_by_template_id(db, source_template.template_id)
+
+        # 2. 深拷贝官方模板的 CoreInfoTemplate
+        old_core_infos = await CoreInfoTemplateMapper.get_by_template_id(db, official_template.template_id)
+        if old_core_infos:
+            new_core_infos = []
+            for old_ci in old_core_infos:
+                new_ci = CoreInfoTemplate(
+                    template_id=source_template.template_id,
+                    field_name=old_ci.field_name,
+                    field_key=old_ci.field_key,
+                    field_type=old_ci.field_type,
+                    default_value=old_ci.default_value,
+                    options=old_ci.options,
+                    is_required=old_ci.is_required,
+                    order_index=old_ci.order_index
+                )
+                new_core_infos.append(new_ci)
+            await CoreInfoTemplateMapper.batch_create(db, new_core_infos)
+
+        # 3. 深拷贝官方模板的 SummaryTemplate
+        old_summaries = await SummaryTemplateMapper.get_by_template_id(db, official_template.template_id)
+        if old_summaries:
+            new_summaries = []
+            for old_sum in old_summaries:
+                new_sum = SummaryTemplate(
+                    template_id=source_template.template_id,
+                    title=old_sum.title,
+                    generation_mode=old_sum.generation_mode,
+                    content_template=old_sum.content_template,
+                    sources=old_sum.sources,
+                    default_prompt=old_sum.default_prompt,
+                    custom_prompt=old_sum.custom_prompt,
+                    order_index=old_sum.order_index
+                )
+                new_summaries.append(new_sum)
+            await SummaryTemplateMapper.batch_create(db, new_summaries)
+
+        # 4. 深拷贝官方模板的 StructureTemplate (处理树形结构)
+        old_structures = await StructureTemplateMapper.get_by_template_id(db, official_template.template_id)
+        if old_structures:
+            # 按层级排序，确保父节点先于子节点处理
+            sorted_old_structures = sorted(old_structures, key=lambda x: x.level)
+            
+            id_mapping = {}
+            new_structures = []
+            
+            for old_struct in sorted_old_structures:
+                new_struct_id = uuid4()
+                id_mapping[old_struct.structure_template_id] = new_struct_id
+                
+                new_parent_id = None
+                if old_struct.parent_id:
+                    new_parent_id = id_mapping.get(old_struct.parent_id)
+                
+                new_struct = StructureTemplate(
+                    structure_template_id=new_struct_id,
+                    template_id=source_template.template_id,
+                    parent_id=new_parent_id,
+                    title=old_struct.title,
+                    level=old_struct.level,
+                    generation_mode=old_struct.generation_mode,
+                    content_template=old_struct.content_template,
+                    sources=old_struct.sources,
+                    default_prompt=old_struct.default_prompt,
+                    custom_prompt=old_struct.custom_prompt,
+                    order_index=old_struct.order_index
+                )
+                new_structures.append(new_struct)
+            
+            await StructureTemplateMapper.batch_create(db, new_structures)
+
+        # 5. 直接修改原模板的主表内容 (兜底字段覆盖)
         source_template.purpose = official_template.purpose
         source_template.display_name = official_template.display_name
         source_template.content = official_template.content

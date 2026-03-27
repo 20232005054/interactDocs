@@ -12,6 +12,13 @@ class ChapterMapper:
         return result.scalars().all()
 
     @staticmethod
+    async def get_chapters_by_parent_id(db: AsyncSession, parent_id: UUID):
+        result = await db.execute(
+            select(Chapter).where(Chapter.parent_id == parent_id).order_by(Chapter.order_index)
+        )
+        return result.scalars().all()
+
+    @staticmethod
     async def get_chapter_by_id(db: AsyncSession, chapter_id: UUID):
         result = await db.execute(
             select(Chapter).where(Chapter.chapter_id == chapter_id)
