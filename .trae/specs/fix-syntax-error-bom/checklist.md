@@ -1,2 +1,0 @@
-- [x] `ai_service.py` 文件中的 BOM 标记已被成功移除
-- [x] 后端服务能够正常解析 `ai_service.py`，不再报 `SyntaxError: invalid non-printable character U+FEFF` 错误

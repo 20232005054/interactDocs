@@ -249,10 +249,11 @@ public.update_updated_at_column()
 
 （这三张表用于支持多维度的模板定义，包含 `template_id` 外键关联到 `templates` 表。）
 
+### 2.12 历史记录表
+
 #### document_summary_history (摘要历史)
 
 | 字段 | 类型 | 约束 | 说明 |
-|------|------|------|------|
 | `history_id` | uuid | PK, DEFAULT gen_random_uuid() | 记录唯一标识 |
 | `summary_id` | uuid | FK → document_summaries | 所属摘要 |
 | `version` | integer | NOT NULL | 版本号 |
@@ -290,6 +291,7 @@ public.update_updated_at_column()
 | `idx_document_versions_document_id` | document_versions | document_id | 文档快照查询 |
 | `idx_documents_template_id` | documents | template_id | 模板文档查询 |
 | `idx_documents_user_id` | documents | user_id | 用户文档查询 |
+| `idx_document_core_info_document_id` | document_core_info | document_id | 文档核心信息查询 |
 
 ### 3.3 业务索引
 
@@ -338,6 +340,7 @@ documents ─┬─► chapters
            ├─► document_keywords
            ├─► document_versions
            ├─► chat_records
+           ├─► document_core_info
            └─► operation_history
 
 chapters ─┬─► paragraphs
@@ -375,9 +378,13 @@ summaries ◄──► keywords
 | documents | chapters | 删除文档时级联删除所有章节 |
 | documents | document_keywords | 删除文档时级联删除所有关键词 |
 | documents | document_summaries | 删除文档时级联删除所有摘要 |
+| documents | document_core_info | 删除文档时级联删除所有核心信息 |
 | chapters | paragraphs | 删除章节时级联删除所有段落 |
 | document_keywords | document_keyword_history | 删除关键词时级联删除历史 |
 | document_summaries | document_summary_history | 删除摘要时级联删除历史 |
+| templates | core_info_templates | 删除模板时级联删除核心信息模板 |
+| templates | summary_templates | 删除模板时级联删除摘要模板 |
+| templates | structure_templates | 删除模板时级联删除结构模板 |
 
 ### 5.2 SET NULL (置空)
 
@@ -515,13 +522,14 @@ summaries ◄──► keywords
 
 1. `users` (无依赖)
 2. `templates` (依赖 users)
-3. `documents` (依赖 users, templates)
-4. `chapters` (依赖 documents, 自关联)
-5. `paragraphs` (依赖 chapters)
-6. `document_summaries` / `document_keywords` (依赖 documents)
-7. `document_summary_history` / `document_keyword_history` (依赖 summaries/keywords)
-8. `document_versions` / `chat_records` / `operation_history` (依赖 users, documents, chapters)
-9. `dependency_edges` (无强外键，逻辑关联)
+3. `core_info_templates` / `summary_templates` / `structure_templates` (依赖 templates)
+4. `documents` (依赖 users, templates)
+5. `chapters` (依赖 documents, 自关联)
+6. `paragraphs` (依赖 chapters)
+7. `document_summaries` / `document_keywords` / `document_core_info` (依赖 documents)
+8. `document_summary_history` / `document_keyword_history` (依赖 summaries/keywords)
+9. `document_versions` / `chat_records` / `operation_history` (依赖 users, documents, chapters)
+10. `dependency_edges` (无强外键，逻辑关联)
 
 ### 9.2 触发器创建
 

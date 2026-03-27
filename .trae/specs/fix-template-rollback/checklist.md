@@ -1,6 +1,0 @@
-- [x] `template_service.py` 成功引入了必要的 Mapper
-- [x] `rollback_template` 执行了删除旧子表数据的操作
-- [x] `rollback_template` 成功将官方模板的 `CoreInfoTemplate` 复制给了目标模板
-- [x] `rollback_template` 成功将官方模板的 `SummaryTemplate` 复制给了目标模板
-- [x] `rollback_template` 使用映射算法成功将官方模板的 `StructureTemplate` 树复制给了目标模板
-- [x] 回退操作没有引发外键约束等数据库异常

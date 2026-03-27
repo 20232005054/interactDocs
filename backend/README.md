@@ -35,6 +35,10 @@ backend/
 │   ├── summaries.py        # 摘要接口
 │   ├── keywords.py         # 关键词接口
 │   ├── templates.py        # 模板接口
+│   ├── core_info.py        # 核心信息接口
+│   ├── core_info_templates.py # 核心信息模板接口
+│   ├── summary_templates.py   # 摘要模板接口
+│   ├── structure_templates.py # 结构模板接口
 │   ├── ai.py               # AI 对话接口
 │   └── endpoints.py        # 辅助接口
 ├── core/                   # 核心组件
@@ -113,9 +117,22 @@ python main.py
 |------|------|------|
 | GET | `/api/v1/chapters/{id}` | 章节详情 |
 | POST | `/api/v1/chapters/{document_id}` | 创建章节 |
+| POST | `/api/v1/chapters/{document_id}/sub/{parent_id}` | 创建子章节 |
 | PUT | `/api/v1/chapters/{id}` | 更新章节 |
 | DELETE | `/api/v1/chapters/{id}` | 删除章节 |
 | GET | `/api/v1/chapters/{id}/toc` | 章节目录 |
+| POST | `/api/v1/chapters/{id}/generate-content` | AI生成章节内容 |
+
+### 核心信息与模板管理
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/v1/core-info/document/{document_id}` | 获取文档核心信息列表 |
+| POST | `/api/v1/core-info/document/{document_id}` | 批量保存核心信息 |
+| GET | `/api/v1/templates` | 模板列表 |
+| GET | `/api/v1/core-info-templates/template/{template_id}` | 获取核心信息模板 |
+| POST | `/api/v1/core-info-templates/template/{template_id}` | 创建/更新核心信息模板 |
+| GET | `/api/v1/structure-templates/template/{template_id}` | 获取结构模板树 |
 
 ### 段落管理
 

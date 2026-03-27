@@ -124,28 +124,25 @@ data: [DONE]
 - **接口**: `GET /api/v1/documents/documents/{document_id}/chapters`
 - **说明**: 注意路径中包含重复的 `documents`
 
-### 2.7 全局变量管理
+### 2.7 核心信息管理
 
-全局变量存储在 `documents.content.global_variables` 中。
+- **接口**: `GET /api/v1/core-info/document/{document_id}`
+- **说明**: 获取指定文档的所有核心信息列表。
 
-| 接口 | 方法 | 说明 |
-|------|------|------|
-| `/api/v1/documents/{document_id}/global-variables` | GET | 获取全局变量列表 |
-| `/api/v1/documents/{document_id}/global-variables` | PUT | 批量更新全局变量 |
-| `/api/v1/documents/{document_id}/global-variables` | POST | 添加单个全局变量 |
-| `/api/v1/documents/{document_id}/global-variables/{order_index}` | PUT | 更新单个全局变量 |
-| `/api/v1/documents/{document_id}/global-variables/{order_index}` | DELETE | 删除全局变量 |
-
-**全局变量结构**:
-
+- **接口**: `POST /api/v1/core-info/document/{document_id}`
+- **说明**: 批量保存/更新当前文档的核心信息。
+- **请求体**: 
 ```json
 {
-  "key": "变量名",
-  "value": "变量值",
-  "type": "string",
-  "description": "变量说明",
-  "is_locked": false,
-  "order_index": 0
+  "core_info_list": [
+    {
+      "core_info_id": "UUID (可选)",
+      "title": "字段名",
+      "content": "字段内容",
+      "is_locked": false,
+      "order_index": 0
+    }
+  ]
 }
 ```
 
@@ -432,10 +429,26 @@ data: [DONE]
 
 - **接口**: `GET /api/v1/templates/by-purpose/{purpose}?is_system=...&is_active=...`
 
-### 7.9 模板回滚
+### 7.10 核心信息模板管理
 
-- **接口**: `POST /api/v1/templates/rollback/{template_id}`
-- **说明**: 将模板内容回滚到对应的系统模板版本
+- **获取指定模板下的核心信息模板列表**
+  - **接口**: `GET /api/v1/core-info-templates/template/{template_id}`
+- **创建/更新核心信息模板**
+  - **接口**: `POST /api/v1/core-info-templates/template/{template_id}`
+
+### 7.11 摘要模板管理
+
+- **获取指定模板下的摘要模板列表**
+  - **接口**: `GET /api/v1/summary-templates/template/{template_id}`
+- **创建/更新摘要模板**
+  - **接口**: `POST /api/v1/summary-templates/template/{template_id}`
+
+### 7.12 结构模板管理
+
+- **获取指定模板下的结构模板树**
+  - **接口**: `GET /api/v1/structure-templates/template/{template_id}`
+- **创建/更新结构模板树**
+  - **接口**: `POST /api/v1/structure-templates/template/{template_id}`
 
 ---
 
