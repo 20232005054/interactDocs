@@ -187,19 +187,26 @@ data: [DONE]
 
 - **接口**: `POST /api/v1/chapters/{document_id}`
 - **说明**: 
-  - 使用默认标题创建
+  - 使用默认标题创建一级章节
   - `order_index` 自动追加到文档末尾
 
-### 3.4 删除章节
+### 3.4 创建子章节
+
+- **接口**: `POST /api/v1/chapters/{document_id}/sub/{parent_id}`
+- **说明**: 
+  - 必须提供有效的 `parent_id` 
+  - 使用默认标题创建，并自动计算在父节点下的 `order_index`
+
+### 3.5 删除章节
 
 - **接口**: `DELETE /api/v1/chapters/{chapter_id}`
 
-### 3.5 获取章节目录
+### 3.6 获取章节目录
 
 - **接口**: `GET /api/v1/chapters/{chapter_id}/toc`
 - **说明**: 提取 `heading-1` 到 `heading-6` 类型的段落作为目录
 
-### 3.6 从摘要生成章节内容
+### 3.7 从摘要生成章节内容
 
 - **接口**: `POST /api/v1/chapters/{chapter_id}/generate-content`
 - **返回**: SSE 流式响应

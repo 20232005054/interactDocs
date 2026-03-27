@@ -74,28 +74,10 @@ public.update_updated_at_column()
 | `user_id` | uuid | FK → users | 所属用户 |
 | `template_id` | uuid | FK → templates | 关联模板 |
 | `title` | varchar(80) | NOT NULL | 文档标题 |
-| `content` | jsonb | DEFAULT '[]' | 全局变量等配置 |
 | `purpose` | varchar(50) | NULL | 使用目的 |
 | `snapshot_cursor` | integer | DEFAULT 0 | 快照计数器 |
 | `created_at` | timestamp | DEFAULT CURRENT_TIMESTAMP | 创建时间 |
 | `updated_at` | timestamp | DEFAULT CURRENT_TIMESTAMP | 更新时间 |
-
-**content 结构示例**:
-
-```json
-{
-  "global_variables": [
-    {
-      "key": "变量名",
-      "value": "变量值",
-      "type": "string",
-      "description": "变量说明",
-      "is_locked": false,
-      "order_index": 0
-    }
-  ]
-}
-```
 
 ### 2.4 chapters (章节表)
 
@@ -241,7 +223,31 @@ public.update_updated_at_column()
 - `paragraph` → `keyword`: 段落关联关键词
 - `summary` → `keyword`: 摘要关联关键词
 
-### 2.12 历史记录表
+### 2.13 核心信息表
+
+#### document_core_info (文档核心信息)
+
+存储文档的核心信息（原全局变量）。
+
+| 字段 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| `core_info_id` | uuid | PK, DEFAULT gen_random_uuid() | 唯一标识 |
+| `document_id` | uuid | FK → documents, ON DELETE CASCADE | 所属文档 |
+| `title` | varchar(200) | NOT NULL | 信息名称 |
+| `content` | text | NOT NULL | 信息内容 |
+| `order_index` | integer | NOT NULL, DEFAULT 0 | 排序索引 |
+| `is_locked` | boolean | NOT NULL, DEFAULT false | 是否锁定 |
+| `is_change` | integer | NOT NULL, DEFAULT 0 | 变更状态 |
+| `created_at` | timestamp | DEFAULT CURRENT_TIMESTAMP | 创建时间 |
+| `updated_at` | timestamp | DEFAULT CURRENT_TIMESTAMP | 更新时间 |
+
+### 2.14 扩展模板表
+
+#### core_info_templates (核心信息模板)
+#### summary_templates (摘要模板)
+#### structure_templates (结构模板)
+
+（这三张表用于支持多维度的模板定义，包含 `template_id` 外键关联到 `templates` 表。）
 
 #### document_summary_history (摘要历史)
 
