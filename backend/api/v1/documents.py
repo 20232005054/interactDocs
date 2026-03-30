@@ -165,7 +165,9 @@ async def apply_summary_template(document_id: UUID, db: AsyncSession = Depends(g
                 "content": item["summary"].content,
                 "order_index": item["summary"].order_index,
                 "generation_mode": item["generation_mode"],
-                "sources": item["sources"]
+                "sources": item["sources"],
+                "degraded": item.get("degraded", False),
+                "generation_error": item.get("generation_error"),
             }
             for item in created_items
         ]
@@ -186,10 +188,15 @@ async def apply_structure_template(document_id: UUID, db: AsyncSession = Depends
                 "title": item["chapter"].title,
                 "level": item["chapter"].order_index,
                 "order_index": item["chapter"].order_index,
+                "generation_mode": item["generation_mode"],
                 "content_template": item["content_template"],
                 "sources": item["sources"],
                 "default_prompt": item["default_prompt"],
-                "custom_prompt": item["custom_prompt"]
+                "custom_prompt": item["custom_prompt"],
+                "degraded": item.get("degraded", False),
+                "generation_error": item.get("generation_error"),
+                "paragraph_id": str(item["paragraph"].paragraph_id) if item.get("paragraph") else None,
+                "paragraph_content": item.get("paragraph_content"),
             }
             for item in created_items
         ]

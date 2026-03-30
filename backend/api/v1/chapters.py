@@ -14,6 +14,14 @@ router = APIRouter(prefix="/api/v1", tags=["章节管理"])
 
 
 
+@router.get("/chapters/document/{document_id}/tree", summary="获取文档章节层级目录")
+async def get_chapter_tree(document_id: UUID, db: AsyncSession = Depends(get_db)):
+    """
+    获取文档的章节目录（层级树状结构）
+    """
+    tree = await ChapterService.get_chapter_tree(db, document_id)
+    return success_response(data={"tree": tree})
+
 @router.get("/chapters/{chapter_id}", summary="获取章节段落详情")
 async def get_chapter_detail(chapter_id: UUID, db: AsyncSession = Depends(get_db)):
     chapter_data = await ChapterService.get_chapter_detail(db, chapter_id)

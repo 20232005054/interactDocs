@@ -79,6 +79,7 @@ class StructureTemplateService:
                     node = {
                         "structure_template_id": str(t.structure_template_id),
                         "title": t.title,
+                        "field_key": t.field_key,
                         "level": t.level,
                         "generation_mode": t.generation_mode,
                         "order_index": t.order_index,

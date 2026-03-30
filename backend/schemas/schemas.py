@@ -33,7 +33,7 @@ class Token(BaseModel):
 
 
 
-# --- 文档相关 (Document) ---
+# --- 文档相关 (Document) ---------------------------------------------------------------------------------
 class DocumentBase(BaseModel):
     title: str = Field(..., max_length=80, description="方案标题")
     purpose: str = Field(..., description="使用目的")
@@ -48,7 +48,7 @@ class DocumentUpdate(BaseModel):
     template_id: Optional[UUID] = Field(None, description="模板ID")
 
 
-# --- 章节相关 (Chapter) ---
+# --- 段落相关 (Paragraph) ---------------------------------------------------------------------------------
 class ParagraphBase(BaseModel):
     content: str = Field(..., description="文本内容")
     para_type: str = Field(..., description="类型：正文、一级标题、二级标题、三级标题")
@@ -60,7 +60,7 @@ class ParagraphBase(BaseModel):
 
 class ParagraphCreate(BaseModel):
     para_type: Optional[str] = None
-    order_index: Optional[int] = None
+    # order_index: Optional[int] = None
     ai_eval: Optional[str] = None
     ai_suggestion: Optional[str] = None
     ai_generate: Optional[str] = None
@@ -201,9 +201,11 @@ class DocumentKeywordUpdate(BaseModel):
 class CoreInfoBase(BaseModel):
     title: str = Field(..., description="核心信息标题")
     content: str = Field(..., description="核心信息内容")
+    field_type: str = Field(default="text", description="字段类型")
+    options: Optional[List[str]] = Field(None, description="select类型的选项列表")
+    is_required: bool = Field(default=True, description="是否必填")
 
 class CoreInfoCreate(CoreInfoBase):
-    document_id: UUID = Field(..., description="文档ID")
     order_index: Optional[int] = Field(None, description="排序索引")
     is_locked: Optional[bool] = Field(False, description="是否锁定")
 
@@ -268,6 +270,7 @@ class CoreInfoTemplateUpdate(BaseModel):
 class SummaryTemplateCreate(BaseModel):
     template_id: UUID = Field(..., description="关联的主模板ID")
     title: str = Field(..., description="摘要标题")
+    field_key: str = Field(..., description="字段标识")
     generation_mode: int = Field(default=0, description="生成方式：0=复制，1=AI总结")
     content_template: Optional[str] = Field(None, description="内容模板，支持{{变量名}}替换")
     sources: Optional[List[SourceInfo]] = Field(None, description="来源信息数组")
@@ -278,6 +281,7 @@ class SummaryTemplateCreate(BaseModel):
 
 class SummaryTemplateUpdate(BaseModel):
     title: Optional[str] = Field(None, description="摘要标题")
+    field_key: Optional[str] = Field(None, description="字段标识")
     generation_mode: Optional[int] = Field(None, description="生成方式：0=复制，1=AI总结")
     content_template: Optional[str] = Field(None, description="内容模板")
     sources: Optional[List[SourceInfo]] = Field(None, description="来源信息数组")
@@ -291,6 +295,7 @@ class StructureTemplateCreate(BaseModel):
     template_id: UUID = Field(..., description="关联的主模板ID")
     parent_id: Optional[UUID] = Field(None, description="父章节ID")
     title: str = Field(..., description="章节标题")
+    field_key: str = Field(..., description="字段标识")
     level: int = Field(..., description="层级")
     generation_mode: int = Field(default=0, description="生成方式：0=复制，1=AI总结")
     content_template: Optional[str] = Field(None, description="内容模板")
@@ -303,6 +308,7 @@ class StructureTemplateCreate(BaseModel):
 class StructureTemplateUpdate(BaseModel):
     parent_id: Optional[UUID] = Field(None, description="父章节ID")
     title: Optional[str] = Field(None, description="章节标题")
+    field_key: Optional[str] = Field(None, description="字段标识")
     level: Optional[int] = Field(None, description="层级")
     generation_mode: Optional[int] = Field(None, description="生成方式：0=复制，1=AI总结")
     content_template: Optional[str] = Field(None, description="内容模板")

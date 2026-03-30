@@ -1,0 +1,6 @@
+- [x] `SummaryTemplate` 模型包含了 `field_key` 字段。
+- [x] `StructureTemplate` 模型包含了 `field_key` 字段。
+- [x] Schema 定义已同步更新 `field_key` 的验证和传递。
+- [x] 深拷贝逻辑（`create_document`）能够正确转移 `field_key`。
+- [x] `database.sql` 初始化脚本和相应的更新迁移脚本均包含了 `field_key`。
+- [x] `insert_template_test_data.sql` 已完全去除了在 `sources` 中对 UUID 的硬编码依赖，改为使用 `field_key`。

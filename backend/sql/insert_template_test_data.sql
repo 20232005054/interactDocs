@@ -30,59 +30,59 @@ INSERT INTO core_info_templates (core_template_id, template_id, field_name, fiel
 
 -- 3. 插入摘要模板测试数据
 -- 复制模式示例（generation_mode=0）
-INSERT INTO summary_templates (summary_template_id, template_id, title, generation_mode, content_template, sources, default_prompt, custom_prompt, order_index) VALUES
-('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '试验名称', 0, '{{trial_name}}', 
+INSERT INTO summary_templates (summary_template_id, template_id, title, field_key, generation_mode, content_template, sources, default_prompt, custom_prompt, order_index) VALUES
+('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '试验名称', 'sum_trial_name', 0, '{{trial_name}}', 
 '[{"source": "keyinfo", "match_type": "关键信息匹配", "match_key": "trial_name", "target_field": "trial_name"}]',
 NULL, NULL, 0),
-('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a02', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '申办方', 0, '{{sponsor}}',
+('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a02', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '申办方', 'sum_sponsor', 0, '{{sponsor}}',
 '[{"source": "keyinfo", "match_type": "关键信息匹配", "match_key": "sponsor", "target_field": "sponsor"}]',
 NULL, NULL, 1);
 
 -- AI生成模式示例（generation_mode=1，引用核心信息）
-INSERT INTO summary_templates (summary_template_id, template_id, title, generation_mode, content_template, sources, default_prompt, custom_prompt, order_index) VALUES
-('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a03', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '研究目的', 1, NULL, 
+INSERT INTO summary_templates (summary_template_id, template_id, title, field_key, generation_mode, content_template, sources, default_prompt, custom_prompt, order_index) VALUES
+('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a03', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '研究目的', 'sum_research_purpose', 1, NULL, 
 '[{"source": "keyinfo", "match_type": "关键信息匹配", "match_key": "trial_purpose", "target_field": "trial_purpose"}, {"source": "keyinfo", "match_type": "关键信息匹配", "match_key": "primary_endpoint", "target_field": "primary_endpoint"}]',
 '根据以下核心信息，撰写研究目的摘要：\n研究目的：{{trial_purpose}}\n主要终点：{{primary_endpoint}}',
 '作为临床试验专家，请根据研究目的和主要终点，撰写一段100-150字的研究目的摘要，要求语言专业、逻辑清晰。',
 2);
 
 -- AI生成模式示例（generation_mode=1，引用其他摘要）
-INSERT INTO summary_templates (summary_template_id, template_id, title, generation_mode, content_template, sources, default_prompt, custom_prompt, order_index) VALUES
-('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a04', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '研究概述', 1, NULL,
-'[{"source": "summary", "match_type": "摘要信息匹配", "match_key": "d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a03", "target_field": "research_purpose"}]',
+INSERT INTO summary_templates (summary_template_id, template_id, title, field_key, generation_mode, content_template, sources, default_prompt, custom_prompt, order_index) VALUES
+('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a04', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '研究概述', 'sum_research_overview', 1, NULL,
+'[{"source": "summary", "match_type": "摘要信息匹配", "match_key": "sum_research_purpose", "target_field": "research_purpose"}]',
 '请根据以下摘要信息，撰写研究概述：\n{{research_purpose}}',
 '综合研究目的摘要，撰写一段200字的研究概述，突出研究的核心价值。',
 3);
 
 -- 4. 插入文章结构模板测试数据
 -- 一级标题
-INSERT INTO structure_templates (structure_template_id, template_id, parent_id, title, level, generation_mode, content_template, sources, default_prompt, custom_prompt, order_index) VALUES
-('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', NULL, '研究背景', 1, 1, NULL, 
+INSERT INTO structure_templates (structure_template_id, template_id, parent_id, title, field_key, level, generation_mode, content_template, sources, default_prompt, custom_prompt, order_index) VALUES
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', NULL, '研究背景', 'chp_research_background', 1, 1, NULL, 
 '[{"source": "keyinfo", "match_type": "关键信息匹配", "match_key": "trial_purpose", "target_field": "trial_purpose"}]',
 '根据研究目的撰写研究背景...',
 '作为临床试验专家，请根据研究目的撰写研究背景，包括疾病现状、研究意义等内容。',
 0),
-('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a02', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', NULL, '研究设计', 1, 1, NULL, NULL, '根据核心信息撰写研究设计章节...', NULL, 1),
-('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a03', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', NULL, '统计分析', 1, 1, NULL, NULL, '撰写统计分析章节...', NULL, 2),
-('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a04', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', NULL, '讨论与结论', 1, 1, NULL,
-'[{"source": "chapter", "match_type": "章节信息匹配", "match_key": "e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a02", "target_field": "research_design"}, {"source": "summary", "match_type": "摘要信息匹配", "match_key": "d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a03", "target_field": "research_purpose"}]',
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a02', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', NULL, '研究设计', 'chp_research_design', 1, 1, NULL, NULL, '根据核心信息撰写研究设计章节...', NULL, 1),
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a03', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', NULL, '统计分析', 'chp_statistical_analysis', 1, 1, NULL, NULL, '撰写统计分析章节...', NULL, 2),
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a04', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', NULL, '讨论与结论', 'chp_discussion_conclusion', 1, 1, NULL,
+'[{"source": "chapter", "match_type": "章节信息匹配", "match_key": "chp_research_design", "target_field": "research_design"}, {"source": "summary", "match_type": "摘要信息匹配", "match_key": "sum_research_purpose", "target_field": "research_purpose"}]',
 '根据研究结果撰写讨论与结论...',
 '综合研究设计和研究目的，撰写讨论与结论章节。',
 3);
 
 -- 二级标题（研究设计的子章节）
-INSERT INTO structure_templates (structure_template_id, template_id, parent_id, title, level, generation_mode, content_template, sources, default_prompt, custom_prompt, order_index) VALUES
-('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a05', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a02', '研究类型', 2, 1, NULL, NULL, '撰写研究类型说明...', NULL, 0),
-('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a06', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a02', '样本量估算', 2, 0,
+INSERT INTO structure_templates (structure_template_id, template_id, parent_id, title, field_key, level, generation_mode, content_template, sources, default_prompt, custom_prompt, order_index) VALUES
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a05', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a02', '研究类型', 'chp_research_type', 2, 1, NULL, NULL, '撰写研究类型说明...', NULL, 0),
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a06', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a02', '样本量估算', 'chp_sample_size', 2, 0,
 '本研究计划纳入{{sample_size}}例受试者。',
 '[{"source": "keyinfo", "match_type": "关键信息匹配", "match_key": "sample_size", "target_field": "sample_size"}]',
 NULL, NULL, 1),
-('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a07', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a02', '入排标准', 2, 1, NULL,
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a07', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a02', '入排标准', 'chp_eligibility_criteria', 2, 1, NULL,
 '[{"source": "keyinfo", "match_type": "关键信息匹配", "match_key": "target_population", "target_field": "target_population"}]',
 '根据目标人群撰写入排标准...',
 NULL, 2);
 
 -- 二级标题（统计分析的子章节）
-INSERT INTO structure_templates (structure_template_id, template_id, parent_id, title, level, generation_mode, content_template, sources, default_prompt, custom_prompt, order_index) VALUES
-('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a08', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a03', '主要分析', 2, 1, NULL, NULL, '撰写主要分析方法...', NULL, 0),
-('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a09', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a03', '次要分析', 2, 1, NULL, NULL, '撰写次要分析方法...', NULL, 1);
+INSERT INTO structure_templates (structure_template_id, template_id, parent_id, title, field_key, level, generation_mode, content_template, sources, default_prompt, custom_prompt, order_index) VALUES
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a08', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a03', '主要分析', 'chp_primary_analysis', 2, 1, NULL, NULL, '撰写主要分析方法...', NULL, 0),
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a09', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a03', '次要分析', 'chp_secondary_analysis', 2, 1, NULL, NULL, '撰写次要分析方法...', NULL, 1);

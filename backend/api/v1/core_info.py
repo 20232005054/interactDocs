@@ -8,21 +8,22 @@ from core.response import success_response
 
 router = APIRouter(prefix="/api/v1", tags=["核心信息管理"])
 
-@router.post("/", response_model=CoreInfo, summary="创建核心信息")
-async def create_core_info(core_info: CoreInfoCreate, db: AsyncSession = Depends(get_db)):
+@router.post("/documents/{document_id}/core-info", summary="创建核心信息")
+async def create_core_info(document_id: uuid.UUID, core_info: CoreInfoCreate, db: AsyncSession = Depends(get_db)):
     """
     创建核心信息
     
-    - **document_id**: 文档ID
+    - **document_id**: 文档ID (URL路径参数)
     - **title**: 核心信息标题
     - **content**: 核心信息内容
     - **order_index**: 排序索引（可选）
     - **is_locked**: 是否锁定（默认False）
     """
-    result = await CoreInfoService.create_core_info(db, core_info)
-    return success_response(result)
+    result = await CoreInfoService.create_core_info(db, document_id, core_info)
+    # 将 SQLAlchemy 模型转换为 Pydantic Schema 后再返回给 success_response
+    return success_response(CoreInfo.model_validate(result))
 
-@router.get("/{core_info_id}", response_model=CoreInfo, summary="获取核心信息详情")
+@router.get("/{core_info_id}", summary="获取核心信息详情")
 async def get_core_info(core_info_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     """
     根据ID获取核心信息详情
@@ -30,17 +31,17 @@ async def get_core_info(core_info_id: uuid.UUID, db: AsyncSession = Depends(get_
     result = await CoreInfoService.get_core_info_by_id(db, core_info_id)
     if not result:
         raise HTTPException(status_code=404, detail="核心信息不存在")
-    return success_response(result)
+    return success_response(CoreInfo.model_validate(result))
 
-@router.get("/document/{document_id}", response_model=list[CoreInfo], summary="获取文档的核心信息列表")
+@router.get("/document/{document_id}", summary="获取文档的核心信息列表")
 async def get_core_info_by_document(document_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     """
     获取指定文档的所有核心信息，按order_index排序
     """
     result = await CoreInfoService.get_core_info_by_document_id(db, document_id)
-    return success_response(result)
+    return success_response([CoreInfo.model_validate(item) for item in result])
 
-@router.put("/{core_info_id}", response_model=CoreInfo, summary="更新核心信息")
+@router.put("/{core_info_id}", summary="更新核心信息")
 async def update_core_info(core_info_id: uuid.UUID, core_info: CoreInfoUpdate, db: AsyncSession = Depends(get_db)):
     """
     更新核心信息
@@ -59,7 +60,7 @@ async def update_core_info(core_info_id: uuid.UUID, core_info: CoreInfoUpdate, d
         raise HTTPException(status_code=400, detail="核心信息已锁定，无法修改")
     
     result = await CoreInfoService.update_core_info(db, core_info_id, core_info)
-    return success_response(result)
+    return success_response(CoreInfo.model_validate(result))
 
 @router.delete("/{core_info_id}", summary="删除核心信息")
 async def delete_core_info(core_info_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
@@ -91,7 +92,7 @@ async def update_core_info_order(core_info_id: uuid.UUID, order_update: CoreInfo
     success = await CoreInfoService.update_order(db, existing.document_id, core_info_id, order_update.new_order)
     return success_response(None, "排序更新成功" if success else "排序更新失败")
 
-@router.post("/{core_info_id}/lock", response_model=CoreInfo, summary="锁定核心信息")
+@router.post("/{core_info_id}/lock", summary="锁定核心信息")
 async def lock_core_info(core_info_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     """
     锁定核心信息，锁定后无法修改内容
@@ -101,9 +102,9 @@ async def lock_core_info(core_info_id: uuid.UUID, db: AsyncSession = Depends(get
         raise HTTPException(status_code=404, detail="核心信息不存在")
     
     result = await CoreInfoService.lock_core_info(db, core_info_id)
-    return success_response(result, "锁定成功")
+    return success_response(CoreInfo.model_validate(result), "锁定成功")
 
-@router.post("/{core_info_id}/unlock", response_model=CoreInfo, summary="解锁核心信息")
+@router.post("/{core_info_id}/unlock", summary="解锁核心信息")
 async def unlock_core_info(core_info_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     """
     解锁核心信息，解锁后可以修改内容
@@ -113,4 +114,4 @@ async def unlock_core_info(core_info_id: uuid.UUID, db: AsyncSession = Depends(g
         raise HTTPException(status_code=404, detail="核心信息不存在")
     
     result = await CoreInfoService.unlock_core_info(db, core_info_id)
-    return success_response(result, "解锁成功")
+    return success_response(CoreInfo.model_validate(result), "解锁成功")

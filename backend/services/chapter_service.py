@@ -27,6 +27,52 @@ class ChapterService:
         return chapter_list
 
     @staticmethod
+    async def get_chapter_tree(db: AsyncSession, document_id: UUID):
+        # 1. 检查文档是否存在
+        document = await DocumentMapper.get_document_by_id(db, document_id)
+        if not document:
+            raise HTTPException(status_code=404, detail="文档不存在")
+        
+        # 2. 从mapper获取文档下的所有章节
+        chapters = await ChapterMapper.get_chapters_by_document_id(db, document_id)
+        
+        # 3. 构建章节字典，并建立 chapter_id 到节点数据的映射
+        chapter_dict_map = {}
+        for chapter in chapters:
+            chapter_dict_map[chapter.chapter_id] = {
+                "chapter_id": chapter.chapter_id,
+                "document_id": chapter.document_id,
+                "parent_id": chapter.parent_id,
+                "title": chapter.title,
+                "status": chapter.status,
+                "order_index": chapter.order_index,
+                "updated_at": chapter.updated_at,
+                "children": []
+            }
+        
+        # 4. 构建树形结构
+        tree = []
+        for chapter in chapters:
+            node = chapter_dict_map[chapter.chapter_id]
+            if chapter.parent_id and chapter.parent_id in chapter_dict_map:
+                # 如果有父节点，且父节点存在，将当前节点添加到父节点的 children 中
+                chapter_dict_map[chapter.parent_id]["children"].append(node)
+            else:
+                # 否则作为顶级节点
+                tree.append(node)
+                
+        # 5. 对同级节点按 order_index 排序（其实数据库已排序，但层级构建后可再确认）
+        def sort_tree(nodes):
+            nodes.sort(key=lambda x: x["order_index"])
+            for n in nodes:
+                if n["children"]:
+                    sort_tree(n["children"])
+                    
+        sort_tree(tree)
+        
+        return tree
+
+    @staticmethod
     async def get_chapter_detail(db: AsyncSession, chapter_id: UUID):
         # 直接使用mapper获取章节和段落
         chapter, paragraphs = await ChapterMapper.get_chapter_with_paragraphs(db, chapter_id)
@@ -69,9 +115,11 @@ class ChapterService:
         if not document:
             raise HTTPException(status_code=404, detail="文档不存在")
         
-        # 计算默认的 order_index：当前文档最大 order_index + 1
+        # 计算默认的 order_index：当前同级章节最大 order_index + 1
         chapters = await ChapterMapper.get_chapters_by_document_id(db, document_id)
-        max_order_index = max([chapter.order_index for chapter in chapters], default=-1)
+        # 只取同级的章节（parent_id 为 None）
+        sibling_chapters = [c for c in chapters if c.parent_id is None]
+        max_order_index = max([chapter.order_index for chapter in sibling_chapters], default=-1)
         order_index = max_order_index + 1
         
         # 创建新章节，使用默认值
@@ -96,9 +144,11 @@ class ChapterService:
         if not parent_chapter:
             raise HTTPException(status_code=404, detail="父章节不存在")
         
-        # 计算默认的 order_index：当前文档最大 order_index + 1
+        # 计算默认的 order_index：当前同级章节最大 order_index + 1
         chapters = await ChapterMapper.get_chapters_by_document_id(db, document_id)
-        max_order_index = max([chapter.order_index for chapter in chapters], default=-1)
+        # 只取同级的章节（parent_id 为 当前 parent_id）
+        sibling_chapters = [c for c in chapters if c.parent_id == parent_id]
+        max_order_index = max([chapter.order_index for chapter in sibling_chapters], default=-1)
         order_index = max_order_index + 1
         
         # 创建新子章节，使用默认值

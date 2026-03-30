@@ -44,7 +44,31 @@ class ChapterMapper:
 
     @staticmethod
     async def delete_chapter(db: AsyncSession, chapter):
+        document_id = chapter.document_id
+        parent_id = chapter.parent_id
+        deleted_order_index = chapter.order_index
+
         await db.delete(chapter)
+        await db.commit()
+
+        # 严格维护：将被删章节之后的所有同级章节的 order_index 减 1
+        from sqlalchemy import update
+        if parent_id is None:
+            await db.execute(
+                update(Chapter)
+                .where(Chapter.document_id == document_id)
+                .where(Chapter.parent_id == None)
+                .where(Chapter.order_index > deleted_order_index)
+                .values(order_index=Chapter.order_index - 1)
+            )
+        else:
+            await db.execute(
+                update(Chapter)
+                .where(Chapter.document_id == document_id)
+                .where(Chapter.parent_id == parent_id)
+                .where(Chapter.order_index > deleted_order_index)
+                .values(order_index=Chapter.order_index - 1)
+            )
         await db.commit()
 
     @staticmethod

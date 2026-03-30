@@ -7,21 +7,24 @@ from sqlalchemy import select, func
 
 class CoreInfoService:
     @staticmethod
-    async def create_core_info(db: AsyncSession, core_info_in: CoreInfoCreate) -> DocumentCoreInfo:
+    async def create_core_info(db: AsyncSession, document_id: uuid.UUID, core_info_in: CoreInfoCreate) -> DocumentCoreInfo:
         # 计算 order_index
         if core_info_in.order_index is None:
             result = await db.execute(
                 select(func.count(DocumentCoreInfo.core_info_id))
-                .where(DocumentCoreInfo.document_id == core_info_in.document_id)
+                .where(DocumentCoreInfo.document_id == document_id)
             )
             order_index = result.scalar() or 0
         else:
             order_index = core_info_in.order_index
         
         core_info = DocumentCoreInfo(
-            document_id=core_info_in.document_id,
+            document_id=document_id,
             title=core_info_in.title,
             content=core_info_in.content,
+            field_type=core_info_in.field_type,
+            options=core_info_in.options,
+            is_required=core_info_in.is_required,
             order_index=order_index,
             is_locked=core_info_in.is_locked
         )

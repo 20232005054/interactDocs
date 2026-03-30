@@ -191,6 +191,33 @@ data: [DONE]
 
 创建文档时，系统会复制选定的模板生成新的用户模板，文档绑定到新模板而非直接引用原模板。
 
+### 模板生成模式（mode0 / mode1）
+
+- `generation_mode=0`：复制模式。根据 `content_template` 与 `sources` 做变量替换，不触发 AI 调用。
+- `generation_mode=1`：AI 生成模式。先按 `sources` 装配上下文，再用 `custom_prompt` 或 `default_prompt` 渲染提示词并调用 AI。
+- 摘要模板在 `POST /api/v1/documents/{document_id}/apply-summary-template` 执行后，返回每个摘要的 `generation_mode`、`degraded`、`generation_error` 字段。
+- 结构模板在 `POST /api/v1/documents/{document_id}/apply-structure-template` 执行后，除上述字段外，还会返回 `paragraph_id` 与 `paragraph_content`（仅 mode1 会创建段落）。
+
+### mode1 降级策略
+
+- mode1 来源装配失败、AI 调用异常或 AI 空响应时，系统会自动降级到复制模式生成内容，确保模板应用流程不中断。
+- 降级结果通过 `degraded=true` 标记，并在 `generation_error` 中返回 `trace_id`、`error_type`、`error_message`、`error_code`、`duration_ms` 等排障信息。
+- 单条模板项失败不会阻断整批模板应用，接口会继续处理后续条目并统一返回结果。
+
+### AI 性能与稳定性配置
+
+AI 客户端支持以下环境变量配置（`services/ai_client.py`）：
+
+| 变量名 | 默认值 | 说明 |
+|------|------|------|
+| `AI_MODEL` | `qwen-max` | AI 模型名称 |
+| `AI_TIMEOUT_SECONDS` | `30` | 单次请求超时时间（秒） |
+| `AI_MAX_RETRIES` | `2` | 超时/异常后的最大重试次数 |
+| `AI_RETRY_BACKOFF_SECONDS` | `0.8` | 重试退避基数（秒，按次数递增） |
+| `AI_MAX_CONCURRENCY` | `5` | 并发上限（通过信号量限制） |
+
+生产环境建议根据模型耗时与实例规格调整超时、重试与并发参数，优先保障高峰期稳定性。
+
 ### 依赖关系追踪
 
 通过 `dependency_edges` 表维护实体间关系:
