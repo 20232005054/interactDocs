@@ -211,21 +211,21 @@ class SummaryTemplate(Base):
     sources字段结构（数组）：
     [
         {
-            "source": "keyinfo", 
+            "source": {
+                "value": "keyinfo", 
+                "label": "关键信息",
+                "ui_type": "select"
+            },
             "match_type": "关键信息匹配", 
-            "match_key": "trial_name",
+            "match_keys": [
+                {"value": "trial_name", "label": "试验名称"}
+            ],
             "target_field": "trial_name"
-        },
-        {
-            "source": "summary", 
-            "match_type": "摘要信息匹配", 
-            "match_key": "summary_template_id_1",
-            "target_field": "summary_content"
         }
     ]
-    - source: 来源类型（keyinfo/summary/chapter）
+    - source: 来源类型对象，包含 value (keyinfo/summary/chapter), label (显示名), ui_type (组件类型)
     - match_type: 匹配方式描述
-    - match_key: 具体匹配的标识
+    - match_keys: 匹配标识列表（多选），每项包含 value 和 label
     - target_field: 目标字段名，对应content_template中的{{变量名}}
     """
     default_prompt = Column(Text, nullable=True)
@@ -252,21 +252,21 @@ class StructureTemplate(Base):
     sources字段结构（数组）：
     [
         {
-            "source": "keyinfo", 
+            "source": {
+                "value": "keyinfo", 
+                "label": "关键信息",
+                "ui_type": "select"
+            },
             "match_type": "关键信息匹配", 
-            "match_key": "trial_name",
+            "match_keys": [
+                {"value": "trial_name", "label": "试验名称"}
+            ],
             "target_field": "trial_name"
-        },
-        {
-            "source": "chapter", 
-            "match_type": "章节信息匹配", 
-            "match_key": "structure_template_id_1",
-            "target_field": "chapter_content"
         }
     ]
-    - source: 来源类型（keyinfo/summary/chapter）
+    - source: 来源类型对象，包含 value (keyinfo/summary/chapter), label (显示名), ui_type (组件类型)
     - match_type: 匹配方式描述
-    - match_key: 具体匹配的标识
+    - match_keys: 匹配标识列表（多选），每项包含 value 和 label
     - target_field: 目标字段名，对应content_template中的{{变量名}}
     """
     default_prompt = Column(Text, nullable=True)

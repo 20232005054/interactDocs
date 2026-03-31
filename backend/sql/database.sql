@@ -186,7 +186,7 @@ CREATE TABLE IF NOT EXISTS summary_templates (
     field_key VARCHAR(50) NOT NULL,
     generation_mode INTEGER DEFAULT 0,
     content_template TEXT,
-    sources JSONB,
+    sources JSONB, -- 来源配置数组，结构：[{"source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"}, "match_keys": [{"value": "trial_name", "label": "试验名称"}], "target_field": "trial_name", "match_type": "关键信息匹配"}]
     default_prompt TEXT,
     custom_prompt TEXT,
     order_index INTEGER DEFAULT 0,
@@ -204,7 +204,7 @@ CREATE TABLE IF NOT EXISTS structure_templates (
     level INTEGER NOT NULL,
     generation_mode INTEGER DEFAULT 0,
     content_template TEXT,
-    sources JSONB,
+    sources JSONB, -- 来源配置数组，结构同 summary_templates
     default_prompt TEXT,
     custom_prompt TEXT,
     order_index INTEGER DEFAULT 0,

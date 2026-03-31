@@ -238,10 +238,16 @@ class AIAssistRequest(BaseModel):
 
 
 # --- 核心信息模板相关 (CoreInfoTemplate) ---
+class UISelectOption(BaseModel):
+    value: str = Field(..., description="选项值")
+    label: str = Field(..., description="显示名称")
+    ui_type: Optional[str] = Field("select", description="UI组件类型")
+
+
 class SourceInfo(BaseModel):
-    source: str = Field(..., description="来源类型：keyinfo/summary/chapter")
+    source: UISelectOption = Field(..., description="来源类型对象")
     match_type: str = Field(..., description="匹配方式描述")
-    match_key: str = Field(..., description="具体匹配的标识")
+    match_keys: List[UISelectOption] = Field(..., description="具体匹配的标识列表")
     target_field: str = Field(..., description="目标字段名，对应content_template中的{{变量名}}")
 
 

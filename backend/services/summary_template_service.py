@@ -136,34 +136,55 @@ class SummaryTemplateService:
         chapter_map = None
 
         for source in sources:
-            source_type = source.get("source")
-            match_key = source.get("match_key")
+            # 兼容旧结构和新结构
+            source_obj = source.get("source")
+            source_type = source_obj.get("value") if isinstance(source_obj, dict) else source_obj
+            
+            # 兼容旧的 match_key 和新的 match_keys
+            match_keys_data = source.get("match_keys")
+            if not match_keys_data:
+                old_match_key = source.get("match_key")
+                match_keys = [{"value": old_match_key}] if old_match_key else []
+            else:
+                match_keys = match_keys_data
+
             target_field = source.get("target_field")
             if not target_field:
                 continue
 
-            value = ""
-            if source_type == "keyinfo":
-                if core_info_map is None:
-                    core_info_map = await SummaryTemplateService._get_core_info_map(db, document.document_id)
-                value = core_info_map.get(match_key, "")
-            elif source_type == "summary":
-                if summary_map is None:
-                    summary_map = await SummaryTemplateService._get_summary_content_map(
-                        db, document
-                    )
-                merged_summary_map = {**summary_map, **generated_summary_map}
-                value = merged_summary_map.get(match_key, "")
-            elif source_type == "chapter":
-                if chapter_map is None:
-                    chapter_map = await SummaryTemplateService._get_chapter_content_map(
-                        db, document
-                    )
-                value = chapter_map.get(match_key, "")
+            values = []
+            for mk in match_keys:
+                match_key = mk.get("value") if isinstance(mk, dict) else mk
+                if not match_key:
+                    continue
 
-            data_map[target_field] = value
-            if match_key and match_key not in data_map:
-                data_map[match_key] = value
+                value = ""
+                if source_type == "keyinfo":
+                    if core_info_map is None:
+                        core_info_map = await SummaryTemplateService._get_core_info_map(db, document.document_id)
+                    value = core_info_map.get(match_key, "")
+                elif source_type == "summary":
+                    if summary_map is None:
+                        summary_map = await SummaryTemplateService._get_summary_content_map(
+                            db, document
+                        )
+                    merged_summary_map = {**summary_map, **generated_summary_map}
+                    value = merged_summary_map.get(match_key, "")
+                elif source_type == "chapter":
+                    if chapter_map is None:
+                        chapter_map = await SummaryTemplateService._get_chapter_content_map(
+                            db, document
+                        )
+                    value = chapter_map.get(match_key, "")
+
+                if value:
+                    values.append(str(value))
+                    # 将单个 key 也存入 data_map 以支持旧的模板变量
+                    if match_key not in data_map:
+                        data_map[match_key] = value
+
+            # 将多个来源的内容合并存入 target_field
+            data_map[target_field] = "\n".join(values)
 
         return data_map
 
