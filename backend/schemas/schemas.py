@@ -181,6 +181,7 @@ class GenerateSchemaResponse(BaseModel):
 # --- 摘要相关 (DocumentSummary) ---
 class DocumentSummaryBase(BaseModel):
     title: str = Field(..., description="摘要标题")
+    field_key: str = Field(..., description="摘要标识")
     content: str = Field(..., description="摘要内容")
 
 class DocumentSummaryCreate(DocumentSummaryBase):
@@ -189,6 +190,7 @@ class DocumentSummaryCreate(DocumentSummaryBase):
 
 class DocumentSummaryUpdate(BaseModel):
     title: Optional[str] = Field(None, description="摘要标题")
+    field_key: Optional[str] = Field(None, description="摘要标识")
     content: Optional[str] = Field(None, description="摘要内容")
 
 

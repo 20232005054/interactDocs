@@ -262,12 +262,8 @@ class SummaryTemplateService:
     @staticmethod
     async def _get_summary_content_map(db: AsyncSession, document: Document) -> dict:
         summaries = await SummaryMapper.get_summaries_by_document_id(db, document.document_id)
-        title_to_content = {summary.title: summary.content for summary in summaries}
-        summary_templates = await SummaryTemplateDbMapper.get_by_template_id(db, document.template_id)
-
-        summary_map = {}
-        for template in summary_templates:
-            summary_map[template.field_key] = title_to_content.get(template.title, "")
+        # 现在 summaries 已经有了 field_key 字段，可以直接映射
+        summary_map = {summary.field_key: summary.content for summary in summaries}
         return summary_map
 
     @staticmethod

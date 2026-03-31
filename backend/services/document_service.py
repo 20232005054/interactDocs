@@ -399,7 +399,8 @@ class DocumentService:
             # 创建摘要记录
             summary_data = {
                 "document_id": document_id,
-                "title": template.field_key, # title 字段作为业务唯一标识存储 field_key
+                "title": template.title, # title 存储显示标题
+                "field_key": template.field_key, # field_key 存储业务唯一标识
                 "content": content,
                 "version": 1,
                 "is_change": 0,
@@ -469,10 +470,12 @@ class DocumentService:
         
         # 预加载 core_info 和 summaries
         core_info_list = await CoreInfoMapper.get_core_info_by_document_id(db, document_id)
+        # TODO: 后续如果 CoreInfo 也拆分出 field_key，这里需要相应更新
         core_info_id_map = {item.title: item.core_info_id for item in core_info_list}
         
         existing_summaries = await SummaryMapper.get_summaries_by_document_id(db, document_id)
-        summary_id_map = {item.title: item.summary_id for item in existing_summaries}
+        # 依赖建边和变量替换都依赖于 field_key，所以这里使用 field_key 作为映射键
+        summary_id_map = {item.field_key: item.summary_id for item in existing_summaries}
 
         # 构建 structure_template 的 field_key 到 template_id 的映射，用于解析 chapter 依赖
         structure_field_key_to_id = {tmpl.field_key: tmpl.structure_template_id for tmpl in structure_templates}
@@ -499,7 +502,7 @@ class DocumentService:
             paragraph = None
             paragraph_content = ""
 
-            if generation_mode == 1:
+            if generation_mode in (0, 1):
                 source_data_map = {}
                 try:
                     source_data_map = await StructureTemplateService.build_sources_data_map(
@@ -518,7 +521,8 @@ class DocumentService:
                         error_code=error_code,
                         duration_ms=duration_ms,
                     )
-                if generation_error is None:
+                
+                if generation_mode == 1 and generation_error is None:
                     try:
                         paragraph_content = await StructureTemplateService.render_ai_content(
                             db=db,
@@ -539,7 +543,7 @@ class DocumentService:
                         )
 
                 if not paragraph_content:
-                    if generation_error is None:
+                    if generation_mode == 1 and generation_error is None:
                         generation_error = DocumentService._build_generation_error(
                             template_id=str(template.structure_template_id),
                             field_key=template.field_key,
@@ -553,50 +557,65 @@ class DocumentService:
                     )
 
                 degraded = generation_error is not None
-                paragraph = Paragraph(
-                    chapter_id=chapter.chapter_id,
-                    content=paragraph_content or "",
-                    para_type="paragraph",
-                    order_index=0,
-                    ai_eval=None,
-                    ai_suggestion=None,
-                    ai_generate=paragraph_content if not degraded else None,
-                    ischange=0,
-                )
-                db.add(paragraph)
-                await db.flush()
+                
+                # 只有当生成的内容不为空，或者原本就是AI生成模式时，才创建段落
+                if paragraph_content or generation_mode == 1:
+                    paragraph = Paragraph(
+                        chapter_id=chapter.chapter_id,
+                        content=paragraph_content or "",
+                        para_type="paragraph",
+                        order_index=0,
+                        ai_eval=None,
+                        ai_suggestion=None,
+                        ai_generate=paragraph_content if generation_mode == 1 and not degraded else None,
+                        ischange=0,
+                    )
+                    db.add(paragraph)
+                    await db.flush()
 
-                # 建立依赖边
-                if template.sources:
-                    for src in template.sources:
-                        source_type = src.get("source")
-                        match_key = src.get("match_key")
-                        target_id = None
-                        target_type = None
+                    # 建立依赖边
+                    if template.sources:
+                        for src in template.sources:
+                            # 兼容新旧结构
+                            source_obj = src.get("source")
+                            source_type = source_obj.get("value") if isinstance(source_obj, dict) else source_obj
+                            
+                            match_keys_data = src.get("match_keys")
+                            if not match_keys_data:
+                                old_match_key = src.get("match_key")
+                                match_keys = [{"value": old_match_key}] if old_match_key else []
+                            else:
+                                match_keys = match_keys_data
+                                
+                            for mk in match_keys:
+                                match_key = mk.get("value") if isinstance(mk, dict) else mk
+                                if not match_key:
+                                    continue
+                                
+                                target_id = None
+                                target_type = None
 
-                        if source_type == "keyinfo":
-                            target_type = "document_entity"
-                            target_id = core_info_id_map.get(match_key)
-                        elif source_type == "summary":
-                            target_type = "summary"
-                            target_id = summary_id_map.get(match_key)
-                        elif source_type == "chapter":
-                            target_type = "chapter"
-                            # 假设 match_key 是被引用章节的 field_key
-                            # 我们先找到对应的 structure_template_id，再从 template_id_map 中找到真实的 chapter_id
-                            ref_template_id = structure_field_key_to_id.get(match_key)
-                            if ref_template_id:
-                                target_id = template_id_map.get(ref_template_id)
+                                if source_type == "keyinfo":
+                                    target_type = "document_entity"
+                                    target_id = core_info_id_map.get(match_key)
+                                elif source_type == "summary":
+                                    target_type = "summary"
+                                    target_id = summary_id_map.get(match_key)
+                                elif source_type == "chapter":
+                                    target_type = "chapter"
+                                    ref_template_id = structure_field_key_to_id.get(match_key)
+                                    if ref_template_id:
+                                        target_id = template_id_map.get(ref_template_id)
 
-                        if target_type and target_id:
-                            await DependencyService.create_dependency_edge(
-                                db=db,
-                                source_type="paragraph",
-                                source_id=paragraph.paragraph_id,
-                                target_type=target_type,
-                                target_id=target_id
-                            )
-            elif generation_mode not in (0, 1):
+                                if target_type and target_id:
+                                    await DependencyService.create_dependency_edge(
+                                        db=db,
+                                        source_type="paragraph",
+                                        source_id=paragraph.paragraph_id,
+                                        target_type=target_type,
+                                        target_id=target_id
+                                    )
+            else:
                 generation_error = DocumentService._build_generation_error(
                     template_id=str(template.structure_template_id),
                     field_key=template.field_key,

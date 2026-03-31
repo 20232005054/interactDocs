@@ -3,6 +3,9 @@ from uuid import UUID
 from typing import List, Optional
 from db.models import StructureTemplate
 from db.mappers.structure_template_mapper import StructureTemplateMapper
+from services.summary_template_service import SummaryTemplateService
+from db.models import Document
+from typing import Dict
 import re
 
 
@@ -135,3 +138,41 @@ class StructureTemplateService:
         获取提示词（优先使用custom_prompt）
         """
         return structure_template.custom_prompt or structure_template.default_prompt
+
+    @staticmethod
+    async def build_sources_data_map(
+        db: AsyncSession,
+        document: Document,
+        sources: list,
+        generated_summary_map: Dict[str, str] = None,
+    ) -> dict:
+        """
+        构建数据来源映射。
+        复用 SummaryTemplateService 中的逻辑。
+        """
+        return await SummaryTemplateService.build_sources_data_map(
+            db=db,
+            document=document,
+            sources=sources,
+            generated_summary_map=generated_summary_map
+        )
+
+    @staticmethod
+    async def render_ai_content(
+        db: AsyncSession,
+        document: Document,
+        structure_template: StructureTemplate,
+        generated_summary_map: Dict[str, str] = None,
+        source_data_map: Dict[str, str] = None,
+    ) -> str:
+        """
+        渲染AI内容。
+        复用 SummaryTemplateService 中的逻辑，但传入结构模板特定的参数。
+        """
+        return await SummaryTemplateService.render_ai_content(
+            db=db,
+            document=document,
+            summary_template=structure_template, # 由于两个模型的结构高度相似，这里直接传入
+            generated_summary_map=generated_summary_map,
+            source_data_map=source_data_map
+        )

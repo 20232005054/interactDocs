@@ -110,6 +110,7 @@ class DocumentSummary(Base):
     summary_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     document_id = Column(UUID(as_uuid=True), ForeignKey("documents.document_id", ondelete="CASCADE"), nullable=False)
     title = Column(String(200), nullable=False)
+    field_key = Column(String(50), nullable=False)
     content = Column(Text, nullable=False)
     version = Column(Integer, nullable=False, default=1)
     is_change = Column(Integer, nullable=False, default=0)  # 0-无变更，1-有变更
@@ -129,6 +130,7 @@ class DocumentSummaryHistory(Base):
     summary_id = Column(UUID(as_uuid=True), ForeignKey("document_summaries.summary_id", ondelete="CASCADE"), nullable=False)
     version = Column(Integer, nullable=False)
     title = Column(String(200), nullable=False)
+    field_key = Column(String(50), nullable=False)
     content = Column(Text, nullable=False)
     created_at = Column(TIMESTAMP, server_default=func.now())
 
@@ -208,7 +210,7 @@ class SummaryTemplate(Base):
     content_template = Column(Text, nullable=True)
     sources = Column(JSONB, nullable=True)
     """
-    sources字段结构（数组）：
+    sources字段结构(数组):
     [
         {
             "source": {

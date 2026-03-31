@@ -162,6 +162,7 @@ async def apply_summary_template(document_id: UUID, db: AsyncSession = Depends(g
             {
                 "summary_id": str(item["summary"].summary_id),
                 "title": item["summary"].title,
+                "field_key": item["summary"].field_key,
                 "content": item["summary"].content,
                 "order_index": item["summary"].order_index,
                 "generation_mode": item["generation_mode"],
