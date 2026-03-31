@@ -47,6 +47,7 @@ class CoreInfoMapper:
             
         document_id = target.document_id
         deleted_order_index = target.order_index
+        parent_id = target.parent_id
 
         result = await db.execute(
             delete(DocumentCoreInfo)
@@ -55,12 +56,16 @@ class CoreInfoMapper:
         
         # 严格维护：将被删记录之后的所有记录的 order_index 减 1
         if result.rowcount > 0:
-            await db.execute(
-                update(DocumentCoreInfo)
-                .where(DocumentCoreInfo.document_id == document_id)
-                .where(DocumentCoreInfo.order_index > deleted_order_index)
-                .values(order_index=DocumentCoreInfo.order_index - 1)
+            query = update(DocumentCoreInfo).where(
+                DocumentCoreInfo.document_id == document_id,
+                DocumentCoreInfo.order_index > deleted_order_index
             )
+            if parent_id:
+                query = query.where(DocumentCoreInfo.parent_id == parent_id)
+            else:
+                query = query.where(DocumentCoreInfo.parent_id.is_(None))
+                
+            await db.execute(query.values(order_index=DocumentCoreInfo.order_index - 1))
             
         await db.commit()
         return result.rowcount > 0
@@ -76,29 +81,35 @@ class CoreInfoMapper:
         if old_order == new_order:
             return True # 没有变化
 
+        parent_id = target.parent_id
+
         # 2. 区分是向前移还是向后移
         if new_order < old_order:
             # 向前移动：新位置到老位置之间的所有元素（不含老位置，含新位置），order_index + 1
-            await db.execute(
-                update(DocumentCoreInfo)
-                .where(
-                    DocumentCoreInfo.document_id == document_id,
-                    DocumentCoreInfo.order_index >= new_order,
-                    DocumentCoreInfo.order_index < old_order
-                )
-                .values(order_index=DocumentCoreInfo.order_index + 1)
+            query = update(DocumentCoreInfo).where(
+                DocumentCoreInfo.document_id == document_id,
+                DocumentCoreInfo.order_index >= new_order,
+                DocumentCoreInfo.order_index < old_order
             )
+            if parent_id:
+                query = query.where(DocumentCoreInfo.parent_id == parent_id)
+            else:
+                query = query.where(DocumentCoreInfo.parent_id.is_(None))
+                
+            await db.execute(query.values(order_index=DocumentCoreInfo.order_index + 1))
         else:
             # 向后移动：老位置到新位置之间的所有元素（不含老位置，含新位置），order_index - 1
-            await db.execute(
-                update(DocumentCoreInfo)
-                .where(
-                    DocumentCoreInfo.document_id == document_id,
-                    DocumentCoreInfo.order_index > old_order,
-                    DocumentCoreInfo.order_index <= new_order
-                )
-                .values(order_index=DocumentCoreInfo.order_index - 1)
+            query = update(DocumentCoreInfo).where(
+                DocumentCoreInfo.document_id == document_id,
+                DocumentCoreInfo.order_index > old_order,
+                DocumentCoreInfo.order_index <= new_order
             )
+            if parent_id:
+                query = query.where(DocumentCoreInfo.parent_id == parent_id)
+            else:
+                query = query.where(DocumentCoreInfo.parent_id.is_(None))
+                
+            await db.execute(query.values(order_index=DocumentCoreInfo.order_index - 1))
 
         # 3. 再更新目标记录到新位置
         result = await db.execute(

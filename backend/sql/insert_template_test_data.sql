@@ -18,15 +18,25 @@ VALUES (
     TRUE
 ) ON CONFLICT (template_id) DO NOTHING;
 
+-- 清理旧数据以防止主键冲突
+DELETE FROM structure_templates WHERE template_id = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
+DELETE FROM summary_templates WHERE template_id = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
+DELETE FROM core_info_templates WHERE template_id = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
+
 -- 2. 插入核心信息模板测试数据
-INSERT INTO core_info_templates (core_template_id, template_id, field_name, field_key, field_type, default_value, options, is_required, order_index) VALUES
-('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '试验名称', 'trial_name', 'text', NULL, NULL, TRUE, 0),
-('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a02', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '申办方', 'sponsor', 'text', NULL, NULL, TRUE, 1),
-('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a03', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '研究目的', 'trial_purpose', 'text', NULL, NULL, TRUE, 2),
-('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a04', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '目标人群', 'target_population', 'text', NULL, NULL, TRUE, 3),
-('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a05', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '主要终点', 'primary_endpoint', 'text', NULL, NULL, TRUE, 4),
-('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a06', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '样本量', 'sample_size', 'number', NULL, NULL, TRUE, 5),
-('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a07', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '研究阶段', 'trial_phase', 'select', NULL, '["I期", "II期", "III期", "IV期"]', TRUE, 6);
+INSERT INTO core_info_templates (core_template_id, template_id, parent_id, field_name, field_key, field_type, default_value, options, is_required, order_index) VALUES
+-- 一级目录：试验基本信息
+('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a00', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', NULL, '试验基本信息', 'group_basic_info', 'group', NULL, NULL, TRUE, 0),
+('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a00', '试验名称', 'trial_name', 'text', NULL, NULL, TRUE, 0),
+('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a02', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a00', '申办方', 'sponsor', 'text', NULL, NULL, TRUE, 1),
+('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a07', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a00', '研究阶段', 'trial_phase', 'select', NULL, '["I期", "II期", "III期", "IV期"]', TRUE, 2),
+
+-- 一级目录：试验设计信息
+('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a10', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', NULL, '试验设计信息', 'group_design_info', 'group', NULL, NULL, TRUE, 1),
+('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a03', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a10', '研究目的', 'trial_purpose', 'text', NULL, NULL, TRUE, 0),
+('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a04', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a10', '目标人群', 'target_population', 'text', NULL, NULL, TRUE, 1),
+('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a05', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a10', '主要终点', 'primary_endpoint', 'text', NULL, NULL, TRUE, 2),
+('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a06', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a10', '样本量', 'sample_size', 'number', NULL, NULL, TRUE, 3);
 
 -- 3. 插入摘要模板测试数据
 -- 复制模式示例（generation_mode=0）

@@ -142,6 +142,7 @@ class DocumentCoreInfo(Base):
     __tablename__ = "document_core_info"
     core_info_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     document_id = Column(UUID(as_uuid=True), ForeignKey("documents.document_id", ondelete="CASCADE"), nullable=False)
+    parent_id = Column(UUID(as_uuid=True), ForeignKey("document_core_info.core_info_id", ondelete="CASCADE"), nullable=True)
     title = Column(String(200), nullable=False)
     content = Column(Text, nullable=False)
     field_type = Column(String(20), default="text")
@@ -155,6 +156,7 @@ class DocumentCoreInfo(Base):
     
     # 关系
     document = relationship("Document", backref="core_info")
+    parent = relationship("DocumentCoreInfo", remote_side=[core_info_id], backref="children")
 
 class Template(Base):
     __tablename__ = "templates"
@@ -187,6 +189,7 @@ class CoreInfoTemplate(Base):
     __tablename__ = "core_info_templates"
     core_template_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     template_id = Column(UUID(as_uuid=True), ForeignKey("templates.template_id", ondelete="CASCADE"), nullable=False)
+    parent_id = Column(UUID(as_uuid=True), ForeignKey("core_info_templates.core_template_id", ondelete="CASCADE"), nullable=True)
     field_name = Column(String(100), nullable=False)
     field_key = Column(String(50), nullable=False)
     field_type = Column(String(20), default="text")
@@ -198,6 +201,7 @@ class CoreInfoTemplate(Base):
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
 
     template = relationship("Template", back_populates="core_info_templates")
+    parent = relationship("CoreInfoTemplate", remote_side=[core_template_id], backref="children")
 
 
 class SummaryTemplate(Base):

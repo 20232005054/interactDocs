@@ -174,6 +174,15 @@ class ChapterService:
             update_data["title"] = chapter_in.title
         if chapter_in.status is not None:
             update_data["status"] = chapter_in.status
+        if chapter_in.parent_id is not None:
+            # 防环校验
+            if str(chapter_in.parent_id) == str(chapter_id):
+                raise ValueError("父章节不能是自己")
+            # 校验父节点是否存在
+            parent_chapter = await ChapterMapper.get_chapter_by_id(db, chapter_in.parent_id)
+            if not parent_chapter or parent_chapter.document_id != chapter.document_id:
+                raise ValueError("父章节不存在或不属于当前文档")
+            update_data["parent_id"] = chapter_in.parent_id
         
         await ChapterMapper.update_chapter(db, chapter_id, update_data)
         # 获取更新后的章节

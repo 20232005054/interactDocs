@@ -82,11 +82,12 @@ class ChapterBase(BaseModel):
 
 class ChapterCreate(ChapterBase):
     document_id: UUID = Field(..., description="文档 ID")
-
+    parent_id: Optional[UUID] = Field(None, description="父章节ID")
 
 class ChapterUpdate(BaseModel):
     title: Optional[str] = None
     status: Optional[int] = None
+    parent_id: Optional[UUID] = Field(None, description="父章节ID")
 
 
 # --- 文档版本相关 (DocumentVersion) ---
@@ -208,14 +209,18 @@ class CoreInfoBase(BaseModel):
     is_required: bool = Field(default=True, description="是否必填")
 
 class CoreInfoCreate(CoreInfoBase):
+    parent_id: Optional[UUID] = Field(None, description="父节点ID")
     order_index: Optional[int] = Field(None, description="排序索引")
     is_locked: Optional[bool] = Field(False, description="是否锁定")
+    children: Optional[List['CoreInfoCreate']] = Field(default=[], description="子节点列表")
 
 class CoreInfoUpdate(BaseModel):
+    parent_id: Optional[UUID] = Field(None, description="父节点ID")
     title: Optional[str] = Field(None, description="核心信息标题")
     content: Optional[str] = Field(None, description="核心信息内容")
     is_locked: Optional[bool] = Field(None, description="是否锁定")
     is_change: Optional[int] = Field(None, description="变更标记")
+    children: Optional[List['CoreInfoUpdate']] = Field(default=[], description="子节点列表")
 
 class CoreInfoOrderUpdate(BaseModel):
     new_order: int = Field(..., description="新的排序索引")
@@ -223,11 +228,13 @@ class CoreInfoOrderUpdate(BaseModel):
 class CoreInfo(CoreInfoBase):
     core_info_id: UUID
     document_id: UUID
+    parent_id: Optional[UUID] = Field(None, description="父节点ID")
     order_index: int
     is_locked: bool
     is_change: int
     created_at: datetime
     updated_at: datetime
+    children: Optional[List['CoreInfo']] = Field(default=[], description="子节点列表")
     
     class Config:
         from_attributes = True
@@ -255,6 +262,7 @@ class SourceInfo(BaseModel):
 
 class CoreInfoTemplateCreate(BaseModel):
     template_id: UUID = Field(..., description="关联的主模板ID")
+    parent_id: Optional[UUID] = Field(None, description="父节点ID")
     field_name: str = Field(..., description="字段名称")
     field_key: str = Field(..., description="字段标识")
     field_type: str = Field(default="text", description="字段类型")
@@ -262,9 +270,11 @@ class CoreInfoTemplateCreate(BaseModel):
     options: Optional[List[str]] = Field(None, description="select类型的选项列表")
     is_required: bool = Field(default=True, description="是否必填")
     order_index: int = Field(default=0, description="排序")
+    children: Optional[List['CoreInfoTemplateCreate']] = Field(default=[], description="子节点列表")
 
 
 class CoreInfoTemplateUpdate(BaseModel):
+    parent_id: Optional[UUID] = Field(None, description="父节点ID")
     field_name: Optional[str] = Field(None, description="字段名称")
     field_key: Optional[str] = Field(None, description="字段标识")
     field_type: Optional[str] = Field(None, description="字段类型")
@@ -272,6 +282,7 @@ class CoreInfoTemplateUpdate(BaseModel):
     options: Optional[List[str]] = Field(None, description="select类型的选项列表")
     is_required: Optional[bool] = Field(None, description="是否必填")
     order_index: Optional[int] = Field(None, description="排序")
+    children: Optional[List['CoreInfoTemplateUpdate']] = Field(default=[], description="子节点列表")
 
 
 # --- 摘要模板相关 (SummaryTemplate) ---

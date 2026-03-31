@@ -56,6 +56,10 @@ class StructureTemplateService:
 
     @staticmethod
     async def update(db: AsyncSession, structure_template_id: UUID, **kwargs):
+        if "parent_id" in kwargs and kwargs["parent_id"] is not None:
+            # 防环校验
+            if str(kwargs["parent_id"]) == str(structure_template_id):
+                raise ValueError("父节点不能是自己")
         return await StructureTemplateMapper.update(db, structure_template_id, kwargs)
 
     @staticmethod

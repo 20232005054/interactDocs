@@ -33,13 +33,13 @@ async def get_core_info(core_info_id: uuid.UUID, db: AsyncSession = Depends(get_
         raise HTTPException(status_code=404, detail="核心信息不存在")
     return success_response(CoreInfo.model_validate(result))
 
-@router.get("/document/{document_id}", summary="获取文档的核心信息列表")
+@router.get("/document/{document_id}", summary="获取文档的核心信息列表（树形结构）")
 async def get_core_info_by_document(document_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     """
-    获取指定文档的所有核心信息，按order_index排序
+    获取指定文档的所有核心信息，按order_index排序并组装为树形结构
     """
-    result = await CoreInfoService.get_core_info_by_document_id(db, document_id)
-    return success_response([CoreInfo.model_validate(item) for item in result])
+    tree = await CoreInfoService.get_core_info_tree(db, document_id)
+    return success_response(tree)
 
 @router.put("/{core_info_id}", summary="更新核心信息")
 async def update_core_info(core_info_id: uuid.UUID, core_info: CoreInfoUpdate, db: AsyncSession = Depends(get_db)):

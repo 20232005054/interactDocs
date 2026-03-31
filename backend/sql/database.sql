@@ -133,6 +133,7 @@ CREATE TABLE IF NOT EXISTS document_summary_history (
 CREATE TABLE IF NOT EXISTS document_core_info (
     core_info_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     document_id UUID NOT NULL REFERENCES documents(document_id) ON DELETE CASCADE,
+    parent_id UUID REFERENCES document_core_info(core_info_id) ON DELETE CASCADE,
     title VARCHAR(200) NOT NULL,
     content TEXT NOT NULL,
     field_type VARCHAR(20) DEFAULT 'text',
@@ -169,6 +170,7 @@ CREATE TABLE IF NOT EXISTS templates (
 CREATE TABLE IF NOT EXISTS core_info_templates (
     core_template_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     template_id UUID NOT NULL REFERENCES templates(template_id) ON DELETE CASCADE,
+    parent_id UUID REFERENCES core_info_templates(core_template_id) ON DELETE CASCADE,
     field_name VARCHAR(100) NOT NULL,
     field_key VARCHAR(50) NOT NULL,
     field_type VARCHAR(20) DEFAULT 'text',
@@ -253,6 +255,10 @@ CREATE INDEX IF NOT EXISTS idx_operation_history_document_id ON operation_histor
 CREATE INDEX IF NOT EXISTS idx_chat_records_document_id ON chat_records(document_id);
 CREATE INDEX IF NOT EXISTS idx_chat_records_chapter_id ON chat_records(chapter_id);
 
+-- document_core_info 索引
+CREATE INDEX IF NOT EXISTS idx_document_core_info_document_id ON document_core_info(document_id);
+CREATE INDEX IF NOT EXISTS idx_document_core_info_parent_id ON document_core_info(parent_id);
+
 -- document_summaries 索引
 CREATE INDEX IF NOT EXISTS idx_document_summaries_document_id ON document_summaries(document_id);
 
@@ -263,6 +269,7 @@ CREATE INDEX IF NOT EXISTS idx_templates_document_id ON templates(document_id);
 
 -- core_info_templates 索引
 CREATE INDEX IF NOT EXISTS idx_core_info_templates_template_id ON core_info_templates(template_id);
+CREATE INDEX IF NOT EXISTS idx_core_info_templates_parent_id ON core_info_templates(parent_id);
 
 -- summary_templates 索引
 CREATE INDEX IF NOT EXISTS idx_summary_templates_template_id ON summary_templates(template_id);

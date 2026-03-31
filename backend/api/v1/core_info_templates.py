@@ -11,28 +11,12 @@ from schemas.schemas import CoreInfoTemplateCreate, CoreInfoTemplateUpdate
 router = APIRouter(prefix="/api/v1/core-info-templates", tags=["核心信息模板管理"])
 
 
-@router.get("/template/{template_id}", summary="获取模板的核心信息字段列表")
+@router.get("/template/{template_id}", summary="获取模板的核心信息字段列表（树形结构）")
 async def get_by_template_id(
     template_id: UUID,
     db: AsyncSession = Depends(get_db)):
-    templates = await CoreInfoTemplateService.get_by_template_id(db, template_id)
-    items = []
-    for t in templates:
-        items.append({
-            "core_template_id": str(t.core_template_id),
-            "template_id": str(t.template_id),
-            "field_name": t.field_name,
-            "field_key": t.field_key,
-            "field_type": t.field_type,
-            "default_value": t.default_value,
-            "options": t.options,
-            "is_required": t.is_required,
-            "order_index": t.order_index,
-            "created_at": t.created_at,
-            "updated_at": t.updated_at
-        })
-    return success_response(data={"items": items})
-
+    tree = await CoreInfoTemplateService.get_template_tree(db, template_id)
+    return success_response(data={"items": tree})
 
 @router.get("/{core_template_id}", summary="获取核心信息模板详情")
 async def get_by_id(
@@ -44,6 +28,7 @@ async def get_by_id(
     return success_response(data={
         "core_template_id": str(template.core_template_id),
         "template_id": str(template.template_id),
+        "parent_id": str(template.parent_id) if template.parent_id else None,
         "field_name": template.field_name,
         "field_key": template.field_key,
         "field_type": template.field_type,
@@ -63,6 +48,7 @@ async def create(
     template = await CoreInfoTemplateService.create(
         db,
         template_id=data.template_id,
+        parent_id=data.parent_id,
         field_name=data.field_name,
         field_key=data.field_key,
         field_type=data.field_type,
@@ -74,6 +60,7 @@ async def create(
     return success_response(data={
         "core_template_id": str(template.core_template_id),
         "template_id": str(template.template_id),
+        "parent_id": str(template.parent_id) if template.parent_id else None,
         "field_name": template.field_name,
         "field_key": template.field_key,
         "field_type": template.field_type,
