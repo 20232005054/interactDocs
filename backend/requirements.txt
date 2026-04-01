@@ -8,6 +8,9 @@ asyncpg>=0.29.0
 
 # AI/ML
 dashscope>=1.14.0
+langchain>=0.1.0
+langchain-community>=0.0.20
+langchain-core>=0.1.0
 
 # Data Validation
 pydantic[email]>=2.5.0

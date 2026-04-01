@@ -1,5 +1,9 @@
+import os
+
+USE_LANGCHAIN = os.getenv("USE_LANGCHAIN", "false").lower() == "true"
 
 from services.document_service import DocumentService
+from services.document_service_v2 import DocumentServiceV2
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
@@ -135,7 +139,10 @@ async def apply_core_info_template(document_id: UUID, db: AsyncSession = Depends
     """
     应用核心信息模板：根据模板创建文档的核心信息字段
     """
-    created_items = await DocumentService.apply_core_info_template(db, document_id)
+    if USE_LANGCHAIN:
+        created_items = await DocumentServiceV2.apply_core_info_template(db, document_id)
+    else:
+        created_items = await DocumentService.apply_core_info_template(db, document_id)
     return success_response(data={
         "message": f"成功创建 {len(created_items)} 个核心信息字段",
         "items": [
@@ -155,7 +162,10 @@ async def apply_summary_template(document_id: UUID, db: AsyncSession = Depends(g
     """
     应用摘要模板：根据模板创建文档的摘要
     """
-    created_items = await DocumentService.apply_summary_template(db, document_id)
+    if USE_LANGCHAIN:
+        created_items = await DocumentServiceV2.apply_summary_template(db, document_id)
+    else:
+        created_items = await DocumentService.apply_summary_template(db, document_id)
     return success_response(data={
         "message": f"成功创建 {len(created_items)} 个摘要",
         "items": [
@@ -180,7 +190,10 @@ async def apply_structure_template(document_id: UUID, db: AsyncSession = Depends
     """
     应用文章结构模板：根据模板创建文档的章节结构
     """
-    created_items = await DocumentService.apply_structure_template(db, document_id)
+    if USE_LANGCHAIN:
+        created_items = await DocumentServiceV2.apply_structure_template(db, document_id)
+    else:
+        created_items = await DocumentService.apply_structure_template(db, document_id)
     return success_response(data={
         "message": f"成功创建 {len(created_items)} 个章节",
         "items": [
