@@ -80,6 +80,7 @@ async def create(
         db,
         template_id=data.template_id,
         title=data.title,
+        field_key=data.field_key,
         level=data.level,
         parent_id=data.parent_id,
         generation_mode=data.generation_mode,

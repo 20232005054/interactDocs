@@ -31,6 +31,7 @@ class StructureTemplateService:
         db: AsyncSession,
         template_id: UUID,
         title: str,
+        field_key: str,
         level: int,
         parent_id: UUID = None,
         generation_mode: int = 0,
@@ -38,12 +39,23 @@ class StructureTemplateService:
         sources: list = None,
         default_prompt: str = None,
         custom_prompt: str = None,
-        order_index: int = 0
+        order_index: int = None
     ):
+        if order_index is None:
+            from sqlalchemy import func, select
+            result = await db.execute(
+                select(func.max(StructureTemplate.order_index))
+                .where(StructureTemplate.template_id == template_id)
+                .where(StructureTemplate.parent_id == parent_id if parent_id else StructureTemplate.parent_id.is_(None))
+            )
+            max_val = result.scalar()
+            order_index = (max_val + 1) if max_val is not None else 0
+
         structure_template = StructureTemplate(
             template_id=template_id,
             parent_id=parent_id,
             title=title,
+            field_key=field_key,
             level=level,
             generation_mode=generation_mode,
             content_template=content_template,
