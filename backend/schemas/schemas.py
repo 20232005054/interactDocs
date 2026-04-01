@@ -269,8 +269,23 @@ class CoreInfoTemplateCreate(BaseModel):
     default_value: Optional[str] = Field(None, description="默认值")
     options: Optional[List[str]] = Field(None, description="select类型的选项列表")
     is_required: bool = Field(default=True, description="是否必填")
-    order_index: int = Field(default=0, description="排序")
+    order_index: Optional[int] = Field(None, description="排序，不传则追加到同级末尾")
     children: Optional[List['CoreInfoTemplateCreate']] = Field(default=[], description="子节点列表")
+
+
+class CoreInfoTemplateInsertAfter(BaseModel):
+    after_id: UUID = Field(..., description="在此节点之后插入")
+    field_name: str = Field(..., description="字段名称")
+    field_key: str = Field(..., description="字段标识")
+    field_type: str = Field(default="text", description="字段类型")
+    default_value: Optional[str] = Field(None, description="默认值")
+    options: Optional[List[str]] = Field(None, description="select类型的选项列表")
+    is_required: bool = Field(default=True, description="是否必填")
+
+
+class CoreInfoTemplateReorder(BaseModel):
+    parent_id: Optional[UUID] = Field(None, description="同级父节点ID，根节点传 null")
+    ordered_ids: List[UUID] = Field(..., description="同级节点按新顺序排列的 ID 列表")
 
 
 class CoreInfoTemplateUpdate(BaseModel):

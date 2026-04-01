@@ -6,7 +6,12 @@ from uuid import UUID
 from core.response import success_response
 from db.session import get_db
 from services.core_info_template_service import CoreInfoTemplateService
-from schemas.schemas import CoreInfoTemplateCreate, CoreInfoTemplateUpdate
+from schemas.schemas import (
+    CoreInfoTemplateCreate,
+    CoreInfoTemplateUpdate,
+    CoreInfoTemplateInsertAfter,
+    CoreInfoTemplateReorder,
+)
 
 router = APIRouter(prefix="/api/v1/core-info-templates", tags=["核心信息模板管理"])
 
@@ -41,7 +46,7 @@ async def get_by_id(
     })
 
 
-@router.post("", summary="创建核心信息模板")
+@router.post("", summary="创建核心信息模板（追加到同级末尾）")
 async def create(
     data: CoreInfoTemplateCreate,
     db: AsyncSession = Depends(get_db)):
@@ -55,7 +60,7 @@ async def create(
         default_value=data.default_value,
         options=data.options,
         is_required=data.is_required,
-        order_index=data.order_index
+        order_index=data.order_index,
     )
     return success_response(data={
         "core_template_id": str(template.core_template_id),
@@ -69,6 +74,56 @@ async def create(
         "is_required": template.is_required,
         "order_index": template.order_index
     })
+
+
+@router.post("/template/{template_id}/insert-after", summary="在指定节点之后插入新节点（同级）")
+async def insert_after(
+    template_id: UUID,
+    data: CoreInfoTemplateInsertAfter,
+    db: AsyncSession = Depends(get_db)):
+    try:
+        template = await CoreInfoTemplateService.insert_after(
+            db,
+            template_id=template_id,
+            after_id=data.after_id,
+            field_name=data.field_name,
+            field_key=data.field_key,
+            field_type=data.field_type,
+            default_value=data.default_value,
+            options=data.options,
+            is_required=data.is_required,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return success_response(data={
+        "core_template_id": str(template.core_template_id),
+        "template_id": str(template.template_id),
+        "parent_id": str(template.parent_id) if template.parent_id else None,
+        "field_name": template.field_name,
+        "field_key": template.field_key,
+        "field_type": template.field_type,
+        "default_value": template.default_value,
+        "options": template.options,
+        "is_required": template.is_required,
+        "order_index": template.order_index
+    })
+
+
+@router.post("/template/{template_id}/reorder", summary="拖拽重排（同级节点重新排序，支持跨父节点移动）")
+async def reorder(
+    template_id: UUID,
+    data: CoreInfoTemplateReorder,
+    db: AsyncSession = Depends(get_db)):
+    try:
+        await CoreInfoTemplateService.reorder(
+            db,
+            template_id=template_id,
+            parent_id=data.parent_id,
+            ordered_ids=data.ordered_ids,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return success_response(message="排序更新成功")
 
 
 @router.put("/{core_template_id}", summary="更新核心信息模板")
@@ -98,7 +153,7 @@ async def update(
     })
 
 
-@router.delete("/{core_template_id}", summary="删除核心信息模板")
+@router.delete("/{core_template_id}", summary="删除核心信息模板（同级后续节点自动补位）")
 async def delete(
     core_template_id: UUID,
     db: AsyncSession = Depends(get_db)):
