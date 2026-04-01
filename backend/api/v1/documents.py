@@ -136,17 +136,38 @@ async def apply_core_info_template(document_id: UUID, db: AsyncSession = Depends
     应用核心信息模板：根据模板创建文档的核心信息字段
     """
     created_items = await DocumentService.apply_core_info_template(db, document_id)
+    
+    # 组装树形结构
+    info_dict_map = {}
+    for item in created_items:
+        info_dict_map[item.core_info_id] = {
+            "core_info_id": str(item.core_info_id),
+            "parent_id": str(item.parent_id) if item.parent_id else None,
+            "title": item.title,
+            "content": item.content,
+            "order_index": item.order_index,
+            "children": []
+        }
+        
+    tree = []
+    for item in created_items:
+        node = info_dict_map[item.core_info_id]
+        if item.parent_id and item.parent_id in info_dict_map:
+            info_dict_map[item.parent_id]["children"].append(node)
+        else:
+            tree.append(node)
+            
+    def sort_tree(nodes):
+        nodes.sort(key=lambda x: x["order_index"])
+        for n in nodes:
+            if n["children"]:
+                sort_tree(n["children"])
+                
+    sort_tree(tree)
+
     return success_response(data={
         "message": f"成功创建 {len(created_items)} 个核心信息字段",
-        "items": [
-            {
-                "core_info_id": str(item.core_info_id),
-                "title": item.title,
-                "content": item.content,
-                "order_index": item.order_index
-            }
-            for item in created_items
-        ]
+        "items": tree
     })
 
 

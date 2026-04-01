@@ -68,10 +68,28 @@ class DocumentService:
         # 2. 深拷贝 CoreInfoTemplate
         old_core_infos = await CoreInfoTemplateMapper.get_by_template_id(db, system_template.template_id)
         if old_core_infos:
-            new_core_infos = []
+            id_mapping = {}
             for old_ci in old_core_infos:
+                id_mapping[old_ci.core_template_id] = uuid4()
+                
+            def get_level(ci):
+                level = 0
+                curr = ci
+                while curr.parent_id:
+                    level += 1
+                    curr = next((x for x in old_core_infos if x.core_template_id == curr.parent_id), None)
+                    if not curr:
+                        break
+                return level
+            
+            old_core_infos_sorted = sorted(old_core_infos, key=get_level)
+            
+            new_core_infos = []
+            for old_ci in old_core_infos_sorted:
                 new_ci = CoreInfoTemplate(
+                    core_template_id=id_mapping[old_ci.core_template_id],
                     template_id=new_template.template_id,
+                    parent_id=id_mapping.get(old_ci.parent_id) if old_ci.parent_id else None,
                     field_name=old_ci.field_name,
                     field_key=old_ci.field_key,
                     field_type=old_ci.field_type,
@@ -272,10 +290,28 @@ class DocumentService:
         
         core_info_templates = await CoreInfoTemplateMapper.get_by_template_id(db, document.template_id)
         
+        id_mapping = {}
+        for template in core_info_templates:
+            id_mapping[template.core_template_id] = uuid4()
+            
+        def get_level(tmpl):
+            level = 0
+            curr = tmpl
+            while curr.parent_id:
+                level += 1
+                curr = next((x for x in core_info_templates if x.core_template_id == curr.parent_id), None)
+                if not curr:
+                    break
+            return level
+            
+        core_info_templates_sorted = sorted(core_info_templates, key=get_level)
+             
         created_items = []
-        for idx, template in enumerate(core_info_templates):
+        for idx, template in enumerate(core_info_templates_sorted):
             core_info = DocumentCoreInfo(
+                core_info_id=id_mapping[template.core_template_id],
                 document_id=document_id,
+                parent_id=id_mapping.get(template.parent_id) if template.parent_id else None,
                 title=template.field_name,
                 content=template.default_value or "",
                 field_type=template.field_type,
@@ -688,6 +724,7 @@ class DocumentService:
             "core_info_templates": [
                 {
                     "core_template_id": str(t.core_template_id),
+                    "parent_id": str(t.parent_id) if t.parent_id else None,
                     "field_name": t.field_name,
                     "field_key": t.field_key,
                     "field_type": t.field_type,
