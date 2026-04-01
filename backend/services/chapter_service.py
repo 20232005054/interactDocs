@@ -209,6 +209,46 @@ class ChapterService:
         return {"message": "删除成功"}
 
     @staticmethod
+    async def insert_chapter_after(db: AsyncSession, document_id: UUID, after_chapter_id: UUID):
+        """在指定章节之后插入新的同级章节"""
+        after_chapter = await ChapterMapper.get_chapter_by_id(db, after_chapter_id)
+        if not after_chapter:
+            raise HTTPException(status_code=404, detail="参考章节不存在")
+
+        insert_index = after_chapter.order_index + 1
+        parent_id = after_chapter.parent_id
+
+        await ChapterMapper.shift_order_index(db, document_id, parent_id, insert_index, delta=1)
+
+        new_chapter = Chapter(
+            document_id=document_id,
+            parent_id=parent_id,
+            title="新章节",
+            status=0,
+            order_index=insert_index
+        )
+        result = await ChapterMapper.create_chapter(db, new_chapter)
+        await db.commit()
+        return result
+
+    @staticmethod
+    async def reorder_chapters(db: AsyncSession, document_id: UUID, parent_id, ordered_ids: list):
+        """
+        拖拽重排：传入同级章节的新顺序 ID 列表，按下标重写 order_index。
+        支持跨父节点移动：若节点原 parent_id 与传入 parent_id 不同，同时更新 parent_id。
+        """
+        items = []
+        for idx, cid in enumerate(ordered_ids):
+            chapter = await ChapterMapper.get_chapter_by_id(db, cid)
+            if not chapter:
+                raise HTTPException(status_code=404, detail=f"章节 {cid} 不存在")
+            item = {"chapter_id": cid, "order_index": idx}
+            if chapter.parent_id != parent_id:
+                item["parent_id"] = parent_id
+            items.append(item)
+        await ChapterMapper.batch_update_order(db, items)
+
+    @staticmethod
     async def get_chapter_toc(db: AsyncSession, chapter_id: UUID):
         chapter = await ChapterMapper.get_chapter_by_id(db, chapter_id)
         if not chapter:

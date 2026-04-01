@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
-from typing import List
+from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
+from pydantic import BaseModel
 
 from core.response import success_response
 from db.session import get_db
@@ -9,6 +10,23 @@ from services.structure_template_service import StructureTemplateService
 from schemas.schemas import StructureTemplateCreate, StructureTemplateUpdate
 
 router = APIRouter(prefix="/api/v1/structure-templates", tags=["文章结构模板管理"])
+
+
+class StructureTemplateInsertAfter(BaseModel):
+    after_id: UUID
+    title: str
+    field_key: str
+    level: int
+    generation_mode: int = 0
+    content_template: Optional[str] = None
+    sources: Optional[list] = None
+    default_prompt: Optional[str] = None
+    custom_prompt: Optional[str] = None
+
+
+class StructureTemplateReorder(BaseModel):
+    parent_id: Optional[UUID] = None
+    ordered_ids: List[UUID]
 
 
 @router.get("/template/{template_id}", summary="获取模板的结构模板列表")
@@ -161,3 +179,44 @@ async def delete(
 ):
     await StructureTemplateService.delete(db, structure_template_id)
     return success_response(message="删除成功")
+
+
+@router.post("/template/{template_id}/insert-after", summary="在指定节点后插入结构模板")
+async def insert_after(
+    template_id: UUID,
+    data: StructureTemplateInsertAfter,
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        template = await StructureTemplateService.insert_after(
+            db, template_id, data.after_id, data.model_dump(exclude={"after_id"})
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return success_response(data={
+        "structure_template_id": str(template.structure_template_id),
+        "template_id": str(template.template_id),
+        "parent_id": str(template.parent_id) if template.parent_id else None,
+        "title": template.title,
+        "field_key": template.field_key,
+        "level": template.level,
+        "generation_mode": template.generation_mode,
+        "content_template": template.content_template,
+        "sources": template.sources,
+        "default_prompt": template.default_prompt,
+        "custom_prompt": template.custom_prompt,
+        "order_index": template.order_index,
+    })
+
+
+@router.post("/template/{template_id}/reorder", summary="拖拽重排结构模板（支持跨父节点移动）")
+async def reorder(
+    template_id: UUID,
+    data: StructureTemplateReorder,
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        await StructureTemplateService.reorder(db, template_id, data.parent_id, data.ordered_ids)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return success_response(message="排序更新成功")

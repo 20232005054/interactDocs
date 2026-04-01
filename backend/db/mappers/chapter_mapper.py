@@ -1,7 +1,9 @@
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import update
 from db.models import Chapter, Paragraph
 from uuid import UUID
+from typing import Optional
 
 class ChapterMapper:
     @staticmethod
@@ -34,12 +36,45 @@ class ChapterMapper:
 
     @staticmethod
     async def update_chapter(db: AsyncSession, chapter_id: UUID, update_data):
-        from sqlalchemy import update
         await db.execute(
             update(Chapter)
             .where(Chapter.chapter_id == chapter_id)
             .values(**update_data)
         )
+        await db.commit()
+
+    @staticmethod
+    async def shift_order_index(
+        db: AsyncSession,
+        document_id: UUID,
+        parent_id: Optional[UUID],
+        from_index: int,
+        delta: int,
+    ) -> None:
+        """批量偏移同级章节 order_index >= from_index 的节点"""
+        query = (
+            update(Chapter)
+            .where(Chapter.document_id == document_id)
+            .where(Chapter.order_index >= from_index)
+        )
+        if parent_id is None:
+            query = query.where(Chapter.parent_id.is_(None))
+        else:
+            query = query.where(Chapter.parent_id == parent_id)
+        await db.execute(query.values(order_index=Chapter.order_index + delta))
+
+    @staticmethod
+    async def batch_update_order(db: AsyncSession, items: list) -> None:
+        """批量重写 order_index，items 每项含 chapter_id、order_index，可选 parent_id"""
+        for item in items:
+            values = {"order_index": item["order_index"]}
+            if "parent_id" in item:
+                values["parent_id"] = item["parent_id"]
+            await db.execute(
+                update(Chapter)
+                .where(Chapter.chapter_id == item["chapter_id"])
+                .values(**values)
+            )
         await db.commit()
 
     @staticmethod
@@ -51,42 +86,31 @@ class ChapterMapper:
         await db.delete(chapter)
         await db.commit()
 
-        # 严格维护：将被删章节之后的所有同级章节的 order_index 减 1
-        from sqlalchemy import update
+        # 被删章节之后的同级章节补位
+        query = (
+            update(Chapter)
+            .where(Chapter.document_id == document_id)
+            .where(Chapter.order_index > deleted_order_index)
+        )
         if parent_id is None:
-            await db.execute(
-                update(Chapter)
-                .where(Chapter.document_id == document_id)
-                .where(Chapter.parent_id == None)
-                .where(Chapter.order_index > deleted_order_index)
-                .values(order_index=Chapter.order_index - 1)
-            )
+            query = query.where(Chapter.parent_id.is_(None))
         else:
-            await db.execute(
-                update(Chapter)
-                .where(Chapter.document_id == document_id)
-                .where(Chapter.parent_id == parent_id)
-                .where(Chapter.order_index > deleted_order_index)
-                .values(order_index=Chapter.order_index - 1)
-            )
+            query = query.where(Chapter.parent_id == parent_id)
+        await db.execute(query.values(order_index=Chapter.order_index - 1))
         await db.commit()
 
     @staticmethod
     async def get_chapter_with_paragraphs(db: AsyncSession, chapter_id: UUID):
-        # 先获取章节
         result = await db.execute(
             select(Chapter).where(Chapter.chapter_id == chapter_id)
         )
         chapter = result.scalar_one_or_none()
-        
+
         if chapter:
-            # 获取段落
             para_result = await db.execute(
                 select(Paragraph).where(Paragraph.chapter_id == chapter_id).order_by(Paragraph.order_index)
             )
             paragraphs = para_result.scalars().all()
-            
-            # 直接返回章节和段落，而不是设置关系
             return chapter, paragraphs
-        
+
         return chapter, []

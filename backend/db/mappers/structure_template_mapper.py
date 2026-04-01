@@ -66,6 +66,22 @@ class StructureTemplateMapper:
         await db.commit()
 
     @staticmethod
+    async def shift_order_index(
+        db: AsyncSession, template_id: UUID, parent_id, from_index: int, delta: int
+    ) -> None:
+        from sqlalchemy import update as sa_update
+        query = (
+            sa_update(StructureTemplate)
+            .where(StructureTemplate.template_id == template_id)
+            .where(StructureTemplate.order_index >= from_index)
+        )
+        if parent_id is None:
+            query = query.where(StructureTemplate.parent_id.is_(None))
+        else:
+            query = query.where(StructureTemplate.parent_id == parent_id)
+        await db.execute(query.values(order_index=StructureTemplate.order_index + delta))
+
+    @staticmethod
     async def delete_by_template_id(db: AsyncSession, template_id: UUID):
         await db.execute(
             delete(StructureTemplate).where(StructureTemplate.template_id == template_id)

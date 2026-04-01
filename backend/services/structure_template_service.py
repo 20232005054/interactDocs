@@ -76,7 +76,63 @@ class StructureTemplateService:
 
     @staticmethod
     async def delete(db: AsyncSession, structure_template_id: UUID):
-        return await StructureTemplateMapper.delete_by_id(db, structure_template_id)
+        node = await StructureTemplateMapper.get_by_id(db, structure_template_id)
+        if not node:
+            return
+        deleted_index = node.order_index
+        template_id = node.template_id
+        parent_id = node.parent_id
+        await StructureTemplateMapper.delete_by_id(db, structure_template_id)
+        await StructureTemplateMapper.shift_order_index(
+            db, template_id, parent_id, deleted_index + 1, delta=-1
+        )
+
+    @staticmethod
+    async def insert_after(
+        db: AsyncSession, template_id: UUID, after_id: UUID, data: dict
+    ):
+        """在指定节点之后插入新节点（同级）"""
+        after_node = await StructureTemplateMapper.get_by_id(db, after_id)
+        if not after_node:
+            raise ValueError("参考节点不存在")
+        insert_index = after_node.order_index + 1
+        await StructureTemplateMapper.shift_order_index(
+            db, template_id, after_node.parent_id, insert_index, delta=1
+        )
+        structure_template = StructureTemplate(
+            template_id=template_id,
+            parent_id=after_node.parent_id,
+            order_index=insert_index,
+            title=data.get("title", ""),
+            field_key=data.get("field_key", ""),
+            level=data.get("level", after_node.level),
+            generation_mode=data.get("generation_mode", 0),
+            content_template=data.get("content_template"),
+            sources=data.get("sources"),
+            default_prompt=data.get("default_prompt"),
+            custom_prompt=data.get("custom_prompt"),
+        )
+        return await StructureTemplateMapper.create(db, structure_template)
+
+    @staticmethod
+    async def reorder(
+        db: AsyncSession, template_id: UUID, parent_id, ordered_ids: list
+    ) -> None:
+        """拖拽重排：传入同级节点新顺序 ID 列表，按下标重写 order_index，支持跨父节点移动"""
+        from sqlalchemy import update as sa_update
+        for idx, sid in enumerate(ordered_ids):
+            node = await StructureTemplateMapper.get_by_id(db, sid)
+            if not node:
+                raise ValueError(f"节点 {sid} 不存在")
+            values = {"order_index": idx}
+            if node.parent_id != parent_id:
+                values["parent_id"] = parent_id
+            await db.execute(
+                sa_update(StructureTemplate)
+                .where(StructureTemplate.structure_template_id == sid)
+                .values(**values)
+            )
+        await db.commit()
 
     @staticmethod
     async def batch_create(db: AsyncSession, templates: List[StructureTemplate]):

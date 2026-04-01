@@ -58,13 +58,7 @@ class ParagraphService:
             else:
                 order_index = 0
         else:
-            for para in reversed(paragraphs):
-                if para.order_index >= order_index:
-                    await ParagraphMapper.update_paragraph(
-                        db,
-                        para.paragraph_id,
-                        {"order_index": para.order_index + 1},
-                    )
+            await ParagraphMapper.shift_order_index(db, chapter_id, order_index, delta=1)
 
         new_paragraph = Paragraph(
             chapter_id=chapter_id,
@@ -115,14 +109,12 @@ class ParagraphService:
                 paragraph.content, paragraph_in.content
             )
         
-        # 构建更新数据
+        # 构建更新数据（order_index 不在此接口修改，排序走专用接口）
         update_data = {}
         if paragraph_in.content is not None:
             update_data["content"] = paragraph_in.content
         if paragraph_in.para_type is not None:
             update_data["para_type"] = paragraph_in.para_type
-        if paragraph_in.order_index is not None:
-            update_data["order_index"] = paragraph_in.order_index
         if paragraph_in.ai_eval is not None:
             update_data["ai_eval"] = paragraph_in.ai_eval
         if paragraph_in.ai_suggestion is not None:
@@ -144,22 +136,14 @@ class ParagraphService:
         paragraph = await ParagraphMapper.get_paragraph_by_id(db, paragraph_id)
         if not paragraph:
             raise HTTPException(status_code=404, detail="段落不存在")
-        
-        # 记录要删除的段落的order_index和章节ID
+
         deleted_order_index = paragraph.order_index
         chapter_id = paragraph.chapter_id
-        
-        # 删除段落
+
         await ParagraphMapper.delete_paragraph(db, paragraph)
-        
-        # 获取章节中剩余的所有段落
-        remaining_paragraphs = await ParagraphMapper.get_paragraphs_by_chapter_id(db, chapter_id)
-        
-        # 对剩余段落中order_index大于被删除段落的段落，将它们的order_index减1
-        for para in remaining_paragraphs:
-            if para.order_index > deleted_order_index:
-                await ParagraphMapper.update_paragraph(db, para.paragraph_id, {"order_index": para.order_index - 1})
-        
+        await ParagraphMapper.shift_order_index(db, chapter_id, deleted_order_index + 1, delta=-1)
+        await db.commit()
+
         return {"message": "删除成功"}
 
     @staticmethod
@@ -175,40 +159,30 @@ class ParagraphService:
 
     @staticmethod
     async def insert_paragraph_after(db: AsyncSession, paragraph_id: UUID, paragraph_in: ParagraphCreate):
-        """
-        在指定段落后插入新段落
-        """
-        # 获取当前段落信息
+        """在指定段落后插入新段落"""
         current_paragraph = await ParagraphMapper.get_paragraph_by_id(db, paragraph_id)
         if not current_paragraph:
             raise HTTPException(status_code=404, detail="段落不存在")
-        
-        # 获取当前段落的order_index和章节ID
+
         current_order_index = current_paragraph.order_index
         chapter_id = current_paragraph.chapter_id
-        
-        # 获取章节中所有段落
-        paragraphs = await ParagraphMapper.get_paragraphs_by_chapter_id(db, chapter_id)
-        
-        # 将所有order_index大于等于当前段落order_index的段落的order_index加1
-        for para in paragraphs:
-            if para.order_index > current_order_index:
-                await ParagraphMapper.update_paragraph(db, para.paragraph_id, {"order_index": para.order_index + 1})
-        
-        # 创建新段落，order_index设为当前段落order_index + 1
+        insert_index = current_order_index + 1
+
+        await ParagraphMapper.shift_order_index(db, chapter_id, insert_index, delta=1)
+
         new_paragraph = Paragraph(
             chapter_id=chapter_id,
             content=paragraph_in.content,
-            para_type="paragraph",  # 默认类型为正文
-            order_index=current_order_index + 1,
-            ai_eval=None,  # 默认为null
-            ai_suggestion=None,  # 默认为null
-            ai_generate=None,  # 默认为null
-            ischange=0  # 默认为0
+            para_type="paragraph",
+            order_index=insert_index,
+            ai_eval=None,
+            ai_suggestion=None,
+            ai_generate=None,
+            ischange=0
         )
-        
-        # 保存新段落
-        return await ParagraphMapper.create_paragraph(db, new_paragraph)
+        result = await ParagraphMapper.create_paragraph(db, new_paragraph)
+        await db.commit()
+        return result
 
     @staticmethod
     async def _handle_paragraph_change(db: AsyncSession, paragraph_id: UUID, is_substantial_change):

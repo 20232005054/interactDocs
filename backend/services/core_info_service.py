@@ -3,7 +3,7 @@ from db.models import DocumentCoreInfo
 from db.mappers.core_info_mapper import CoreInfoMapper
 from schemas.schemas import CoreInfoCreate, CoreInfoUpdate
 import uuid
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
 
 class CoreInfoService:
     @staticmethod
@@ -17,15 +17,26 @@ class CoreInfoService:
         # 计算 order_index
         if core_info_in.order_index is None:
             # 获取同级节点最大 order_index
-            query = select(func.count(DocumentCoreInfo.core_info_id)).where(DocumentCoreInfo.document_id == document_id)
+            query = select(func.max(DocumentCoreInfo.order_index)).where(DocumentCoreInfo.document_id == document_id)
             if core_info_in.parent_id:
                 query = query.where(DocumentCoreInfo.parent_id == core_info_in.parent_id)
             else:
                 query = query.where(DocumentCoreInfo.parent_id.is_(None))
                 
             result = await db.execute(query)
-            order_index = result.scalar() or 0
+            max_val = result.scalar()
+            order_index = (max_val + 1) if max_val is not None else 0
         else:
+            # 传入指定位置时，将该位置及之后的同级节点后移
+            shift_query = update(DocumentCoreInfo).where(
+                DocumentCoreInfo.document_id == document_id,
+                DocumentCoreInfo.order_index >= core_info_in.order_index
+            )
+            if core_info_in.parent_id:
+                shift_query = shift_query.where(DocumentCoreInfo.parent_id == core_info_in.parent_id)
+            else:
+                shift_query = shift_query.where(DocumentCoreInfo.parent_id.is_(None))
+            await db.execute(shift_query.values(order_index=DocumentCoreInfo.order_index + 1))
             order_index = core_info_in.order_index
         
         core_info = DocumentCoreInfo(
@@ -125,3 +136,24 @@ class CoreInfoService:
     @staticmethod
     async def unlock_core_info(db: AsyncSession, core_info_id: uuid.UUID) -> DocumentCoreInfo:
         return await CoreInfoMapper.update_core_info(db, core_info_id, {"is_locked": False})
+
+    @staticmethod
+    async def reorder(db: AsyncSession, document_id: uuid.UUID, parent_id, ordered_ids: list) -> None:
+        """
+        批量重排：传入同级节点新顺序 ID 列表，按下标重写 order_index。
+        支持跨父节点移动：若节点原 parent_id 与传入 parent_id 不同，同时更新 parent_id。
+        """
+        from sqlalchemy import update as sa_update
+        for idx, cid in enumerate(ordered_ids):
+            node = await CoreInfoMapper.get_core_info_by_id(db, cid)
+            if not node:
+                raise ValueError(f"节点 {cid} 不存在")
+            values = {"order_index": idx}
+            if node.parent_id != parent_id:
+                values["parent_id"] = parent_id
+            await db.execute(
+                sa_update(DocumentCoreInfo)
+                .where(DocumentCoreInfo.core_info_id == cid)
+                .values(**values)
+            )
+        await db.commit()

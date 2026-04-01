@@ -4,9 +4,17 @@ from db.session import get_db
 from schemas.schemas import CoreInfo, CoreInfoCreate, CoreInfoUpdate, CoreInfoOrderUpdate
 from services.core_info_service import CoreInfoService
 import uuid
+from uuid import UUID
+from typing import Optional, List
+from pydantic import BaseModel
 from core.response import success_response
 
 router = APIRouter(prefix="/api/v1", tags=["核心信息管理"])
+
+
+class CoreInfoReorder(BaseModel):
+    parent_id: Optional[UUID] = None
+    ordered_ids: List[UUID]
 
 @router.post("/documents/{document_id}/core-info", summary="创建核心信息")
 async def create_core_info(document_id: uuid.UUID, core_info: CoreInfoCreate, db: AsyncSession = Depends(get_db)):
@@ -94,24 +102,29 @@ async def update_core_info_order(core_info_id: uuid.UUID, order_update: CoreInfo
 
 @router.post("/{core_info_id}/lock", summary="锁定核心信息")
 async def lock_core_info(core_info_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    """
-    锁定核心信息，锁定后无法修改内容
-    """
     existing = await CoreInfoService.get_core_info_by_id(db, core_info_id)
     if not existing:
         raise HTTPException(status_code=404, detail="核心信息不存在")
-    
     result = await CoreInfoService.lock_core_info(db, core_info_id)
     return success_response(CoreInfo.model_validate(result), "锁定成功")
 
 @router.post("/{core_info_id}/unlock", summary="解锁核心信息")
 async def unlock_core_info(core_info_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    """
-    解锁核心信息，解锁后可以修改内容
-    """
     existing = await CoreInfoService.get_core_info_by_id(db, core_info_id)
     if not existing:
         raise HTTPException(status_code=404, detail="核心信息不存在")
-    
     result = await CoreInfoService.unlock_core_info(db, core_info_id)
     return success_response(CoreInfo.model_validate(result), "解锁成功")
+
+
+@router.post("/documents/{document_id}/core-info/reorder", summary="批量重排核心信息（拖拽排序）")
+async def reorder_core_info(document_id: uuid.UUID, data: CoreInfoReorder, db: AsyncSession = Depends(get_db)):
+    """
+    传入同级节点的新顺序 ID 列表，按下标重写 order_index。
+    支持跨父节点移动：若节点原 parent_id 与传入 parent_id 不同，同时更新 parent_id。
+    """
+    try:
+        await CoreInfoService.reorder(db, document_id, data.parent_id, data.ordered_ids)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return success_response(None, "排序更新成功")

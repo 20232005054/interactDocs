@@ -1,5 +1,6 @@
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import update
 from db.models import Paragraph
 from uuid import UUID
 
@@ -27,13 +28,24 @@ class ParagraphMapper:
 
     @staticmethod
     async def update_paragraph(db: AsyncSession, paragraph_id: UUID, update_data):
-        from sqlalchemy import update
         await db.execute(
             update(Paragraph)
             .where(Paragraph.paragraph_id == paragraph_id)
             .values(**update_data)
         )
         await db.commit()
+
+    @staticmethod
+    async def shift_order_index(
+        db: AsyncSession, chapter_id: UUID, from_index: int, delta: int
+    ) -> None:
+        """批量偏移 chapter_id 下 order_index >= from_index 的段落"""
+        await db.execute(
+            update(Paragraph)
+            .where(Paragraph.chapter_id == chapter_id)
+            .where(Paragraph.order_index >= from_index)
+            .values(order_index=Paragraph.order_index + delta)
+        )
 
     @staticmethod
     async def delete_paragraph(db: AsyncSession, paragraph):

@@ -82,13 +82,13 @@ class SummaryService:
         """
         创建默认摘要（标题为"新摘要"，内容为空）
         """
-        # 计算order_index
-        count_result = await db.execute(
-            select(func.count(DocumentSummary.summary_id))
+        # 计算order_index：取同文档下最大值+1
+        max_result = await db.execute(
+            select(func.max(DocumentSummary.order_index))
             .where(DocumentSummary.document_id == document_id)
         )
-        count = count_result.scalar() or 0
-        order_index = count
+        max_val = max_result.scalar()
+        order_index = (max_val + 1) if max_val is not None else 0
         
         # 创建新摘要
         new_summary = DocumentSummary(
