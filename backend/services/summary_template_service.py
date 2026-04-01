@@ -200,6 +200,9 @@ class SummaryTemplateService:
         if not prompt_template:
             return ""
 
+        print(f"\n========== 开始生成 AI 摘要: [{summary_template.title}] ==========")
+        print(f"-> 原始 sources 配置: {summary_template.sources}")
+
         if source_data_map is not None:
             variable_map = source_data_map
         else:
@@ -209,19 +212,60 @@ class SummaryTemplateService:
                 sources=summary_template.sources or [],
                 generated_summary_map=generated_summary_map,
             )
-        final_prompt = SummaryTemplateService.render_template_variables(
+            
+        print(f"-> 提取到的 source_data_map: {variable_map}")
+            
+        # 组装纯文本提示词与来源数据
+        sources_text = ""
+        sources = summary_template.sources or []
+        if sources:
+            sources_text = "\n\n请严格结合以下参考数据进行总结和生成：\n"
+            has_data = False
+            for source in sources:
+                target_field = source.get("target_field")
+                if not target_field:
+                    continue
+                
+                # 尝试获取友好的 label
+                label = target_field
+                match_keys = source.get("match_keys")
+                if match_keys and isinstance(match_keys, list) and len(match_keys) > 0:
+                    first_mk = match_keys[0]
+                    if isinstance(first_mk, dict) and first_mk.get("label"):
+                        label = first_mk.get("label")
+                
+                value = variable_map.get(target_field)
+                if value and str(value).strip():
+                    sources_text += f"【{label}】:\n{value}\n\n"
+                    has_data = True
+            
+            if not has_data:
+                sources_text = ""
+
+        # 兼容可能有 {{}} 的旧版模板，同时也拼接了新的参考数据
+        base_prompt = SummaryTemplateService.render_template_variables(
             prompt_template, variable_map
         )
+        # 将摘要的标题作为上下文一部分拼接进去
+        title_context = f"当前需要生成的摘要/内容模块名称为：【{summary_template.title}】\n"
+        final_prompt = f"{title_context}{base_prompt}{sources_text}"
+        
+        print(f"-> 最终构建的 AI 提示词 (final_prompt):\n{final_prompt}")
+
         template_id = getattr(
             summary_template,
             "summary_template_id",
             getattr(summary_template, "structure_template_id", None),
         )
-        return await SummaryTemplateService._call_ai_renderer(
+        
+        content = await SummaryTemplateService._call_ai_renderer(
             final_prompt,
             template_id=str(template_id) if template_id else None,
             field_key=getattr(summary_template, "field_key", None),
         )
+        
+        print(f"-> AI 生成的内容结果:\n{content}\n========================================================\n")
+        return content
 
     @staticmethod
     async def _call_ai_renderer(

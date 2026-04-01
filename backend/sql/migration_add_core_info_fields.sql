@@ -1,3 +1,4 @@
+-- 直接用database就行
 -- Migration script to add field_type, options, and is_required to document_core_info
 
 ALTER TABLE document_core_info
