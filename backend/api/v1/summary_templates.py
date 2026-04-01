@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
-from typing import List
+from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
+from pydantic import BaseModel
 
 from core.response import success_response
 from db.session import get_db
@@ -67,6 +68,7 @@ async def create(
         db,
         template_id=data.template_id,
         title=data.title,
+        field_key=data.field_key,
         generation_mode=data.generation_mode,
         content_template=data.content_template,
         sources=[s.dict() for s in data.sources] if data.sources else None,
@@ -137,3 +139,53 @@ async def delete(
 ):
     await SummaryTemplateService.delete(db, summary_template_id)
     return success_response(message="删除成功")
+
+
+class SummaryTemplateInsertAfter(BaseModel):
+    after_id: UUID
+    title: str
+    field_key: str
+    generation_mode: int = 0
+    content_template: Optional[str] = None
+    sources: Optional[list] = None
+    default_prompt: Optional[str] = None
+    custom_prompt: Optional[str] = None
+
+
+class SummaryTemplateReorder(BaseModel):
+    ordered_ids: list[UUID]
+
+
+@router.post("/template/{template_id}/insert-after", summary="在指定节点后插入摘要模板")
+async def insert_after(
+    template_id: UUID,
+    data: SummaryTemplateInsertAfter,
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        template = await SummaryTemplateService.insert_after(
+            db, template_id, data.after_id, data.model_dump(exclude={"after_id"})
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return success_response(data={
+        "summary_template_id": str(template.summary_template_id),
+        "template_id": str(template.template_id),
+        "title": template.title,
+        "generation_mode": template.generation_mode,
+        "content_template": template.content_template,
+        "sources": template.sources,
+        "default_prompt": template.default_prompt,
+        "custom_prompt": template.custom_prompt,
+        "order_index": template.order_index,
+    })
+
+
+@router.post("/template/{template_id}/reorder", summary="拖拽重排摘要模板")
+async def reorder(
+    template_id: UUID,
+    data: SummaryTemplateReorder,
+    db: AsyncSession = Depends(get_db)
+):
+    await SummaryTemplateService.reorder(db, template_id, data.ordered_ids)
+    return success_response(message="排序更新成功")

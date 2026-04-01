@@ -32,16 +32,23 @@ class SummaryTemplateService:
         db: AsyncSession,
         template_id: UUID,
         title: str,
+        field_key: str,
         generation_mode: int = 0,
         content_template: str = None,
         sources: list = None,
         default_prompt: str = None,
         custom_prompt: str = None,
-        order_index: int = 0
+        order_index: int = None
     ):
+        if order_index is None:
+            max_idx = await SummaryTemplateMapper.get_max_order_index(db, template_id)
+            order_index = max_idx + 1
+        else:
+            await SummaryTemplateMapper.shift_order_index(db, template_id, order_index, delta=1)
         summary_template = SummaryTemplate(
             template_id=template_id,
             title=title,
+            field_key=field_key,
             generation_mode=generation_mode,
             content_template=content_template,
             sources=sources,
@@ -57,7 +64,45 @@ class SummaryTemplateService:
 
     @staticmethod
     async def delete(db: AsyncSession, summary_template_id: UUID):
-        return await SummaryTemplateMapper.delete_by_id(db, summary_template_id)
+        node = await SummaryTemplateMapper.get_by_id(db, summary_template_id)
+        if not node:
+            return
+        deleted_index = node.order_index
+        template_id = node.template_id
+        await SummaryTemplateMapper.delete_by_id(db, summary_template_id)
+        await SummaryTemplateMapper.shift_order_index(db, template_id, deleted_index + 1, delta=-1)
+
+    @staticmethod
+    async def insert_after(
+        db: AsyncSession, template_id: UUID, after_id: UUID, data: dict
+    ):
+        after_node = await SummaryTemplateMapper.get_by_id(db, after_id)
+        if not after_node:
+            raise ValueError("参考节点不存在")
+        insert_index = after_node.order_index + 1
+        await SummaryTemplateMapper.shift_order_index(db, template_id, insert_index, delta=1)
+        summary_template = SummaryTemplate(
+            template_id=template_id,
+            order_index=insert_index,
+            title=data.get("title", ""),
+            field_key=data.get("field_key", ""),
+            generation_mode=data.get("generation_mode", 0),
+            content_template=data.get("content_template"),
+            sources=data.get("sources"),
+            default_prompt=data.get("default_prompt"),
+            custom_prompt=data.get("custom_prompt"),
+        )
+        return await SummaryTemplateMapper.create(db, summary_template)
+
+    @staticmethod
+    async def reorder(
+        db: AsyncSession, template_id: UUID, ordered_ids: list[UUID]
+    ) -> None:
+        items = [
+            {"summary_template_id": sid, "order_index": idx}
+            for idx, sid in enumerate(ordered_ids)
+        ]
+        await SummaryTemplateMapper.batch_update_order(db, items)
 
     @staticmethod
     async def batch_create(db: AsyncSession, templates: List[SummaryTemplate]):

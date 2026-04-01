@@ -1,6 +1,6 @@
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import delete
+from sqlalchemy import delete, update, func
 from db.models import SummaryTemplate
 from uuid import UUID
 
@@ -58,3 +58,36 @@ class SummaryTemplateMapper:
         db.add_all(templates)
         await db.commit()
         return templates
+
+    @staticmethod
+    async def get_max_order_index(db: AsyncSession, template_id: UUID) -> int:
+        """返回同一 template_id 下最大 order_index，无节点时返回 -1"""
+        result = await db.execute(
+            select(func.max(SummaryTemplate.order_index))
+            .where(SummaryTemplate.template_id == template_id)
+        )
+        val = result.scalar()
+        return val if val is not None else -1
+
+    @staticmethod
+    async def shift_order_index(
+        db: AsyncSession, template_id: UUID, from_index: int, delta: int
+    ) -> None:
+        """批量偏移同一 template_id 下 order_index >= from_index 的节点"""
+        await db.execute(
+            update(SummaryTemplate)
+            .where(SummaryTemplate.template_id == template_id)
+            .where(SummaryTemplate.order_index >= from_index)
+            .values(order_index=SummaryTemplate.order_index + delta)
+        )
+
+    @staticmethod
+    async def batch_update_order(db: AsyncSession, items: list[dict]) -> None:
+        """按 summary_template_id 批量重写 order_index"""
+        for item in items:
+            await db.execute(
+                update(SummaryTemplate)
+                .where(SummaryTemplate.summary_template_id == item["summary_template_id"])
+                .values(order_index=item["order_index"])
+            )
+        await db.commit()

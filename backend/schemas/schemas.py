@@ -310,7 +310,7 @@ class SummaryTemplateCreate(BaseModel):
     sources: Optional[List[SourceInfo]] = Field(None, description="来源信息数组")
     default_prompt: Optional[str] = Field(None, description="默认AI提示词")
     custom_prompt: Optional[str] = Field(None, description="专属AI提示词")
-    order_index: int = Field(default=0, description="排序")
+    order_index: Optional[int] = Field(None, description="排序，不传则追加到末尾")
 
 
 class SummaryTemplateUpdate(BaseModel):
