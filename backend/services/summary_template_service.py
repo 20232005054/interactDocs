@@ -6,7 +6,6 @@ from db.models import (
     SummaryTemplate,
     Document,
     DocumentCoreInfo,
-    CoreInfoTemplate,
     Paragraph,
 )
 from db.mappers.summary_mapper import SummaryMapper
@@ -186,17 +185,9 @@ class SummaryTemplateService:
         chapter_map = None
 
         for source in sources:
-            # 兼容旧结构和新结构
             source_obj = source.get("source")
-            source_type = source_obj.get("value") if isinstance(source_obj, dict) else source_obj
-            
-            # 兼容旧的 match_key 和新的 match_keys
-            match_keys_data = source.get("match_keys")
-            if not match_keys_data:
-                old_match_key = source.get("match_key")
-                match_keys = [{"value": old_match_key}] if old_match_key else []
-            else:
-                match_keys = match_keys_data
+            source_type = source_obj.get("value") if isinstance(source_obj, dict) else None
+            match_keys = source.get("match_keys") or []
 
             target_field = source.get("target_field")
             if not target_field:
@@ -204,7 +195,7 @@ class SummaryTemplateService:
 
             values = []
             for mk in match_keys:
-                match_key = mk.get("value") if isinstance(mk, dict) else mk
+                match_key = mk.get("value") if isinstance(mk, dict) else None
                 if not match_key:
                     continue
 
@@ -298,7 +289,19 @@ class SummaryTemplateService:
         )
         # 将摘要的标题作为上下文一部分拼接进去
         title_context = f"当前需要生成的摘要/内容模块名称为：【{summary_template.title}】\n"
-        final_prompt = f"{title_context}{base_prompt}{sources_text}"
+
+        # 构建核心信息结构化背景文本
+        core_info_background = ""
+        try:
+            structured_text = await SummaryTemplateService._get_core_info_structured_text(
+                db, document.document_id
+            )
+            if structured_text:
+                core_info_background = f"\n\n【文档核心信息背景】\n{structured_text}\n"
+        except Exception:
+            pass  # 背景信息获取失败不影响主流程
+
+        final_prompt = f"{title_context}{base_prompt}{core_info_background}{sources_text}"
         
         print(f"-> 最终构建的 AI 提示词 (final_prompt):\n{final_prompt}")
 
@@ -338,20 +341,50 @@ class SummaryTemplateService:
             select(DocumentCoreInfo).where(DocumentCoreInfo.document_id == document_id)
         )
         core_infos = result.scalars().all()
+        return {info.field_key: info.content for info in core_infos if info.field_key}
 
-        template_result = await db.execute(
-            select(CoreInfoTemplate)
-            .join(DocumentCoreInfo, CoreInfoTemplate.field_name == DocumentCoreInfo.title)
+    @staticmethod
+    async def _get_core_info_structured_text(db: AsyncSession, document_id: UUID) -> str:
+        """
+        将文档核心信息按树形分组结构转成带缩进的文本块，用于 AI prompt 背景上下文。
+        group 节点作为标题行，叶子节点输出 "字段名：内容"，跳过内容为空的节点。
+
+        示例输出：
+            试验基本信息：
+              试验名称：一项评估XX药物治疗晚期肺癌的III期临床试验
+              申办方：XX制药有限公司
+              研究阶段：III期
+            试验设计信息：
+              研究目的：评估XX药物对比安慰剂的疗效
+              样本量：300
+        """
+        result = await db.execute(
+            select(DocumentCoreInfo)
             .where(DocumentCoreInfo.document_id == document_id)
+            .order_by(DocumentCoreInfo.order_index)
         )
-        templates = template_result.scalars().all()
-        template_map = {t.field_name: t.field_key for t in templates}
+        all_nodes = result.scalars().all()
+        if not all_nodes:
+            return ""
 
-        core_info_map = {}
-        for info in core_infos:
-            field_key = template_map.get(info.title, info.title)
-            core_info_map[field_key] = info.content
-        return core_info_map
+        # 构建 id → node 映射
+        node_map = {n.core_info_id: n for n in all_nodes}
+
+        def build_text(parent_id, indent: int) -> str:
+            lines = []
+            children = [n for n in all_nodes if n.parent_id == parent_id]
+            children.sort(key=lambda x: x.order_index)
+            prefix = "  " * indent
+            for node in children:
+                if node.field_type == "group":
+                    lines.append(f"{prefix}{node.title}：")
+                    lines.append(build_text(node.core_info_id, indent + 1))
+                else:
+                    if node.content and node.content.strip():
+                        lines.append(f"{prefix}{node.title}：{node.content.strip()}")
+            return "\n".join(filter(None, lines))
+
+        return build_text(None, 0)
 
     @staticmethod
     async def _get_summary_content_map(db: AsyncSession, document: Document) -> dict:

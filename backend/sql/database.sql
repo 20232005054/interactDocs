@@ -135,6 +135,7 @@ CREATE TABLE IF NOT EXISTS document_core_info (
     document_id UUID NOT NULL REFERENCES documents(document_id) ON DELETE CASCADE,
     parent_id UUID REFERENCES document_core_info(core_info_id) ON DELETE CASCADE,
     title VARCHAR(200) NOT NULL,
+    field_key VARCHAR(50),
     content TEXT NOT NULL,
     field_type VARCHAR(20) DEFAULT 'text',
     options JSONB,

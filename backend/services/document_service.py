@@ -16,6 +16,7 @@ from services.dependency_service import DependencyService
 from services.summary_template_service import SummaryTemplateService
 from services.structure_template_service import StructureTemplateService
 from services.ai_client import AIClientError
+from core.constants import EdgeSourceType, EdgeTargetType
 
 class DocumentService:
     @staticmethod
@@ -330,6 +331,7 @@ class DocumentService:
                 document_id=document_id,
                 parent_id=id_mapping.get(template.parent_id) if template.parent_id else None,
                 title=template.field_name,
+                field_key=template.field_key,
                 content=template.default_value or "",
                 field_type=template.field_type,
                 options=template.options,
@@ -357,7 +359,7 @@ class DocumentService:
 
         # 预加载 core_info 和 summaries，用于解决 N+1 查询问题和依赖边创建
         core_info_list = await CoreInfoMapper.get_core_info_by_document_id(db, document_id)
-        core_info_id_map = {item.title: item.core_info_id for item in core_info_list} # 注意：title 对应 field_key
+        core_info_id_map = {item.field_key: item.core_info_id for item in core_info_list if item.field_key}
         
         # 建立已存在摘要的字典，用于后续模板引用或建边
         existing_summaries = await SummaryMapper.get_summaries_by_document_id(db, document_id)
@@ -367,8 +369,6 @@ class DocumentService:
 
         created_items = []
         generated_summary_map = {}
-        # 为了兼容已有逻辑，提取 core_info 的字典
-        core_info_map = {item.title: item.content for item in core_info_list}
         for idx, template in enumerate(summary_templates):
             content = ""
             generation_mode = template.generation_mode
@@ -471,33 +471,36 @@ class DocumentService:
             # 建立依赖边
             if template.sources:
                 for src in template.sources:
-                    source_type = src.get("source")
-                    match_key = src.get("match_key")
-                    target_id = None
-                    target_type = None
+                    source_obj = src.get("source")
+                    source_type = source_obj.get("value") if isinstance(source_obj, dict) else None
+                    match_keys = src.get("match_keys") or []
 
-                    if source_type == "keyinfo":
-                        target_type = "document_entity"
-                        target_id = core_info_id_map.get(match_key)
-                    elif source_type == "summary":
-                        target_type = "summary"
-                        target_id = summary_id_map.get(match_key)
-                    elif source_type == "chapter":
-                        # 注意：目前摘要不直接依赖章节，如果在模板里配了，这里可能取不到。
-                        # 因为 apply_summary_template 时，章节可能还没创建。
-                        # 如果需要支持，则需预加载所有 Chapter。这里暂留扩展空间。
-                        target_type = "chapter"
-                        pass 
+                    for mk in match_keys:
+                        match_key = mk.get("value") if isinstance(mk, dict) else None
+                        if not match_key:
+                            continue
 
-                    if target_type and target_id:
-                        await DependencyService.create_dependency_edge(
-                            db=db,
-                            source_type="summary",
-                            source_id=summary.summary_id,
-                            target_type=target_type,
-                            target_id=target_id,
-                            document_id=document_id
-                        )
+                        target_id = None
+                        target_type = None
+
+                        if source_type == "keyinfo":
+                            target_type = EdgeTargetType.CORE_INFO
+                            target_id = core_info_id_map.get(match_key)
+                        elif source_type == "summary":
+                            target_type = EdgeTargetType.SUMMARY
+                            target_id = summary_id_map.get(match_key)
+                        elif source_type == "chapter":
+                            target_type = EdgeTargetType.CHAPTER
+
+                        if target_type and target_id:
+                            await DependencyService.create_dependency_edge(
+                                db=db,
+                                source_type=EdgeSourceType.SUMMARY,
+                                source_id=summary.summary_id,
+                                target_type=target_type,
+                                target_id=target_id,
+                                document_id=document_id
+                            )
 
             created_items.append({
                 "summary": summary,
@@ -524,8 +527,7 @@ class DocumentService:
         
         # 预加载 core_info 和 summaries
         core_info_list = await CoreInfoMapper.get_core_info_by_document_id(db, document_id)
-        # TODO: 后续如果 CoreInfo 也拆分出 field_key，这里需要相应更新
-        core_info_id_map = {item.title: item.core_info_id for item in core_info_list}
+        core_info_id_map = {item.field_key: item.core_info_id for item in core_info_list if item.field_key}
         
         existing_summaries = await SummaryMapper.get_summaries_by_document_id(db, document_id)
         # 依赖建边和变量替换都依赖于 field_key，所以这里使用 field_key 作为映射键
@@ -627,22 +629,15 @@ class DocumentService:
                     db.add(paragraph)
                     await db.flush()
 
-                    # 建立依赖边
+                    # 建立依赖边（章节级别）
                     if template.sources:
                         for src in template.sources:
-                            # 兼容新旧结构
                             source_obj = src.get("source")
-                            source_type = source_obj.get("value") if isinstance(source_obj, dict) else source_obj
-                            
-                            match_keys_data = src.get("match_keys")
-                            if not match_keys_data:
-                                old_match_key = src.get("match_key")
-                                match_keys = [{"value": old_match_key}] if old_match_key else []
-                            else:
-                                match_keys = match_keys_data
-                                
+                            source_type = source_obj.get("value") if isinstance(source_obj, dict) else None
+                            match_keys = src.get("match_keys") or []
+
                             for mk in match_keys:
-                                match_key = mk.get("value") if isinstance(mk, dict) else mk
+                                match_key = mk.get("value") if isinstance(mk, dict) else None
                                 if not match_key:
                                     continue
                                 
@@ -650,13 +645,13 @@ class DocumentService:
                                 target_type = None
 
                                 if source_type == "keyinfo":
-                                    target_type = "document_entity"
+                                    target_type = EdgeTargetType.CORE_INFO
                                     target_id = core_info_id_map.get(match_key)
                                 elif source_type == "summary":
-                                    target_type = "summary"
+                                    target_type = EdgeTargetType.SUMMARY
                                     target_id = summary_id_map.get(match_key)
                                 elif source_type == "chapter":
-                                    target_type = "chapter"
+                                    target_type = EdgeTargetType.CHAPTER
                                     ref_template_id = structure_field_key_to_id.get(match_key)
                                     if ref_template_id:
                                         target_id = template_id_map.get(ref_template_id)
@@ -664,8 +659,8 @@ class DocumentService:
                                 if target_type and target_id:
                                     await DependencyService.create_dependency_edge(
                                         db=db,
-                                        source_type="paragraph",
-                                        source_id=paragraph.paragraph_id,
+                                        source_type=EdgeSourceType.CHAPTER,
+                                        source_id=chapter.chapter_id,
                                         target_type=target_type,
                                         target_id=target_id,
                                         document_id=document_id
@@ -699,31 +694,12 @@ class DocumentService:
 
     @staticmethod
     async def _get_core_info_map(db: AsyncSession, document_id: UUID) -> dict:
-        """
-        获取文档核心信息的键值对映射
-        key为field_key，value为content
-        """
+        """获取文档核心信息的键值对映射，key 为 field_key，value 为 content"""
         result = await db.execute(
             select(DocumentCoreInfo).where(DocumentCoreInfo.document_id == document_id)
         )
         core_infos = result.scalars().all()
-        
-        core_info_templates = await db.execute(
-            select(CoreInfoTemplate).join(
-                DocumentCoreInfo, 
-                CoreInfoTemplate.field_name == DocumentCoreInfo.title
-            ).where(DocumentCoreInfo.document_id == document_id)
-        )
-        templates = core_info_templates.scalars().all()
-        
-        template_map = {t.field_name: t.field_key for t in templates}
-        
-        core_info_map = {}
-        for info in core_infos:
-            field_key = template_map.get(info.title, info.title)
-            core_info_map[field_key] = info.content
-        
-        return core_info_map
+        return {info.field_key: info.content for info in core_infos if info.field_key}
 
     @staticmethod
     async def get_template_info(db: AsyncSession, document_id: UUID):

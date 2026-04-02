@@ -144,6 +144,7 @@ class DocumentCoreInfo(Base):
     document_id = Column(UUID(as_uuid=True), ForeignKey("documents.document_id", ondelete="CASCADE"), nullable=False)
     parent_id = Column(UUID(as_uuid=True), ForeignKey("document_core_info.core_info_id", ondelete="CASCADE"), nullable=True)
     title = Column(String(200), nullable=False)
+    field_key = Column(String(50), nullable=True)
     content = Column(Text, nullable=False)
     field_type = Column(String(20), default="text")
     options = Column(JSONB, nullable=True)

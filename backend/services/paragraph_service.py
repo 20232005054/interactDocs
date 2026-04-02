@@ -10,6 +10,7 @@ from sqlalchemy import select
 from db.models import Chapter, Document, Paragraph
 from services.dependency_service import DependencyService
 from typing import Optional
+from core.constants import EdgeSourceType, EdgeTargetType
 
 class ParagraphService:
     @staticmethod
@@ -80,9 +81,9 @@ class ParagraphService:
         if matched_summary_id and doc_id:
             await DependencyService.create_dependency_edge(
                 db,
-                "paragraph",
-                created_paragraph.paragraph_id,
-                "summary",
+                EdgeSourceType.CHAPTER,
+                chapter_id,
+                EdgeTargetType.SUMMARY,
                 matched_summary_id,
                 document_id=doc_id,
                 target_version=matched_summary_version,
@@ -93,9 +94,9 @@ class ParagraphService:
             if doc_id:
                 await DependencyService.create_dependency_edge(
                     db,
-                    "paragraph",
-                    created_paragraph.paragraph_id,
-                    "keyword",
+                    EdgeSourceType.CHAPTER,
+                    chapter_id,
+                    EdgeTargetType.KEYWORD,
                     keyword_id,
                     document_id=doc_id,
                 )
@@ -193,19 +194,11 @@ class ParagraphService:
 
     @staticmethod
     async def _handle_paragraph_change(db: AsyncSession, paragraph_id: UUID, is_substantial_change):
-        """
-        处理段落变更时的摘要更新
-        当段落发生实质变更时，调用AI重新生成依赖该段落的摘要内容
-        """
+        """段落发生实质变更时，通过章节级依赖边找到下游摘要并触发更新"""
         if not is_substantial_change:
             return
-        
-        # 获取与该段落关联的摘要（通过DependencyEdge表）
-        edges = await DependencyEdgeMapper.get_edges_by_source_and_target_type(
-            db, "paragraph", paragraph_id, "summary"
-        )
-        
-        # 获取段落信息及其所属章节和文档的元数据
+
+        # 查段落及所属章节
         result = await db.execute(
             select(Paragraph, Chapter, Document)
             .join(Chapter, Paragraph.chapter_id == Chapter.chapter_id)
@@ -215,48 +208,41 @@ class ParagraphService:
         data = result.first()
         if not data:
             return
-        
+
         target_paragraph, chapter, _ = data
-        
-        # 提取当前段落的所有层级标题
+
+        # 通过章节级依赖边找下游摘要
+        edges = await DependencyEdgeMapper.get_edges_by_source_and_target_type(
+            db, EdgeSourceType.CHAPTER, chapter.chapter_id, EdgeTargetType.SUMMARY
+        )
+
+        # 提取当前段落的层级标题上下文
         hierarchy_titles = []
         para_result = await db.execute(
             select(Paragraph).where(Paragraph.chapter_id == chapter.chapter_id).order_by(Paragraph.order_index)
         )
         paragraphs = para_result.scalars().all()
-        
         for para in paragraphs:
             if para.para_type in ['heading-1', 'heading-2', 'heading-3']:
-                hierarchy_titles.append({
-                    "type": para.para_type,
-                    "content": para.content
-                })
+                hierarchy_titles.append({"type": para.para_type, "content": para.content})
             if para.paragraph_id == paragraph_id:
                 break
-        
-        # 构建下游段落信息
+
         downstream_paragraph = {
             "paragraph_id": str(target_paragraph.paragraph_id),
             "content": target_paragraph.content,
             "chapter_title": chapter.title,
             "hierarchy_titles": hierarchy_titles
         }
-        
+
         for edge in edges:
             summary_id = edge.target_id
-            
             try:
-                # 调用AI帮填摘要，传入变更的段落信息作为下游依赖
                 from services.ai_service import assist_single_summary
-                
                 await assist_single_summary(db, summary_id, downstream_paragraph)
-                
-                # 更新摘要的is_change字段为3，表示因下游段落变更而需要更新
                 await SummaryMapper.update_summary(db, summary_id, {"is_change": 3})
-                
             except Exception as e:
                 print(f"处理段落变更时更新摘要失败: {e}")
-                # 即使AI生成失败，也要标记摘要需要更新
                 await SummaryMapper.update_summary(db, summary_id, {"is_change": 3})
     
     @staticmethod
@@ -291,7 +277,7 @@ class ParagraphService:
         """
         # 获取段落的所有关联链接（通过DependencyEdge表）
         edges = await DependencyEdgeMapper.get_edges_by_source_and_target_type(
-            db, "paragraph", paragraph_id, "summary"
+            db, EdgeSourceType.PARAGRAPH, paragraph_id, EdgeTargetType.SUMMARY
         )
         
         related_summaries = []
