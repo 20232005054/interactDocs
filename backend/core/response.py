@@ -14,12 +14,8 @@ class ResponseModel(BaseModel, Generic[T]):
     data: Optional[T] = None
 
 
-def success_response(data: Any = None, message: str = "成功") -> JSONResponse:
-    response_data = ResponseModel(code=200, message=message, data=data)
-    return JSONResponse(
-        status_code=200,
-        content=jsonable_encoder(response_data)
-    )
+def success_response(data: Any = None, message: str = "成功") -> dict:
+    return {"code": 200, "message": message, "data": data}
 
 
 # 全局异常处理

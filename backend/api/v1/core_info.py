@@ -7,7 +7,7 @@ import uuid
 from uuid import UUID
 from typing import Optional, List
 from pydantic import BaseModel
-from core.response import success_response
+from core.response import success_response, ResponseModel
 
 router = APIRouter(prefix="/api/v1", tags=["核心信息管理"])
 
