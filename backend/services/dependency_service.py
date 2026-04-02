@@ -11,49 +11,32 @@ class DependencyService:
         source_id: UUID,
         target_type: str,
         target_id: UUID,
+        document_id: UUID,
         target_version: int = None,
         relevance_score: float = 1.0
     ):
-        """
-        创建或更新依赖边
-        
-        Args:
-            db: 数据库会话
-            source_type: 源类型 (paragraph/summary/keyword)
-            source_id: 源ID
-            target_type: 目标类型 (paragraph/summary/keyword)
-            target_id: 目标ID
-            target_version: 目标版本（可选）
-            relevance_score: 相关度分数（默认1.0）
-            
-        Returns:
-            创建或更新的依赖边
-        """
         # 检查是否已存在相同的依赖边
         existing_edges = await DependencyEdgeMapper.get_edges_by_source_and_target_type(
             db, source_type, source_id, target_type
         )
         
-        # 如果已存在关联，更新它
         for edge in existing_edges:
             if edge.target_id == target_id:
-                # 如果提供了版本信息，更新版本
                 if target_version is not None:
                     await DependencyEdgeMapper.update_edge(db, edge.edge_id, {
                         "target_version": target_version
                     })
                 return edge
         
-        # 创建新的依赖边
         edge_data = {
             "source_type": source_type,
             "source_id": source_id,
             "target_type": target_type,
             "target_id": target_id,
+            "document_id": document_id,
             "relevance_score": relevance_score
         }
         
-        # 如果提供了版本信息，添加到创建数据中
         if target_version is not None:
             edge_data["target_version"] = target_version
         

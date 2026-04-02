@@ -7,7 +7,7 @@ from schemas.schemas import ParagraphCreate, ParagraphUpdate
 from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy import select
-from db.models import Chapter, Document
+from db.models import Chapter, Document, Paragraph
 from services.dependency_service import DependencyService
 from typing import Optional
 
@@ -73,25 +73,32 @@ class ParagraphService:
 
         created_paragraph = await ParagraphMapper.create_paragraph(db, new_paragraph)
 
-        if matched_summary_id:
+        # 获取 document_id 用于依赖边
+        chapter = await db.get(Chapter, chapter_id)
+        doc_id = chapter.document_id if chapter else None
+
+        if matched_summary_id and doc_id:
             await DependencyService.create_dependency_edge(
                 db,
                 "paragraph",
                 created_paragraph.paragraph_id,
                 "summary",
                 matched_summary_id,
+                document_id=doc_id,
                 target_version=matched_summary_version,
                 relevance_score=relevance_score,
             )
 
         for keyword_id in keyword_ids or []:
-            await DependencyService.create_dependency_edge(
-                db,
-                "paragraph",
-                created_paragraph.paragraph_id,
-                "keyword",
-                keyword_id,
-            )
+            if doc_id:
+                await DependencyService.create_dependency_edge(
+                    db,
+                    "paragraph",
+                    created_paragraph.paragraph_id,
+                    "keyword",
+                    keyword_id,
+                    document_id=doc_id,
+                )
 
         return created_paragraph
 

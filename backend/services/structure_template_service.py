@@ -31,7 +31,6 @@ class StructureTemplateService:
         db: AsyncSession,
         template_id: UUID,
         title: str,
-        field_key: str,
         level: int,
         parent_id: UUID = None,
         generation_mode: int = 0,
@@ -41,6 +40,9 @@ class StructureTemplateService:
         custom_prompt: str = None,
         order_index: int = None
     ):
+        from uuid import uuid4 as _uuid4
+        field_key = "struct_" + _uuid4().hex[:8]
+
         if order_index is None:
             from sqlalchemy import func, select
             result = await db.execute(
@@ -65,6 +67,7 @@ class StructureTemplateService:
             order_index=order_index
         )
         return await StructureTemplateMapper.create(db, structure_template)
+
 
     @staticmethod
     async def update(db: AsyncSession, structure_template_id: UUID, **kwargs):
@@ -91,7 +94,10 @@ class StructureTemplateService:
     async def insert_after(
         db: AsyncSession, template_id: UUID, after_id: UUID, data: dict
     ):
-        """在指定节点之后插入新节点（同级）"""
+        """在指定节点之后插入新节点（同级），field_key 后端自动生成"""
+        from uuid import uuid4 as _uuid4
+        field_key = "struct_" + _uuid4().hex[:8]
+
         after_node = await StructureTemplateMapper.get_by_id(db, after_id)
         if not after_node:
             raise ValueError("参考节点不存在")
@@ -104,7 +110,7 @@ class StructureTemplateService:
             parent_id=after_node.parent_id,
             order_index=insert_index,
             title=data.get("title", ""),
-            field_key=data.get("field_key", ""),
+            field_key=field_key,
             level=data.get("level", after_node.level),
             generation_mode=data.get("generation_mode", 0),
             content_template=data.get("content_template"),

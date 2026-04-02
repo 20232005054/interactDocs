@@ -180,12 +180,22 @@ class DocumentService:
         count_result = await db.execute(select(func.count()).select_from(Document))
         total = count_result.scalar_one()
         
-        # 分页查询文档，按更新时间倒序排列（最新的在前）
+        # 分页查询文档，同时 join 模板获取 purpose 和 display_name
         offset = (page - 1) * page_size
         result = await db.execute(
-            select(Document).order_by(Document.updated_at.desc()).offset(offset).limit(page_size)
+            select(Document, Template.purpose, Template.display_name)
+            .outerjoin(Template, Document.template_id == Template.template_id)
+            .order_by(Document.updated_at.desc())
+            .offset(offset)
+            .limit(page_size)
         )
-        documents = result.scalars().all()
+        rows = result.all()
+        
+        # 将结果组装为 (document, purpose, display_name) 元组列表
+        documents = [
+            {"doc": row[0], "purpose": row[1], "display_name": row[2]}
+            for row in rows
+        ]
         
         return total, documents
 
@@ -194,7 +204,14 @@ class DocumentService:
         document = await DocumentMapper.get_document_by_id(db, document_id)
         if not document:
             raise HTTPException(status_code=404, detail="文档不存在")
-        return document
+        # 查模板名
+        template_name = None
+        if document.template_id:
+            result = await db.execute(
+                select(Template.display_name).where(Template.template_id == document.template_id)
+            )
+            template_name = result.scalar()
+        return document, template_name
 
     @staticmethod
     async def update_document(db: AsyncSession, document_id: UUID, doc_in: DocumentUpdate):
@@ -478,7 +495,8 @@ class DocumentService:
                             source_type="summary",
                             source_id=summary.summary_id,
                             target_type=target_type,
-                            target_id=target_id
+                            target_id=target_id,
+                            document_id=document_id
                         )
 
             created_items.append({
@@ -649,7 +667,8 @@ class DocumentService:
                                         source_type="paragraph",
                                         source_id=paragraph.paragraph_id,
                                         target_type=target_type,
-                                        target_id=target_id
+                                        target_id=target_id,
+                                        document_id=document_id
                                     )
             else:
                 generation_error = DocumentService._build_generation_error(

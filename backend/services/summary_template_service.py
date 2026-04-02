@@ -32,7 +32,6 @@ class SummaryTemplateService:
         db: AsyncSession,
         template_id: UUID,
         title: str,
-        field_key: str,
         generation_mode: int = 0,
         content_template: str = None,
         sources: list = None,
@@ -40,6 +39,9 @@ class SummaryTemplateService:
         custom_prompt: str = None,
         order_index: int = None
     ):
+        from uuid import uuid4 as _uuid4
+        field_key = "summary_" + _uuid4().hex[:8]
+
         if order_index is None:
             max_idx = await SummaryTemplateMapper.get_max_order_index(db, template_id)
             order_index = max_idx + 1
@@ -76,6 +78,9 @@ class SummaryTemplateService:
     async def insert_after(
         db: AsyncSession, template_id: UUID, after_id: UUID, data: dict
     ):
+        from uuid import uuid4 as _uuid4
+        field_key = "summary_" + _uuid4().hex[:8]
+
         after_node = await SummaryTemplateMapper.get_by_id(db, after_id)
         if not after_node:
             raise ValueError("参考节点不存在")
@@ -84,8 +89,8 @@ class SummaryTemplateService:
         summary_template = SummaryTemplate(
             template_id=template_id,
             order_index=insert_index,
+            field_key=field_key,
             title=data.get("title", ""),
-            field_key=data.get("field_key", ""),
             generation_mode=data.get("generation_mode", 0),
             content_template=data.get("content_template"),
             sources=data.get("sources"),

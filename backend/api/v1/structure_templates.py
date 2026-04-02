@@ -15,7 +15,6 @@ router = APIRouter(prefix="/api/v1/structure-templates", tags=["文章结构模�
 class StructureTemplateInsertAfter(BaseModel):
     after_id: UUID
     title: str
-    field_key: str
     level: int
     generation_mode: int = 0
     content_template: Optional[str] = None
@@ -98,7 +97,6 @@ async def create(
         db,
         template_id=data.template_id,
         title=data.title,
-        field_key=data.field_key,
         level=data.level,
         parent_id=data.parent_id,
         generation_mode=data.generation_mode,

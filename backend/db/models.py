@@ -290,6 +290,8 @@ class DependencyEdge(Base):
     
     edge_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.document_id", ondelete="CASCADE"), nullable=False)
+
     # 依赖方 (主体：通常是生成的段落 Paragraph)
     source_type = Column(String(30), nullable=False)  # 例: 'paragraph', 'chapter', 'document'
     source_id = Column(UUID(as_uuid=True), nullable=False)

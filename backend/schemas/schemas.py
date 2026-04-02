@@ -264,7 +264,6 @@ class CoreInfoTemplateCreate(BaseModel):
     template_id: UUID = Field(..., description="关联的主模板ID")
     parent_id: Optional[UUID] = Field(None, description="父节点ID")
     field_name: str = Field(..., description="字段名称")
-    field_key: str = Field(..., description="字段标识")
     field_type: str = Field(default="text", description="字段类型")
     default_value: Optional[str] = Field(None, description="默认值")
     options: Optional[List[str]] = Field(None, description="select类型的选项列表")
@@ -276,7 +275,6 @@ class CoreInfoTemplateCreate(BaseModel):
 class CoreInfoTemplateInsertAfter(BaseModel):
     after_id: UUID = Field(..., description="在此节点之后插入")
     field_name: str = Field(..., description="字段名称")
-    field_key: str = Field(..., description="字段标识")
     field_type: str = Field(default="text", description="字段类型")
     default_value: Optional[str] = Field(None, description="默认值")
     options: Optional[List[str]] = Field(None, description="select类型的选项列表")
@@ -304,7 +302,6 @@ class CoreInfoTemplateUpdate(BaseModel):
 class SummaryTemplateCreate(BaseModel):
     template_id: UUID = Field(..., description="关联的主模板ID")
     title: str = Field(..., description="摘要标题")
-    field_key: str = Field(..., description="字段标识")
     generation_mode: int = Field(default=0, description="生成方式：0=复制，1=AI总结")
     content_template: Optional[str] = Field(None, description="内容模板，支持{{变量名}}替换")
     sources: Optional[List[SourceInfo]] = Field(None, description="来源信息数组")
@@ -329,7 +326,6 @@ class StructureTemplateCreate(BaseModel):
     template_id: UUID = Field(..., description="关联的主模板ID")
     parent_id: Optional[UUID] = Field(None, description="父章节ID")
     title: str = Field(..., description="章节标题")
-    field_key: str = Field(..., description="字段标识")
     level: int = Field(..., description="层级")
     generation_mode: int = Field(default=0, description="生成方式：0=复制，1=AI总结")
     content_template: Optional[str] = Field(None, description="内容模板")

@@ -223,6 +223,7 @@ CREATE TABLE IF NOT EXISTS structure_templates (
 -- 6.1 依赖边表 (异构关联)
 CREATE TABLE IF NOT EXISTS dependency_edges (
     edge_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    document_id UUID NOT NULL REFERENCES documents(document_id) ON DELETE CASCADE,
     source_type VARCHAR(30) NOT NULL,
     source_id UUID NOT NULL,
     target_type VARCHAR(30) NOT NULL,

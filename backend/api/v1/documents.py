@@ -35,10 +35,13 @@ async def list_documents(pagination: PaginationParams = Depends(),db: AsyncSessi
     
     # 构建返回数据
     items = []
-    for doc in documents:
+    for item in documents:
+        doc = item["doc"]
         items.append({
             "document_id": doc.document_id,
             "title": doc.title,
+            "template_purpose": item["purpose"],
+            "template_name": item["display_name"],
             "created_at": doc.created_at,
             "updated_at": doc.updated_at
         })
@@ -52,14 +55,14 @@ async def list_documents(pagination: PaginationParams = Depends(),db: AsyncSessi
 
 @router.get("/{document_id}", summary="获取文档详情")
 async def get_document(document_id: UUID, db: AsyncSession = Depends(get_db)):
-    document = await DocumentService.get_document(db, document_id)
+    document, template_name = await DocumentService.get_document(db, document_id)
     
-    # 构建返回数据
     result = {
         "document_id": document.document_id,
         "title": document.title,
         "purpose": document.purpose,
         "template_id": document.template_id,
+        "template_name": template_name,
         "created_at": document.created_at,
         "updated_at": document.updated_at
     }

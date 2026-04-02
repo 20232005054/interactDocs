@@ -58,7 +58,6 @@ class CoreInfoTemplateService:
         db: AsyncSession,
         template_id: UUID,
         field_name: str,
-        field_key: str,
         parent_id: UUID = None,
         field_type: str = "text",
         default_value: str = None,
@@ -66,13 +65,17 @@ class CoreInfoTemplateService:
         is_required: bool = True,
         order_index: int = None,
     ):
-        """
-        新增节点（追加到同级末尾）。
-        order_index 不传时自动取同级 max+1。
-        """
+        """field_key 后端自动生成，order_index 不传时追加到末尾，传入时位移后插入。"""
+        from uuid import uuid4 as _uuid4
+        field_key = "core_" + _uuid4().hex[:8]
+
         if order_index is None:
             max_idx = await CoreInfoTemplateMapper.get_max_order_index(db, template_id, parent_id)
             order_index = max_idx + 1
+        else:
+            await CoreInfoTemplateMapper.shift_order_index(
+                db, template_id, parent_id, order_index, delta=1
+            )
 
         core_template = CoreInfoTemplate(
             template_id=template_id,
@@ -93,23 +96,20 @@ class CoreInfoTemplateService:
         template_id: UUID,
         after_id: UUID,
         field_name: str,
-        field_key: str,
         field_type: str = "text",
         default_value: str = None,
         options: dict = None,
         is_required: bool = True,
     ):
-        """
-        在指定节点之后插入新节点（同级）。
-        将 after 节点之后的所有同级节点 order_index +1，新节点取 after.order_index+1。
-        """
+        """field_key 后端自动生成。"""
+        from uuid import uuid4 as _uuid4
+        field_key = "core_" + _uuid4().hex[:8]
+
         after_node = await CoreInfoTemplateMapper.get_by_id(db, after_id)
         if not after_node:
             raise ValueError("参考节点不存在")
 
         insert_index = after_node.order_index + 1
-
-        # 后续同级节点全部 +1
         await CoreInfoTemplateMapper.shift_order_index(
             db, template_id, after_node.parent_id, insert_index, delta=1
         )

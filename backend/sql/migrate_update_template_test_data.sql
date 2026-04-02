@@ -1,29 +1,16 @@
 -- =====================================================
--- 模板机制升级 - 测试数据SQL语句
--- field_key 命名规则：
---   核心信息模板: core_xxxxxxxx
---   摘要模板:     summary_xxxxxxxx
---   结构模板:     struct_xxxxxxxx
+-- 迁移脚本：更新测试模板数据
+-- 变更内容：
+--   1. field_key 统一改为带前缀格式（core_/summary_/struct_）
+--   2. sources 里的 match_keys.value 同步更新
+--   3. 结构模板提示词改为纯文本（去除{{}}变量）
+--   4. 字数要求统一改为100-200字
 -- =====================================================
-
--- 1. 创建测试主模板（如果不存在）
-INSERT INTO templates (template_id, group_id, purpose, display_name, content, version, is_system, is_active)
-VALUES (
-    'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
-    'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
-    '临床试验方案',
-    '肿瘤临床试验方案模板',
-    '{"description": "用于肿瘤临床试验方案的撰写", "default_prompt": "你是一位专业的临床试验方案撰写专家，请根据提供的信息撰写章节内容。"}',
-    1, TRUE, TRUE
-) ON CONFLICT (template_id) DO NOTHING;
 
 DELETE FROM structure_templates WHERE template_id = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
 DELETE FROM summary_templates   WHERE template_id = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
 DELETE FROM core_info_templates WHERE template_id = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
 
--- ============================================================
--- 2. 核心信息模板
--- ============================================================
 INSERT INTO core_info_templates (core_template_id, template_id, parent_id, field_name, field_key, field_type, default_value, options, is_required, order_index) VALUES
 ('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a00', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', NULL,                                    '试验基本信息', 'core_basicinfo',  'group',  NULL, NULL,                          TRUE, 0),
 ('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a00', '试验名称',     'core_trialname',  'text',   NULL, NULL,                          TRUE, 0),
@@ -35,9 +22,6 @@ INSERT INTO core_info_templates (core_template_id, template_id, parent_id, field
 ('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a05', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a10', '主要终点',     'core_endpoint',   'text',   NULL, NULL,                          TRUE, 2),
 ('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a06', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a10', '样本量',       'core_samplesize', 'number', NULL, NULL,                          TRUE, 3);
 
--- ============================================================
--- 3. 摘要模板
--- ============================================================
 INSERT INTO summary_templates (summary_template_id, template_id, title, field_key, generation_mode, content_template, sources, default_prompt, custom_prompt, order_index) VALUES
 ('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '试验名称', 'summary_trialname', 0,
  '{{core_trialname}}',
@@ -58,11 +42,6 @@ INSERT INTO summary_templates (summary_template_id, template_id, title, field_ke
  '综合研究目的摘要，撰写研究概述，突出研究的核心价值，100-200字。',
  3);
 
--- ============================================================
--- 4. 结构模板（提示词为纯文本，字数要求100-200字）
--- ============================================================
-
--- 一级章节
 INSERT INTO structure_templates (structure_template_id, template_id, parent_id, title, field_key, level, generation_mode, content_template, sources, default_prompt, custom_prompt, order_index) VALUES
 ('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', NULL, '研究背景', 'struct_background', 1, 1, NULL,
  '[{"source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"}, "match_type": "关键信息匹配", "match_keys": [{"value": "core_purpose", "label": "研究目的"}], "target_field": "core_purpose"}, {"source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"}, "match_type": "关键信息匹配", "match_keys": [{"value": "core_trialname", "label": "试验名称"}], "target_field": "core_trialname"}]',
@@ -85,7 +64,6 @@ INSERT INTO structure_templates (structure_template_id, template_id, parent_id, 
  '你是一位资深临床试验方案撰写专家。请根据提供的研究设计和研究目的摘要，撰写讨论与结论章节，100-200字。',
  3);
 
--- 二级章节（研究设计子章节）
 INSERT INTO structure_templates (structure_template_id, template_id, parent_id, title, field_key, level, generation_mode, content_template, sources, default_prompt, custom_prompt, order_index) VALUES
 ('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a05', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a02', '研究类型', 'struct_restype', 2, 1, NULL,
  '[{"source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"}, "match_type": "关键信息匹配", "match_keys": [{"value": "core_phase", "label": "研究阶段"}], "target_field": "core_phase"}, {"source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"}, "match_type": "关键信息匹配", "match_keys": [{"value": "core_purpose", "label": "研究目的"}], "target_field": "core_purpose"}]',
@@ -100,10 +78,7 @@ INSERT INTO structure_templates (structure_template_id, template_id, parent_id, 
  '[{"source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"}, "match_type": "关键信息匹配", "match_keys": [{"value": "core_population", "label": "目标人群"}], "target_field": "core_population"}, {"source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"}, "match_type": "关键信息匹配", "match_keys": [{"value": "core_phase", "label": "研究阶段"}], "target_field": "core_phase"}]',
  '你是一位资深临床试验方案撰写专家。请根据提供的目标人群和研究阶段，撰写入排标准小节，分别列出3-5条纳入标准和3-5条排除标准，符合GCP规范，100-200字。',
  '你是一位资深临床试验方案撰写专家。请根据提供的目标人群和研究阶段，撰写入排标准小节，100-200字。',
- 2);
-
--- 二级章节（统计分析子章节）
-INSERT INTO structure_templates (structure_template_id, template_id, parent_id, title, field_key, level, generation_mode, content_template, sources, default_prompt, custom_prompt, order_index) VALUES
+ 2),
 ('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a08', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a03', '主要分析', 'struct_primaryana', 2, 1, NULL,
  '[{"source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"}, "match_type": "关键信息匹配", "match_keys": [{"value": "core_endpoint", "label": "主要终点"}], "target_field": "core_endpoint"}, {"source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"}, "match_type": "关键信息匹配", "match_keys": [{"value": "core_samplesize", "label": "样本量"}], "target_field": "core_samplesize"}]',
  '你是一位资深生物统计学家。请根据提供的主要终点和样本量，撰写主要分析小节，明确统计假设、检验方法和显著性水平，符合ICH E9规范，100-200字。',
