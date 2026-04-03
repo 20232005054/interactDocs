@@ -108,35 +108,21 @@ class ParagraphService:
         paragraph = await ParagraphMapper.get_paragraph_by_id(db, paragraph_id)
         if not paragraph:
             raise HTTPException(status_code=404, detail="段落不存在")
-        
-        # 检查内容是否发生实质性变更
-        is_change = False
-        from services.ai_service import is_substantial_change
-        if paragraph_in.content is not None:
-            is_change = await is_substantial_change(
-                paragraph.content, paragraph_in.content
-            )
-        
-        # 构建更新数据（order_index 不在此接口修改，排序走专用接口）
+
         update_data = {}
         if paragraph_in.content is not None:
             update_data["content"] = paragraph_in.content
+            # 内容有变化时标记 ischange=1（已被手动修改，与原始生成版本不同）
+            if paragraph_in.content != paragraph.content:
+                update_data["ischange"] = 1
         if paragraph_in.para_type is not None:
             update_data["para_type"] = paragraph_in.para_type
         if paragraph_in.ai_eval is not None:
             update_data["ai_eval"] = paragraph_in.ai_eval
         if paragraph_in.ai_suggestion is not None:
             update_data["ai_suggestion"] = paragraph_in.ai_suggestion
-        
-        # 如果发生实质性变更，更新ischange字段
-        if is_change:
-            update_data["ischange"] = 1
-        
+
         await ParagraphMapper.update_paragraph(db, paragraph_id, update_data)
-        
-        # 处理段落变更时的摘要更新
-        await ParagraphService._handle_paragraph_change(db, paragraph_id, is_change)
-        
         return await ParagraphMapper.get_paragraph_by_id(db, paragraph_id)
 
     @staticmethod
@@ -192,58 +178,6 @@ class ParagraphService:
         await db.commit()
         return result
 
-    @staticmethod
-    async def _handle_paragraph_change(db: AsyncSession, paragraph_id: UUID, is_substantial_change):
-        """段落发生实质变更时，通过章节级依赖边找到下游摘要并触发更新"""
-        if not is_substantial_change:
-            return
-
-        # 查段落及所属章节
-        result = await db.execute(
-            select(Paragraph, Chapter, Document)
-            .join(Chapter, Paragraph.chapter_id == Chapter.chapter_id)
-            .join(Document, Chapter.document_id == Document.document_id)
-            .where(Paragraph.paragraph_id == paragraph_id)
-        )
-        data = result.first()
-        if not data:
-            return
-
-        target_paragraph, chapter, _ = data
-
-        # 通过章节级依赖边找下游摘要
-        edges = await DependencyEdgeMapper.get_edges_by_source_and_target_type(
-            db, EdgeSourceType.CHAPTER, chapter.chapter_id, EdgeTargetType.SUMMARY
-        )
-
-        # 提取当前段落的层级标题上下文
-        hierarchy_titles = []
-        para_result = await db.execute(
-            select(Paragraph).where(Paragraph.chapter_id == chapter.chapter_id).order_by(Paragraph.order_index)
-        )
-        paragraphs = para_result.scalars().all()
-        for para in paragraphs:
-            if para.para_type in ['heading-1', 'heading-2', 'heading-3']:
-                hierarchy_titles.append({"type": para.para_type, "content": para.content})
-            if para.paragraph_id == paragraph_id:
-                break
-
-        downstream_paragraph = {
-            "paragraph_id": str(target_paragraph.paragraph_id),
-            "content": target_paragraph.content,
-            "chapter_title": chapter.title,
-            "hierarchy_titles": hierarchy_titles
-        }
-
-        for edge in edges:
-            summary_id = edge.target_id
-            try:
-                from services.ai_service import assist_single_summary
-                await assist_single_summary(db, summary_id, downstream_paragraph)
-                await SummaryMapper.update_summary(db, summary_id, {"is_change": 3})
-            except Exception as e:
-                print(f"处理段落变更时更新摘要失败: {e}")
-                await SummaryMapper.update_summary(db, summary_id, {"is_change": 3})
     
     @staticmethod
     async def apply_ai_assist_result(db: AsyncSession, paragraph_id: UUID):

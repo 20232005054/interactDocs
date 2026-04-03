@@ -162,6 +162,37 @@ async def call_qwen_once(
     return {"content": content, "duration_ms": duration_ms, "error_code": None}
 
 
+async def get_embedding(text: str) -> list[float]:
+    """获取文本的 embedding 向量，用于语义相似度计算"""
+    try:
+        response = await asyncio.to_thread(
+            dashscope.TextEmbedding.call,
+            model="text-embedding-v3",
+            input=text,
+        )
+        if response.status_code == HTTPStatus.OK:
+            return response.output["embeddings"][0]["embedding"]
+        raise AIClientError(
+            f"Embedding 调用失败: {getattr(response, 'message', 'unknown')}",
+            error_code="EMBEDDING_ERROR"
+        )
+    except AIClientError:
+        raise
+    except Exception as exc:
+        raise AIClientError(str(exc), error_code="EMBEDDING_ERROR")
+
+
+async def cosine_similarity(vec_a: list[float], vec_b: list[float]) -> float:
+    """计算两个向量的余弦相似度"""
+    import math
+    dot = sum(a * b for a, b in zip(vec_a, vec_b))
+    norm_a = math.sqrt(sum(a * a for a in vec_a))
+    norm_b = math.sqrt(sum(b * b for b in vec_b))
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return dot / (norm_a * norm_b)
+
+
 async def call_qwen_stream(
     system_prompt: str,
     history: list,

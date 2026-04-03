@@ -229,6 +229,7 @@ class CoreInfo(CoreInfoBase):
     core_info_id: UUID
     document_id: UUID
     parent_id: Optional[UUID] = Field(None, description="父节点ID")
+    field_key: Optional[str] = Field(None, description="字段标识")
     order_index: int
     is_locked: bool
     is_change: int

@@ -21,38 +21,40 @@ class SummaryService:
 
     @staticmethod
     async def update_summary(db: AsyncSession, summary_id: UUID, summary_in: DocumentSummaryUpdate):
-        # 获取旧摘要
         old_summary = await SummaryMapper.get_summary_by_id(db, summary_id)
         if not old_summary:
             return None
-        
-        # 检查是否有实质性变更
-        # 处理 content 为空字符串的情况
-        from services.ai_service import is_substantial_change
+
         new_content = summary_in.content if summary_in.content is not None else old_summary.content
-        is_change = await is_substantial_change(old_summary.content, new_content)
-        
+        new_title = summary_in.title if summary_in.title is not None else old_summary.title
+
         # 创建历史记录
         history = DocumentSummaryHistory(
             summary_id=summary_id,
             version=old_summary.version,
             title=old_summary.title,
-            content=old_summary.content
+            content=old_summary.content,
         )
         db.add(history)
-        
-        # 直接更新现有摘要记录，增加版本号
+
+        # 乐观标记 is_change=1，立即保存
         update_data = {
-            "title": summary_in.title if summary_in.title is not None else old_summary.title,
+            "title": new_title,
             "content": new_content,
-            "order_index": old_summary.order_index,  # 保持原有排序索引
+            "order_index": old_summary.order_index,
             "version": old_summary.version + 1,
-            "is_change": 1 if is_change else 0
+            "is_change": 1 if new_content != old_summary.content else 0,
         }
         updated_summary = await SummaryMapper.update_summary(db, summary_id, update_data)
-        
-        # 处理关联段落更新，传递变更状态
-        await SummaryService._handle_summary_change(db, old_summary, updated_summary, is_change)
+
+        # 内容有变化时启动后台任务
+        if new_content != old_summary.content:
+            import asyncio
+            from services.summary_change_service import handle_summary_change_async
+            asyncio.create_task(
+                handle_summary_change_async(summary_id, old_summary.content, new_content)
+            )
+
         return updated_summary
 
     @staticmethod
@@ -161,55 +163,6 @@ class SummaryService:
 
 
 
-    @staticmethod
-    async def _handle_summary_change(db: AsyncSession, old_summary: DocumentSummary, new_summary: DocumentSummary, is_substantial_change):
-        """摘要发生实质变更时，通过章节级依赖边找到下游章节，标记其段落需要更新"""
-        if not is_substantial_change:
-            return
-
-        # 查依赖该摘要的章节（source_type=chapter）
-        edges = await DependencyEdgeMapper.get_edges_by_target(
-            db, EdgeTargetType.SUMMARY, old_summary.summary_id
-        )
-
-        from services.ai_service import ai_assist_paragraph
-        from schemas.schemas import AIAssistRequest
-
-        upstream_summary = {
-            "summary_id": str(new_summary.summary_id),
-            "title": new_summary.title,
-            "content": new_summary.content
-        }
-
-        for edge in edges:
-            # edge.source_id 现在是 chapter_id
-            chapter_id = edge.source_id
-
-            # 取该章节下的所有段落，逐个触发 AI 更新
-            paragraphs = await ParagraphMapper.get_paragraphs_by_chapter_id(db, chapter_id)
-            for paragraph in paragraphs:
-                assist_request = AIAssistRequest()
-                try:
-                    full_content = ""
-                    async for chunk in ai_assist_paragraph(db, paragraph.paragraph_id, assist_request, upstream_summary):
-                        if chunk.startswith("data: "):
-                            import json
-                            data_str = chunk[6:].strip()
-                            if data_str == "[DONE]":
-                                break
-                            try:
-                                data = json.loads(data_str)
-                                if "content" in data:
-                                    full_content += data["content"]
-                            except json.JSONDecodeError:
-                                pass
-                    await ParagraphMapper.update_paragraph(db, paragraph.paragraph_id, {
-                        "ai_generate": full_content,
-                        "ischange": 2
-                    })
-                except Exception as e:
-                    print(f"处理摘要变更时更新段落失败: {e}")
-                    await ParagraphMapper.update_paragraph(db, paragraph.paragraph_id, {"ischange": 2})
     @staticmethod
     async def get_summary_related_paragraphs(db: AsyncSession, summary_id: UUID):
         """

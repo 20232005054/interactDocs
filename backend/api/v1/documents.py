@@ -7,7 +7,7 @@ from schemas.schemas import DocumentCreate, DocumentUpdate, SnapshotUpdate, Pagi
 from schemas.response_schemas import (
     DocumentResponse, DocumentDetailResponse, DocumentListResponse,
     SnapshotResponse, SnapshotListResponse,
-    ApplyCoreInfoResponse, ApplySummaryResponse, ApplyStructureResponse,
+    ApplyCoreInfoResponse, ApplySummaryResponse, ApplyStructureResponse, ApplyCoreInfoItem
 )
 from core.response import success_response, ResponseModel
 from db.session import get_db
@@ -119,7 +119,6 @@ async def get_template_info(document_id: UUID, db: AsyncSession = Depends(get_db
 
 @router.post("/{document_id}/apply-core-info-template", summary="应用核心信息模板", response_model=ResponseModel[ApplyCoreInfoResponse])
 async def apply_core_info_template(document_id: UUID, db: AsyncSession = Depends(get_db)):
-    from schemas.response_schemas import ApplyCoreInfoItem
     created_items = await DocumentService.apply_core_info_template(db, document_id)
 
     info_dict_map = {}

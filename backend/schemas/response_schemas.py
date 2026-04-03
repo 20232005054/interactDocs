@@ -162,6 +162,7 @@ class CoreInfoResponse(BaseModel):
     document_id: UUID
     parent_id: Optional[UUID] = None
     title: str
+    field_key: Optional[str] = None
     content: str
     field_type: str
     options: Optional[Any] = None

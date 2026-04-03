@@ -104,22 +104,38 @@ class CoreInfoService:
     @staticmethod
     async def update_core_info(db: AsyncSession, core_info_id: uuid.UUID, core_info_in: CoreInfoUpdate) -> DocumentCoreInfo:
         update_data = core_info_in.model_dump(exclude_unset=True)
-        # 移除不可直接更新或需要特殊处理的字段
         if "children" in update_data:
             del update_data["children"]
             
         if "parent_id" in update_data and update_data["parent_id"] is not None:
-            # 校验 parent_id
             existing = await CoreInfoMapper.get_core_info_by_id(db, core_info_id)
             if existing:
                 parent_node = await CoreInfoMapper.get_core_info_by_id(db, update_data["parent_id"])
                 if not parent_node or parent_node.document_id != existing.document_id:
                     raise ValueError("父节点不存在或不属于当前文档")
-                # 防环校验
                 if str(update_data["parent_id"]) == str(core_info_id):
                     raise ValueError("父节点不能是自己")
 
-        return await CoreInfoMapper.update_core_info(db, core_info_id, update_data)
+        # 记录旧内容，用于后台变更判断
+        old_node = await CoreInfoMapper.get_core_info_by_id(db, core_info_id)
+        old_content = old_node.content if old_node else ""
+        new_content = update_data.get("content", old_content)
+
+        # 如果内容有变化，乐观标记 is_change=1
+        if "content" in update_data and new_content != old_content:
+            update_data["is_change"] = 1
+
+        updated = await CoreInfoMapper.update_core_info(db, core_info_id, update_data)
+
+        # 启动后台任务处理下游联动
+        if "content" in update_data and new_content != old_content:
+            import asyncio
+            from services.core_info_change_service import handle_core_info_change_async
+            asyncio.create_task(
+                handle_core_info_change_async(core_info_id, old_content, new_content)
+            )
+
+        return updated
     
     @staticmethod
     async def delete_core_info(db: AsyncSession, core_info_id: uuid.UUID) -> bool:
