@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
 from core.response import success_response, ResponseModel
-from core.auth import get_current_user, get_editor_user
+from core.auth import get_editor_user
 from db.session import get_db
 from services.core_info_template_service import CoreInfoTemplateService
 from schemas.schemas import CoreInfoTemplateCreate, CoreInfoTemplateUpdate, CoreInfoTemplateInsertAfter, CoreInfoTemplateReorder
@@ -31,7 +31,7 @@ def _ci_template_response(t) -> CoreInfoTemplateResponse:
 
 
 @router.get("/template/{template_id}", summary="获取模板的核心信息字段列表（树形结构）", response_model=ResponseModel[CoreInfoTemplateListResponse])
-async def get_by_template_id(template_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def get_by_template_id(template_id: UUID, db: AsyncSession = Depends(get_db)):
     tree = await CoreInfoTemplateService.get_template_tree(db, template_id)
 
     def build_node(d) -> CoreInfoTemplateResponse:
@@ -56,7 +56,7 @@ async def get_by_template_id(template_id: UUID, current_user=Depends(get_current
 
 
 @router.get("/{core_template_id}", summary="获取核心信息模板详情", response_model=ResponseModel[CoreInfoTemplateResponse])
-async def get_by_id(core_template_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def get_by_id(core_template_id: UUID, db: AsyncSession = Depends(get_db)):
     template = await CoreInfoTemplateService.get_by_id(db, core_template_id)
     if not template:
         raise HTTPException(status_code=404, detail="核心信息模板不存在")

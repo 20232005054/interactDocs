@@ -178,14 +178,12 @@ class DocumentService:
     async def list_documents(db: AsyncSession, pagination: PaginationParams, user_id=None):
         page = pagination.page
         page_size = pagination.page_size
-        # 查询文档总数（有 user_id 时只统计该用户的）
         count_query = select(func.count()).select_from(Document)
         if user_id is not None:
             count_query = count_query.where(Document.user_id == user_id)
         count_result = await db.execute(count_query)
         total = count_result.scalar_one()
 
-        # 分页查询文档，同时 join 模板获取 purpose 和 display_name
         offset = (page - 1) * page_size
         query = (
             select(Document, Template.purpose, Template.display_name)

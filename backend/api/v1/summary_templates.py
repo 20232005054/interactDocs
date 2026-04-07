@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from core.response import success_response, ResponseModel
-from core.auth import get_current_user, get_editor_user
+from core.auth import get_editor_user
 from db.session import get_db
 from services.summary_template_service import SummaryTemplateService
 from schemas.schemas import SummaryTemplateCreate, SummaryTemplateUpdate
@@ -46,13 +46,13 @@ def _st_response(t) -> SummaryTemplateResponse:
 
 
 @router.get("/template/{template_id}", summary="获取模板的摘要模板列表", response_model=ResponseModel[SummaryTemplateListResponse])
-async def get_by_template_id(template_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def get_by_template_id(template_id: UUID, db: AsyncSession = Depends(get_db)):
     templates = await SummaryTemplateService.get_by_template_id(db, template_id)
     return success_response(data=SummaryTemplateListResponse(items=[_st_response(t) for t in templates]))
 
 
 @router.get("/{summary_template_id}", summary="获取摘要模板详情", response_model=ResponseModel[SummaryTemplateResponse])
-async def get_by_id(summary_template_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def get_by_id(summary_template_id: UUID, db: AsyncSession = Depends(get_db)):
     template = await SummaryTemplateService.get_by_id(db, summary_template_id)
     if not template:
         raise HTTPException(status_code=404, detail="摘要模板不存在")

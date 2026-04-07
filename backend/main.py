@@ -1,12 +1,14 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from api.v1 import documents, chapters, paragraphs, ai, endpoints, summaries, templates, core_info, core_info_templates, summary_templates, structure_templates
 from api.v1 import auth
 from api.v1.admin import users as admin_users, documents as admin_documents, stats as admin_stats
 from core.response import generic_exception_handler
+from core.security import decode_token
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="方案生成系统", version="1.0.0",timeout=300)
+app = FastAPI(title="方案生成系统", version="1.0.0", timeout=300)
 
 app.add_exception_handler(Exception, generic_exception_handler)
 
@@ -17,6 +19,34 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 不需要鉴权的路径白名单
+_PUBLIC_PATHS = {
+    "/api/v1/auth/register",
+    "/api/v1/auth/login",
+    "/docs",
+    "/openapi.json",
+    "/redoc",
+    "/",
+}
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    """全局鉴权中间件：白名单路径放行，其余路径验证 Bearer token"""
+    if request.url.path in _PUBLIC_PATHS or request.url.path.startswith("/docs"):
+        return await call_next(request)
+
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return JSONResponse(status_code=401, content={"code": 401, "message": "未提供认证凭据", "data": None})
+
+    token = auth_header.removeprefix("Bearer ").strip()
+    try:
+        decode_token(token)
+    except Exception:
+        return JSONResponse(status_code=401, content={"code": 401, "message": "无效的认证凭据", "data": None})
+
+    return await call_next(request)
 
 
 

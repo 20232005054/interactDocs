@@ -7,7 +7,7 @@ from core.response import success_response, ResponseModel
 from db.session import get_db
 from services.template_service import TemplateService
 from schemas.response_schemas import TemplateResponse, TemplateDetailResponse, TemplateListResponse, PurposeListResponse
-from core.auth import get_current_user, get_editor_user, get_admin_user
+from core.auth import get_editor_user, get_admin_user
 
 router = APIRouter(prefix="/api/v1/templates", tags=["模板管理"])
 
@@ -45,7 +45,7 @@ async def create_template(
 
 
 @router.get("/{template_id}", summary="获取模板详情", response_model=ResponseModel[TemplateDetailResponse])
-async def get_template(template_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def get_template(template_id: UUID, db: AsyncSession = Depends(get_db)):
     t = await TemplateService.get_template(db, template_id)
     if not t:
         raise HTTPException(status_code=404, detail="模板不存在")
@@ -60,7 +60,7 @@ async def get_template(template_id: UUID, current_user=Depends(get_current_user)
 @router.get("", summary="获取模板列表", response_model=ResponseModel[TemplateListResponse])
 async def list_templates(
     purpose: Optional[str] = None, is_system: Optional[bool] = None,
-    is_active: Optional[bool] = None, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)
+    is_active: Optional[bool] = None, db: AsyncSession = Depends(get_db)
 ):
     templates = await TemplateService.list_templates(db, purpose, is_system, is_active)
     return success_response(data=TemplateListResponse(items=[_template_response(t) for t in templates]))
@@ -103,7 +103,7 @@ async def update_template_content(template_id: UUID, content: dict, editor=Depen
 
 
 @router.get("/purposes/list", summary="获取所有用途", response_model=ResponseModel[PurposeListResponse])
-async def list_purposes(is_system: bool = True, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def list_purposes(is_system: bool = True, db: AsyncSession = Depends(get_db)):
     purposes = await TemplateService.get_distinct_purposes(db, is_system)
     return success_response(data=PurposeListResponse(purposes=purposes))
 
@@ -111,7 +111,7 @@ async def list_purposes(is_system: bool = True, current_user=Depends(get_current
 @router.get("/by-purpose/{purpose}", summary="根据用途获取模板", response_model=ResponseModel[TemplateListResponse])
 async def get_templates_by_purpose(
     purpose: str, is_system: Optional[bool] = None,
-    is_active: Optional[bool] = None, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)
+    is_active: Optional[bool] = None, db: AsyncSession = Depends(get_db)
 ):
     templates = await TemplateService.get_templates_by_purpose(db, purpose, is_system, is_active)
     return success_response(data=TemplateListResponse(items=[_template_response(t) for t in templates]))

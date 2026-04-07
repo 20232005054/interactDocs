@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from core.response import success_response, ResponseModel
-from core.auth import get_current_user, get_editor_user
+from core.auth import get_editor_user
 from db.session import get_db
 from services.structure_template_service import StructureTemplateService
 from schemas.schemas import StructureTemplateCreate, StructureTemplateUpdate
@@ -50,13 +50,13 @@ def _struct_response(t) -> StructureTemplateResponse:
 
 
 @router.get("/template/{template_id}", summary="获取模板的结构模板列表", response_model=ResponseModel[StructureTemplateListResponse])
-async def get_by_template_id(template_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def get_by_template_id(template_id: UUID, db: AsyncSession = Depends(get_db)):
     templates = await StructureTemplateService.get_by_template_id(db, template_id)
     return success_response(data=StructureTemplateListResponse(items=[_struct_response(t) for t in templates]))
 
 
 @router.get("/template/{template_id}/tree", summary="获取模板的结构树", response_model=ResponseModel[StructureTemplateTreeResponse])
-async def get_structure_tree(template_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def get_structure_tree(template_id: UUID, db: AsyncSession = Depends(get_db)):
     tree_data = await StructureTemplateService.get_structure_tree(db, template_id)
 
     def build_node(d) -> StructureTemplateResponse:
@@ -80,7 +80,7 @@ async def get_structure_tree(template_id: UUID, current_user=Depends(get_current
 
 
 @router.get("/{structure_template_id}", summary="获取结构模板详情", response_model=ResponseModel[StructureTemplateResponse])
-async def get_by_id(structure_template_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def get_by_id(structure_template_id: UUID, db: AsyncSession = Depends(get_db)):
     template = await StructureTemplateService.get_by_id(db, structure_template_id)
     if not template:
         raise HTTPException(status_code=404, detail="结构模板不存在")

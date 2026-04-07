@@ -5,13 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.session import get_db
 from schemas.schemas import AIChatRequest
 from services.ai_chat_service import AIChatService
-from core.auth import get_current_user
 
 router = APIRouter(prefix="/api/v1/ai")
 
 
 @router.post("/chat", summary="与 AI 助理对话")
-async def ai_chat_stream(request: AIChatRequest, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def ai_chat_stream(request: AIChatRequest, db: AsyncSession = Depends(get_db)):
     """
     AI 聊天流式接口
     """
