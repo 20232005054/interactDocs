@@ -44,6 +44,7 @@ class ChapterService:
                 "document_id": chapter.document_id,
                 "parent_id": chapter.parent_id,
                 "title": chapter.title,
+                "field_key": chapter.field_key,
                 "status": chapter.status,
                 "order_index": chapter.order_index,
                 "updated_at": chapter.updated_at,
@@ -101,6 +102,7 @@ class ChapterService:
             "document_id": chapter.document_id,
             "parent_id": chapter.parent_id,
             "title": chapter.title,
+            "field_key": chapter.field_key,
             "status": chapter.status,
             "order_index": chapter.order_index,
             "updated_at": chapter.updated_at,
@@ -193,6 +195,7 @@ class ChapterService:
             "document_id": updated_chapter.document_id,
             "parent_id": updated_chapter.parent_id,
             "title": updated_chapter.title,
+            "field_key": updated_chapter.field_key,
             "status": updated_chapter.status,
             "order_index": updated_chapter.order_index,
             "updated_at": updated_chapter.updated_at

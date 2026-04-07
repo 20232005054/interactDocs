@@ -155,7 +155,7 @@ class StructureTemplateService:
             for t in all_templates:
                 if t.parent_id == parent_id:
                     node = {
-                        "structure_template_id": str(t.structure_template_id),
+                        "structure_template_id": t.structure_template_id,
                         "title": t.title,
                         "field_key": t.field_key,
                         "level": t.level,

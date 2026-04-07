@@ -7,7 +7,8 @@ from schemas.schemas import DocumentCreate, DocumentUpdate, SnapshotUpdate, Pagi
 from schemas.response_schemas import (
     DocumentResponse, DocumentDetailResponse, DocumentListResponse,
     SnapshotResponse, SnapshotListResponse,
-    ApplyCoreInfoResponse, ApplySummaryResponse, ApplyStructureResponse, ApplyCoreInfoItem
+    ApplyCoreInfoResponse, ApplySummaryResponse, ApplyStructureResponse, ApplyCoreInfoItem,
+    TemplateInfoResponse
 )
 from core.response import success_response, ResponseModel
 from db.session import get_db
@@ -111,7 +112,7 @@ async def update_snapshot(snapshot_id: UUID, snapshot_in: SnapshotUpdate, db: As
     return success_response(data=SnapshotResponse(**snapshot))
 
 
-@router.get("/{document_id}/template-info", summary="获取文档关联的模板完整信息")
+@router.get("/{document_id}/template-info", summary="获取文档关联的模板完整信息", response_model=ResponseModel[TemplateInfoResponse])
 async def get_template_info(document_id: UUID, db: AsyncSession = Depends(get_db)):
     template_info = await DocumentService.get_template_info(db, document_id)
     return success_response(data=template_info)
@@ -127,6 +128,8 @@ async def apply_core_info_template(document_id: UUID, db: AsyncSession = Depends
             core_info_id=str(item.core_info_id),
             parent_id=str(item.parent_id) if item.parent_id else None,
             title=item.title,
+            field_key=item.field_key,
+            field_type=item.field_type,
             content=item.content,
             order_index=item.order_index,
             children=[]

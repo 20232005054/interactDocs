@@ -1,6 +1,6 @@
 from core.response import success_response, ResponseModel
 from schemas.schemas import DocumentSummaryUpdate
-from schemas.response_schemas import SummaryResponse, SummaryWithAIResponse, SummaryListResponse
+from schemas.response_schemas import SummaryResponse, SummaryWithAIResponse, SummaryListResponse, SummaryAIAssistResponse, SummaryAIGenerateItem, SummaryAIGenerateResponse, SummaryRelatedParagraphsResponse, RelatedParagraphItem
 from services.summary_service import SummaryService
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -27,6 +27,7 @@ def _summary_response(s) -> SummaryResponse:
         title=s.title,
         field_key=s.field_key,
         content=s.content,
+        is_change=s.is_change,
         version=s.version,
         order_index=s.order_index,
         created_at=s.created_at,
@@ -79,13 +80,15 @@ async def insert_summary_after(summary_id: UUID, db: AsyncSession = Depends(get_
     return success_response(data=_summary_response(new_summary))
 
 
-@router.get("/summaries/{summary_id}/paragraphs", summary="获取摘要关联的段落信息")
+@router.get("/summaries/{summary_id}/paragraphs", summary="获取摘要关联的段落信息", response_model=ResponseModel[SummaryRelatedParagraphsResponse])
 async def get_summary_paragraphs(summary_id: UUID, db: AsyncSession = Depends(get_db)):
     paragraphs = await SummaryService.get_summary_related_paragraphs(db, summary_id)
-    return success_response(data={"paragraphs": paragraphs})
+    return success_response(data=SummaryRelatedParagraphsResponse(
+        paragraphs=[RelatedParagraphItem(**p) for p in paragraphs]
+    ))
 
 
-@router.post("/documents/{document_id}/summaries/ai/generate", summary="AI 生成摘要")
+@router.post("/documents/{document_id}/summaries/ai/generate", summary="AI 生成摘要", response_model=ResponseModel[SummaryAIGenerateResponse])
 async def ai_generate_summaries(document_id: UUID, db: AsyncSession = Depends(get_db)):
     summaries = await SummaryService.get_summaries_by_document_id(db, document_id)
     if not summaries:
@@ -93,16 +96,16 @@ async def ai_generate_summaries(document_id: UUID, db: AsyncSession = Depends(ge
     results = []
     for s in summaries:
         content = await ai_service.assist_single_summary(db, s.summary_id)
-        results.append({"summary_id": str(s.summary_id), "ai_generate": content})
-    return success_response(data={"summaries": results})
+        results.append(SummaryAIGenerateItem(summary_id=s.summary_id, ai_generate=content))
+    return success_response(data=SummaryAIGenerateResponse(summaries=results))
 
 
-@router.post("/summaries/{summary_id}/ai/assist", summary="AI 帮填摘要")
+@router.post("/summaries/{summary_id}/ai/assist", summary="AI 帮填摘要", response_model=ResponseModel[SummaryAIAssistResponse])
 async def ai_assist_summary(summary_id: UUID, db: AsyncSession = Depends(get_db)):
-    summary = await ai_service.assist_single_summary(db, summary_id)
-    if not summary:
+    content = await ai_service.assist_single_summary(db, summary_id)
+    if content is None:
         raise HTTPException(status_code=404, detail="摘要不存在")
-    return success_response(data=summary)
+    return success_response(data=SummaryAIAssistResponse(summary_id=summary_id, ai_generate=content))
 
 
 @router.post("/summaries/{summary_id}/ai/apply", summary="应用AI帮填结果", response_model=ResponseModel[SummaryWithAIResponse])
@@ -113,7 +116,9 @@ async def apply_ai_assist_result(summary_id: UUID, db: AsyncSession = Depends(ge
             summary_id=updated.summary_id,
             document_id=updated.document_id,
             title=updated.title,
+            field_key=updated.field_key,
             content=updated.content,
+            is_change=updated.is_change,
             version=updated.version,
             order_index=updated.order_index,
             ai_generate=updated.ai_generate,

@@ -720,6 +720,7 @@ class DocumentService:
             "core_info_templates": [
                 {
                     "core_template_id": str(t.core_template_id),
+                    "template_id": str(document.template_id),
                     "parent_id": str(t.parent_id) if t.parent_id else None,
                     "field_name": t.field_name,
                     "field_key": t.field_key,
@@ -727,13 +728,16 @@ class DocumentService:
                     "default_value": t.default_value,
                     "options": t.options,
                     "is_required": t.is_required,
-                    "order_index": t.order_index
+                    "order_index": t.order_index,
+                    "created_at": t.created_at,
+                    "updated_at": t.updated_at,
                 }
                 for t in core_info_templates
             ],
             "summary_templates": [
                 {
                     "summary_template_id": str(t.summary_template_id),
+                    "template_id": str(document.template_id),
                     "title": t.title,
                     "field_key": t.field_key,
                     "generation_mode": t.generation_mode,
@@ -741,7 +745,9 @@ class DocumentService:
                     "sources": t.sources,
                     "default_prompt": t.default_prompt,
                     "custom_prompt": t.custom_prompt,
-                    "order_index": t.order_index
+                    "order_index": t.order_index,
+                    "created_at": t.created_at,
+                    "updated_at": t.updated_at,
                 }
                 for t in summary_templates
             ],

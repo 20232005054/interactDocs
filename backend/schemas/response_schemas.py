@@ -75,6 +75,7 @@ class ChapterResponse(BaseModel):
     document_id: UUID
     parent_id: Optional[UUID] = None
     title: str
+    field_key: Optional[str] = None
     status: int
     order_index: int
     updated_at: datetime
@@ -86,6 +87,7 @@ class ChapterTreeNode(BaseModel):
     document_id: UUID
     parent_id: Optional[UUID] = None
     title: str
+    field_key: Optional[str] = None
     status: int
     order_index: int
     updated_at: datetime
@@ -140,6 +142,7 @@ class SummaryResponse(BaseModel):
     title: str
     field_key: str
     content: str
+    is_change: int
     version: int
     order_index: int
     created_at: datetime
@@ -300,6 +303,8 @@ class ApplyCoreInfoItem(BaseModel):
     core_info_id: str
     parent_id: Optional[str] = None
     title: str
+    field_key: Optional[str] = None
+    field_type: str
     content: str
     order_index: int
     children: List['ApplyCoreInfoItem'] = []
@@ -348,3 +353,102 @@ class ApplyStructureItem(BaseModel):
 class ApplyStructureResponse(BaseModel):
     message: str
     items: List[ApplyStructureItem]
+
+
+# ============================================================
+# AI 摘要辅助相关
+# ============================================================
+
+class SummaryAIAssistResponse(BaseModel):
+    summary_id: UUID
+    ai_generate: Optional[str] = None
+
+
+class SummaryAIGenerateItem(BaseModel):
+    summary_id: UUID
+    ai_generate: Optional[str] = None
+
+
+class SummaryAIGenerateResponse(BaseModel):
+    summaries: List[SummaryAIGenerateItem]
+
+
+# ============================================================
+# 依赖关系相关
+# ============================================================
+
+class RelatedSummaryItem(BaseModel):
+    summary_id: UUID
+    document_id: UUID
+    title: str
+    content: str
+    version: int
+    created_at: datetime
+    updated_at: datetime
+    relevance_score: float
+
+
+class ParagraphRelatedSummariesResponse(BaseModel):
+    summaries: List[RelatedSummaryItem]
+
+
+class RelatedParagraphItem(BaseModel):
+    paragraph_id: UUID
+    chapter_id: UUID
+    content: str
+    para_type: str
+    order_index: int
+    ai_eval: Optional[str] = None
+    ai_suggestion: Optional[str] = None
+    summary_version: Optional[int] = None
+    relevance_score: float
+
+
+class SummaryRelatedParagraphsResponse(BaseModel):
+    paragraphs: List[RelatedParagraphItem]
+
+
+class DependencyEdgeItem(BaseModel):
+    edge_id: UUID
+    source_type: Optional[str] = None
+    source_id: Optional[UUID] = None
+    target_type: Optional[str] = None
+    target_id: Optional[UUID] = None
+    relevance_score: float
+    target_version: Optional[int] = None
+
+
+class DependenciesResponse(BaseModel):
+    upstream: List[DependencyEdgeItem]
+    downstream: List[DependencyEdgeItem]
+
+
+# ============================================================
+# 操作历史相关
+# ============================================================
+
+class OperationHistoryItem(BaseModel):
+    history_id: UUID
+    chapter_id: Optional[UUID] = None
+    document_id: UUID
+    user_id: Optional[UUID] = None
+    action: str
+    content_before: Optional[str] = None
+    content_after: Optional[str] = None
+    created_at: datetime
+
+
+class OperationHistoryListResponse(BaseModel):
+    total: int
+    items: List[OperationHistoryItem]
+
+
+# ============================================================
+# 模板完整信息相关
+# ============================================================
+
+class TemplateInfoResponse(BaseModel):
+    template_id: UUID
+    core_info_templates: List[CoreInfoTemplateResponse]
+    summary_templates: List[SummaryTemplateResponse]
+    structure_templates: List[StructureTemplateResponse]

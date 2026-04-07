@@ -8,7 +8,7 @@ from db.session import get_db
 from services.paragraph_service import ParagraphService
 from services import ai_service
 from schemas.schemas import ParagraphCreate, ParagraphUpdate, AIAssistRequest
-from schemas.response_schemas import ParagraphResponse, ParagraphListResponse
+from schemas.response_schemas import ParagraphResponse, ParagraphListResponse, ParagraphRelatedSummariesResponse, RelatedSummaryItem
 
 router = APIRouter(prefix="/api/v1", tags=["段落管理"])
 
@@ -115,7 +115,9 @@ async def apply_ai_assist_result(paragraph_id: UUID, db: AsyncSession = Depends(
         raise HTTPException(status_code=500, detail="应用AI帮填结果失败")
 
 
-@router.get("/paragraphs/{paragraph_id}/summaries", summary="获取段落关联的摘要信息")
+@router.get("/paragraphs/{paragraph_id}/summaries", summary="获取段落关联的摘要信息", response_model=ResponseModel[ParagraphRelatedSummariesResponse])
 async def get_paragraph_summaries(paragraph_id: UUID, db: AsyncSession = Depends(get_db)):
     summaries = await ParagraphService.get_paragraph_related_summaries(db, paragraph_id)
-    return success_response(data={"summaries": summaries})
+    return success_response(data=ParagraphRelatedSummariesResponse(
+        summaries=[RelatedSummaryItem(**s) for s in summaries]
+    ))
