@@ -1,12 +1,19 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from api.v1 import documents, chapters, paragraphs, ai, endpoints, summaries, templates, core_info, core_info_templates, summary_templates, structure_templates
-from api.v1 import auth
+from api.v1 import auth, upload
 from api.v1.admin import users as admin_users, documents as admin_documents, stats as admin_stats
 from core.response import generic_exception_handler
 from core.security import decode_token
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
+
+# 加载 .env 文件（开发环境）
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 app = FastAPI(title="方案生成系统", version="1.0.0", timeout=300)
 
@@ -63,6 +70,8 @@ app.include_router(summary_templates.router)
 app.include_router(structure_templates.router)
 # 用户认证
 app.include_router(auth.router)
+# 文件上传
+app.include_router(upload.router)
 # 管理员
 app.include_router(admin_users.router)
 app.include_router(admin_documents.router)
