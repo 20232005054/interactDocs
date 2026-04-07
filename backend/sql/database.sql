@@ -93,6 +93,7 @@ CREATE TABLE IF NOT EXISTS chat_records (
     document_id UUID REFERENCES documents(document_id),
     chapter_id UUID REFERENCES chapters(chapter_id),
     chapter_content JSONB,
+    role VARCHAR(20) DEFAULT 'user',
     message TEXT NOT NULL,
     response TEXT,
     mode VARCHAR(20) DEFAULT 'chat',

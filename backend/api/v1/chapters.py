@@ -5,7 +5,6 @@ from services.chapter_service import ChapterService
 from services import ai_service
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 from typing import Optional, List
@@ -136,11 +135,3 @@ async def get_chapter_toc(chapter_id: UUID, db: AsyncSession = Depends(get_db)):
     toc = await ChapterService.get_chapter_toc(db, chapter_id)
     return success_response(data=ChapterTocResponse(toc=[TocItem(**t) for t in toc]))
 
-
-@router.post("/chapters/{chapter_id}/generate-content", summary="从摘要生成章节内容")
-async def generate_chapter_content(chapter_id: UUID, db: AsyncSession = Depends(get_db)):
-    return StreamingResponse(
-        ai_service.generate_chapter_content_stream(db, chapter_id),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
-    )

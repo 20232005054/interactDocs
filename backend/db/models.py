@@ -97,6 +97,7 @@ class ChatRecord(Base):
     document_id = Column(UUID(as_uuid=True), ForeignKey("documents.document_id"))
     chapter_id = Column(UUID(as_uuid=True), ForeignKey("chapters.chapter_id"), nullable=True)
     chapter_content = Column(JSONB, nullable=True)
+    role = Column(String(20), default="user")  # user / assistant
     message = Column(Text, nullable=False)
     response = Column(Text, nullable=True)
     mode = Column(String(20), default="chat")

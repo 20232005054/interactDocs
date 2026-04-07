@@ -1,0 +1,1 @@
+ALTER TABLE chat_records ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'user';
