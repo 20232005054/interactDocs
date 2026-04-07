@@ -76,8 +76,7 @@ async def create(data: SummaryTemplateCreate, db: AsyncSession = Depends(get_db)
 
 @router.put("/{summary_template_id}", summary="更新摘要模板", response_model=ResponseModel[SummaryTemplateResponse])
 async def update(summary_template_id: UUID, data: SummaryTemplateUpdate, db: AsyncSession = Depends(get_db)):
-    update_data = {k: ([s.dict() for s in v] if k == "sources" and v else v)
-                   for k, v in data.dict(exclude_unset=True).items()}
+    update_data = data.dict(exclude_unset=True)
     if not update_data:
         raise HTTPException(status_code=400, detail="没有要更新的数据")
     await SummaryTemplateService.update(db, summary_template_id, **update_data)
