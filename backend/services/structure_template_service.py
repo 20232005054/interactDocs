@@ -1,12 +1,9 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
-from typing import List, Optional
-from db.models import StructureTemplate
+from typing import List, Optional, Dict
+from db.models import StructureTemplate, Document
 from db.mappers.structure_template_mapper import StructureTemplateMapper
-from services.summary_template_service import SummaryTemplateService
-from db.models import Document
-from typing import Dict
-import re
+from services.template_render_service import TemplateRenderService
 
 
 class StructureTemplateService:
@@ -197,15 +194,9 @@ class StructureTemplateService:
         sources: list,
         generated_summary_map: Dict[str, str] = None,
     ) -> dict:
-        """
-        构建数据来源映射。
-        复用 SummaryTemplateService 中的逻辑。
-        """
-        return await SummaryTemplateService.build_sources_data_map(
-            db=db,
-            document=document,
-            sources=sources,
-            generated_summary_map=generated_summary_map
+        return await TemplateRenderService.build_sources_data_map(
+            db=db, document=document, sources=sources,
+            generated_summary_map=generated_summary_map,
         )
 
     @staticmethod
@@ -216,14 +207,14 @@ class StructureTemplateService:
         generated_summary_map: Dict[str, str] = None,
         source_data_map: Dict[str, str] = None,
     ) -> str:
-        """
-        渲染AI内容。
-        复用 SummaryTemplateService 中的逻辑，但传入结构模板特定的参数。
-        """
-        return await SummaryTemplateService.render_ai_content(
+        return await TemplateRenderService.render_ai_content(
             db=db,
             document=document,
-            summary_template=structure_template, # 由于两个模型的结构高度相似，这里直接传入
+            title=structure_template.title,
+            sources=structure_template.sources,
+            prompt=structure_template.custom_prompt or structure_template.default_prompt,
+            field_key=structure_template.field_key,
+            template_id=str(structure_template.structure_template_id),
             generated_summary_map=generated_summary_map,
-            source_data_map=source_data_map
+            source_data_map=source_data_map,
         )
