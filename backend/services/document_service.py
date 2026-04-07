@@ -325,7 +325,7 @@ class DocumentService:
         core_info_templates_sorted = sorted(core_info_templates, key=get_level)
              
         created_items = []
-        for idx, template in enumerate(core_info_templates_sorted):
+        for template in core_info_templates_sorted:
             core_info = DocumentCoreInfo(
                 core_info_id=id_mapping[template.core_template_id],
                 document_id=document_id,
@@ -336,7 +336,7 @@ class DocumentService:
                 field_type=template.field_type,
                 options=template.options,
                 is_required=template.is_required,
-                order_index=idx,
+                order_index=template.order_index,
                 is_locked=False,
                 is_change=0
             )
@@ -546,6 +546,7 @@ class DocumentService:
                 document_id=document_id,
                 parent_id=template_id_map.get(template.parent_id) if template.parent_id else None,
                 title=template.title,
+                field_key=template.field_key,
                 status=0,
                 order_index=template.order_index
             )

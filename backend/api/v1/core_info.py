@@ -10,7 +10,7 @@ from typing import Optional, List
 from pydantic import BaseModel
 from core.response import success_response, ResponseModel
 
-router = APIRouter(prefix="/api/v1", tags=["核心信息管理"])
+router = APIRouter(prefix="/api/v1/core-info", tags=["核心信息管理"])
 
 
 class CoreInfoReorder(BaseModel):
@@ -64,7 +64,7 @@ class CoreInfoTreeResponse(BaseModel):
     items: List[CoreInfoResponse]
 
 
-@router.post("/documents/{document_id}/core-info", summary="创建核心信息", response_model=ResponseModel[CoreInfoResponse])
+@router.post("/documents/{document_id}", summary="创建核心信息", response_model=ResponseModel[CoreInfoResponse])
 async def create_core_info(document_id: uuid.UUID, core_info: CoreInfoCreate, db: AsyncSession = Depends(get_db)):
     result = await CoreInfoService.create_core_info(db, document_id, core_info)
     return success_response(data=_build_core_info_response(result))
@@ -133,7 +133,7 @@ async def unlock_core_info(core_info_id: uuid.UUID, db: AsyncSession = Depends(g
     return success_response(data=_build_core_info_response(result), message="解锁成功")
 
 
-@router.post("/documents/{document_id}/core-info/reorder", summary="批量重排核心信息（拖拽排序）")
+@router.post("/documents/{document_id}/reorder", summary="批量重排核心信息（拖拽排序）")
 async def reorder_core_info(document_id: uuid.UUID, data: CoreInfoReorder, db: AsyncSession = Depends(get_db)):
     try:
         await CoreInfoService.reorder(db, document_id, data.parent_id, data.ordered_ids)

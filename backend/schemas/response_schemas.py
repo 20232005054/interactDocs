@@ -138,6 +138,7 @@ class SummaryResponse(BaseModel):
     summary_id: UUID
     document_id: UUID
     title: str
+    field_key: str
     content: str
     version: int
     order_index: int

@@ -40,6 +40,7 @@ class Chapter(Base):
     document_id = Column(UUID(as_uuid=True), ForeignKey("documents.document_id", ondelete="CASCADE"), nullable=False)
     parent_id = Column(UUID(as_uuid=True), ForeignKey("chapters.chapter_id", ondelete="CASCADE"), nullable=True)
     title = Column(String(200), nullable=False, default="")
+    field_key = Column(String(50), nullable=True)
     status = Column(Integer, default=0)  # 0-编辑中，1-已完成
     order_index = Column(Integer, nullable=False, default=0) # 排序索引
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())

@@ -25,6 +25,7 @@ def _summary_response(s) -> SummaryResponse:
         summary_id=s.summary_id,
         document_id=s.document_id,
         title=s.title,
+        field_key=s.field_key,
         content=s.content,
         version=s.version,
         order_index=s.order_index,
@@ -86,10 +87,14 @@ async def get_summary_paragraphs(summary_id: UUID, db: AsyncSession = Depends(ge
 
 @router.post("/documents/{document_id}/summaries/ai/generate", summary="AI 生成摘要")
 async def ai_generate_summaries(document_id: UUID, db: AsyncSession = Depends(get_db)):
-    summaries = await ai_service.generate_all_summaries(db, document_id)
+    summaries = await SummaryService.get_summaries_by_document_id(db, document_id)
     if not summaries:
-        raise HTTPException(status_code=404, detail="文档不存在")
-    return success_response(data={"summaries": summaries})
+        raise HTTPException(status_code=404, detail="文档不存在或无摘要")
+    results = []
+    for s in summaries:
+        content = await ai_service.assist_single_summary(db, s.summary_id)
+        results.append({"summary_id": str(s.summary_id), "ai_generate": content})
+    return success_response(data={"summaries": results})
 
 
 @router.post("/summaries/{summary_id}/ai/assist", summary="AI 帮填摘要")

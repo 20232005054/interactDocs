@@ -123,8 +123,8 @@ async def _handle_chapter_downstream(db, chapter_id: UUID, document, structure_t
     if not chapter:
         return
 
-    # 通过章节 title 找对应的 StructureTemplate
-    template = next((t for t in structure_templates if t.title == chapter.title), None)
+    # 通过章节 field_key 找对应的 StructureTemplate
+    template = next((t for t in structure_templates if t.field_key == chapter.field_key), None)
     if not template:
         logger.warning("找不到章节 %s 对应的结构模板", chapter_id)
         return

@@ -1,4 +1,5 @@
 class EdgeSourceType:
+    PARAGRAPH = "paragraph"
     CHAPTER = "chapter"
     SUMMARY = "summary"
 

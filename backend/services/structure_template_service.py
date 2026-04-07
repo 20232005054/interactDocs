@@ -177,33 +177,6 @@ class StructureTemplateService:
         return build_tree()
 
     @staticmethod
-    def generate_content_copy_mode(content_template: str, sources: list, data_map: dict) -> str:
-        """
-        复制模式：根据sources中的target_field替换模板中的变量
-        
-        Args:
-            content_template: 内容模板，如 "本研究计划纳入{{sample_size}}例受试者"
-            sources: 来源信息数组，包含target_field字段
-            data_map: 数据映射，key为match_key，value为实际数据
-        
-        Returns:
-            替换后的内容
-        """
-        if not sources:
-            return content_template
-        
-        result = content_template
-        for source in sources:
-            target_field = source.get("target_field")
-            match_key = source.get("match_key")
-            
-            if target_field and match_key:
-                value = data_map.get(match_key, "")
-                result = result.replace(f"{{{{{target_field}}}}}", str(value))
-        
-        return result
-
-    @staticmethod
     def get_generation_mode(structure_template: StructureTemplate) -> int:
         """
         获取生成方式：0=复制，1=AI总结

@@ -10,6 +10,8 @@ from db.mappers.paragraph_mapper import ParagraphMapper
 from core.constants import EdgeSourceType, EdgeTargetType
 
 
+from uuid import uuid4
+
 class SummaryService:
     @staticmethod
     async def get_summary_by_id(db: AsyncSession, summary_id: UUID):
@@ -95,11 +97,13 @@ class SummaryService:
         
         # 创建新摘要
         new_summary = DocumentSummary(
-            document_id=document_id,    # 关联文档
-            title="新摘要",                # 默认标题
-            content="",                  # 空内容
-            version=1,                   # 初始版本号
-            order_index=order_index      # 排序索引
+            document_id=document_id,
+            title="新摘要",
+            field_key="summary_" + uuid4().hex[:8],
+            content="",
+            version=1,
+            is_change=0,
+            order_index=order_index
         )
         
         return await SummaryMapper.create_summary(db, new_summary)
@@ -127,11 +131,13 @@ class SummaryService:
         
         # 创建新摘要
         new_summary = DocumentSummary(
-            document_id=document_id,    # 关联文档
-            title="新摘要",                # 默认标题
-            content="",                  # 空内容
-            version=1,                   # 初始版本号
-            order_index=target_order_index + 1  # 插入到目标摘要后
+            document_id=document_id,
+            title="新摘要",
+            field_key="summary_" + uuid4().hex[:8],
+            content="",
+            version=1,
+            is_change=0,
+            order_index=target_order_index + 1
         )
         
         return await SummaryMapper.create_summary(db, new_summary)
