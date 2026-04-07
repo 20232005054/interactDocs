@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from api.v1 import documents, chapters, paragraphs, ai, endpoints, summaries, templates, core_info, core_info_templates, summary_templates, structure_templates
+from api.v1 import auth
+from api.v1.admin import users as admin_users, documents as admin_documents, stats as admin_stats
 from core.response import generic_exception_handler
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,6 +31,12 @@ app.include_router(core_info.router)
 app.include_router(core_info_templates.router)
 app.include_router(summary_templates.router)
 app.include_router(structure_templates.router)
+# 用户认证
+app.include_router(auth.router)
+# 管理员
+app.include_router(admin_users.router)
+app.include_router(admin_documents.router)
+app.include_router(admin_stats.router)
 
 @app.get("/")
 async def root():

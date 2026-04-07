@@ -2,6 +2,7 @@ from core.response import success_response, ResponseModel
 from schemas.schemas import DocumentSummaryUpdate
 from schemas.response_schemas import SummaryResponse, SummaryWithAIResponse, SummaryListResponse, SummaryAIAssistResponse, SummaryAIGenerateItem, SummaryAIGenerateResponse, SummaryRelatedParagraphsResponse, RelatedParagraphItem
 from services.summary_service import SummaryService
+from core.auth import get_current_user
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,13 +37,13 @@ def _summary_response(s) -> SummaryResponse:
 
 
 @router.post("/documents/{document_id}/summaries", summary="创建摘要", response_model=ResponseModel[SummaryResponse])
-async def create_summary(document_id: UUID, db: AsyncSession = Depends(get_db)):
+async def create_summary(document_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     new_summary = await SummaryService.create_default_summary(db, document_id)
     return success_response(data=_summary_response(new_summary))
 
 
 @router.get("/summaries/{summary_id}", summary="获取指定摘要详情", response_model=ResponseModel[SummaryResponse])
-async def get_summary(summary_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_summary(summary_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     summary = await SummaryService.get_summary_by_id(db, summary_id)
     if not summary:
         raise HTTPException(status_code=404, detail="摘要不存在")
@@ -50,7 +51,7 @@ async def get_summary(summary_id: UUID, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/documents/{document_id}/summaries", summary="获取文档的摘要列表", response_model=ResponseModel[SummaryListResponse])
-async def get_document_summaries(document_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_document_summaries(document_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     summaries = await SummaryService.get_summaries_by_document_id(db, document_id)
     sorted_summaries = sorted(summaries, key=lambda x: x.order_index)
     return success_response(data=SummaryListResponse(
@@ -59,7 +60,7 @@ async def get_document_summaries(document_id: UUID, db: AsyncSession = Depends(g
 
 
 @router.put("/summaries/{summary_id}", summary="更新摘要", response_model=ResponseModel[SummaryResponse])
-async def update_summary(summary_id: UUID, summary_in: DocumentSummaryUpdate, db: AsyncSession = Depends(get_db)):
+async def update_summary(summary_id: UUID, summary_in: DocumentSummaryUpdate, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     updated = await SummaryService.update_summary(db, summary_id, summary_in)
     if not updated:
         raise HTTPException(status_code=404, detail="摘要不存在")
@@ -67,13 +68,13 @@ async def update_summary(summary_id: UUID, summary_in: DocumentSummaryUpdate, db
 
 
 @router.delete("/summaries/{summary_id}", summary="删除摘要")
-async def delete_summary(summary_id: UUID, db: AsyncSession = Depends(get_db)):
+async def delete_summary(summary_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await SummaryService.delete_summary(db, summary_id)
     return success_response(message=result["message"])
 
 
 @router.post("/summaries/{summary_id}/insert-after", summary="在当前摘要后插入新摘要", response_model=ResponseModel[SummaryResponse])
-async def insert_summary_after(summary_id: UUID, db: AsyncSession = Depends(get_db)):
+async def insert_summary_after(summary_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     new_summary = await SummaryService.insert_summary_after(db, summary_id)
     if not new_summary:
         raise HTTPException(status_code=404, detail="摘要不存在")
@@ -81,7 +82,7 @@ async def insert_summary_after(summary_id: UUID, db: AsyncSession = Depends(get_
 
 
 @router.get("/summaries/{summary_id}/paragraphs", summary="获取摘要关联的段落信息", response_model=ResponseModel[SummaryRelatedParagraphsResponse])
-async def get_summary_paragraphs(summary_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_summary_paragraphs(summary_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     paragraphs = await SummaryService.get_summary_related_paragraphs(db, summary_id)
     return success_response(data=SummaryRelatedParagraphsResponse(
         paragraphs=[RelatedParagraphItem(**p) for p in paragraphs]
@@ -89,7 +90,7 @@ async def get_summary_paragraphs(summary_id: UUID, db: AsyncSession = Depends(ge
 
 
 @router.post("/documents/{document_id}/summaries/ai/generate", summary="AI 生成摘要", response_model=ResponseModel[SummaryAIGenerateResponse])
-async def ai_generate_summaries(document_id: UUID, db: AsyncSession = Depends(get_db)):
+async def ai_generate_summaries(document_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     summaries = await SummaryService.get_summaries_by_document_id(db, document_id)
     if not summaries:
         raise HTTPException(status_code=404, detail="文档不存在或无摘要")
@@ -101,7 +102,7 @@ async def ai_generate_summaries(document_id: UUID, db: AsyncSession = Depends(ge
 
 
 @router.post("/summaries/{summary_id}/ai/assist", summary="AI 帮填摘要", response_model=ResponseModel[SummaryAIAssistResponse])
-async def ai_assist_summary(summary_id: UUID, db: AsyncSession = Depends(get_db)):
+async def ai_assist_summary(summary_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     content = await ai_service.assist_single_summary(db, summary_id)
     if content is None:
         raise HTTPException(status_code=404, detail="摘要不存在")
@@ -109,7 +110,7 @@ async def ai_assist_summary(summary_id: UUID, db: AsyncSession = Depends(get_db)
 
 
 @router.post("/summaries/{summary_id}/ai/apply", summary="应用AI帮填结果", response_model=ResponseModel[SummaryWithAIResponse])
-async def apply_ai_assist_result(summary_id: UUID, db: AsyncSession = Depends(get_db)):
+async def apply_ai_assist_result(summary_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     try:
         updated = await SummaryService.apply_ai_assist_result(db, summary_id)
         return success_response(data=SummaryWithAIResponse(

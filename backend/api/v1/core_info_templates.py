@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
 from core.response import success_response, ResponseModel
+from core.auth import get_current_user, get_editor_user
 from db.session import get_db
 from services.core_info_template_service import CoreInfoTemplateService
 from schemas.schemas import CoreInfoTemplateCreate, CoreInfoTemplateUpdate, CoreInfoTemplateInsertAfter, CoreInfoTemplateReorder
@@ -30,7 +31,7 @@ def _ci_template_response(t) -> CoreInfoTemplateResponse:
 
 
 @router.get("/template/{template_id}", summary="获取模板的核心信息字段列表（树形结构）", response_model=ResponseModel[CoreInfoTemplateListResponse])
-async def get_by_template_id(template_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_by_template_id(template_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     tree = await CoreInfoTemplateService.get_template_tree(db, template_id)
 
     def build_node(d) -> CoreInfoTemplateResponse:
@@ -55,7 +56,7 @@ async def get_by_template_id(template_id: UUID, db: AsyncSession = Depends(get_d
 
 
 @router.get("/{core_template_id}", summary="获取核心信息模板详情", response_model=ResponseModel[CoreInfoTemplateResponse])
-async def get_by_id(core_template_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_by_id(core_template_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     template = await CoreInfoTemplateService.get_by_id(db, core_template_id)
     if not template:
         raise HTTPException(status_code=404, detail="核心信息模板不存在")
@@ -63,7 +64,7 @@ async def get_by_id(core_template_id: UUID, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("", summary="创建核心信息模板（追加到同级末尾）", response_model=ResponseModel[CoreInfoTemplateResponse])
-async def create(data: CoreInfoTemplateCreate, db: AsyncSession = Depends(get_db)):
+async def create(data: CoreInfoTemplateCreate, editor=Depends(get_editor_user), db: AsyncSession = Depends(get_db)):
     template = await CoreInfoTemplateService.create(
         db,
         template_id=data.template_id,
@@ -79,7 +80,7 @@ async def create(data: CoreInfoTemplateCreate, db: AsyncSession = Depends(get_db
 
 
 @router.post("/template/{template_id}/insert-after", summary="在指定节点之后插入新节点（同级）", response_model=ResponseModel[CoreInfoTemplateResponse])
-async def insert_after(template_id: UUID, data: CoreInfoTemplateInsertAfter, db: AsyncSession = Depends(get_db)):
+async def insert_after(template_id: UUID, data: CoreInfoTemplateInsertAfter, editor=Depends(get_editor_user), db: AsyncSession = Depends(get_db)):
     try:
         template = await CoreInfoTemplateService.insert_after(
             db,
@@ -97,7 +98,7 @@ async def insert_after(template_id: UUID, data: CoreInfoTemplateInsertAfter, db:
 
 
 @router.post("/template/{template_id}/reorder", summary="拖拽重排（同级节点重新排序，支持跨父节点移动）")
-async def reorder(template_id: UUID, data: CoreInfoTemplateReorder, db: AsyncSession = Depends(get_db)):
+async def reorder(template_id: UUID, data: CoreInfoTemplateReorder, editor=Depends(get_editor_user), db: AsyncSession = Depends(get_db)):
     try:
         await CoreInfoTemplateService.reorder(db, template_id=template_id, parent_id=data.parent_id, ordered_ids=data.ordered_ids)
     except ValueError as e:
@@ -106,7 +107,7 @@ async def reorder(template_id: UUID, data: CoreInfoTemplateReorder, db: AsyncSes
 
 
 @router.put("/{core_template_id}", summary="更新核心信息模板", response_model=ResponseModel[CoreInfoTemplateResponse])
-async def update(core_template_id: UUID, data: CoreInfoTemplateUpdate, db: AsyncSession = Depends(get_db)):
+async def update(core_template_id: UUID, data: CoreInfoTemplateUpdate, editor=Depends(get_editor_user), db: AsyncSession = Depends(get_db)):
     update_data = data.dict(exclude_unset=True)
     if not update_data:
         raise HTTPException(status_code=400, detail="没有要更新的数据")
@@ -118,6 +119,6 @@ async def update(core_template_id: UUID, data: CoreInfoTemplateUpdate, db: Async
 
 
 @router.delete("/{core_template_id}", summary="删除核心信息模板（同级后续节点自动补位）")
-async def delete(core_template_id: UUID, db: AsyncSession = Depends(get_db)):
+async def delete(core_template_id: UUID, editor=Depends(get_editor_user), db: AsyncSession = Depends(get_db)):
     await CoreInfoTemplateService.delete(db, core_template_id)
     return success_response(message="删除成功")

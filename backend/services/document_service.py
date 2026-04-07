@@ -47,7 +47,7 @@ class DocumentService:
         return None, None
 
     @staticmethod
-    async def create_document(db: AsyncSession, doc_in: DocumentCreate):
+    async def create_document(db: AsyncSession, doc_in: DocumentCreate, user_id=None):
         # 获取系统模板
         system_template = await TemplateMapper.get_template(db, doc_in.template_id)
         if not system_template:
@@ -157,11 +157,12 @@ class DocumentService:
             
             await StructureTemplateMapper.batch_create(db, new_structures)
         
-        # 5. 创建新文档，关联新创建的模板
+        # 5. 创建新文档，关联新创建的模板，写入 user_id
         new_document = Document(
             title=doc_in.title,
             purpose=doc_in.purpose,
-            template_id=new_template.template_id
+            template_id=new_template.template_id,
+            user_id=user_id,
         )
         
         created_document = await DocumentMapper.create_document(db, new_document)
@@ -174,22 +175,28 @@ class DocumentService:
         return created_document
 
     @staticmethod
-    async def list_documents(db: AsyncSession, pagination: PaginationParams):
+    async def list_documents(db: AsyncSession, pagination: PaginationParams, user_id=None):
         page = pagination.page
         page_size = pagination.page_size
-        # 查询文档总数
-        count_result = await db.execute(select(func.count()).select_from(Document))
+        # 查询文档总数（有 user_id 时只统计该用户的）
+        count_query = select(func.count()).select_from(Document)
+        if user_id is not None:
+            count_query = count_query.where(Document.user_id == user_id)
+        count_result = await db.execute(count_query)
         total = count_result.scalar_one()
-        
+
         # 分页查询文档，同时 join 模板获取 purpose 和 display_name
         offset = (page - 1) * page_size
-        result = await db.execute(
+        query = (
             select(Document, Template.purpose, Template.display_name)
             .outerjoin(Template, Document.template_id == Template.template_id)
             .order_by(Document.updated_at.desc())
             .offset(offset)
             .limit(page_size)
         )
+        if user_id is not None:
+            query = query.where(Document.user_id == user_id)
+        result = await db.execute(query)
         rows = result.all()
         
         # 将结果组装为 (document, purpose, display_name) 元组列表

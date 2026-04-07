@@ -9,6 +9,7 @@ from services.paragraph_service import ParagraphService
 from services import ai_service
 from schemas.schemas import ParagraphCreate, ParagraphUpdate, AIAssistRequest
 from schemas.response_schemas import ParagraphResponse, ParagraphListResponse, ParagraphRelatedSummariesResponse, RelatedSummaryItem
+from core.auth import get_current_user
 
 router = APIRouter(prefix="/api/v1", tags=["段落管理"])
 
@@ -28,7 +29,7 @@ def _para_response(p) -> ParagraphResponse:
 
 
 @router.get("/paragraphs/{paragraph_id}", summary="获取段落详情", response_model=ResponseModel[ParagraphResponse])
-async def get_paragraph(paragraph_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_paragraph(paragraph_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     paragraph = await ParagraphService.get_paragraph_detail(db, paragraph_id)
     if not paragraph:
         raise HTTPException(status_code=404, detail="段落不存在")
@@ -36,13 +37,13 @@ async def get_paragraph(paragraph_id: UUID, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/chapters/{chapter_id}/paragraphs", summary="创建段落", response_model=ResponseModel[ParagraphResponse])
-async def create_paragraph(chapter_id: UUID, paragraph_in: ParagraphCreate, db: AsyncSession = Depends(get_db)):
+async def create_paragraph(chapter_id: UUID, paragraph_in: ParagraphCreate, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     paragraph = await ParagraphService.create_paragraph(db, chapter_id, paragraph_in)
     return success_response(data=_para_response(paragraph))
 
 
 @router.put("/paragraphs/{paragraph_id}", summary="更新段落全部信息", response_model=ResponseModel[ParagraphResponse])
-async def update_paragraph(paragraph_id: UUID, paragraph_in: ParagraphUpdate, db: AsyncSession = Depends(get_db)):
+async def update_paragraph(paragraph_id: UUID, paragraph_in: ParagraphUpdate, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     updated = await ParagraphService.update_paragraph(db, paragraph_id, paragraph_in)
     if not updated:
         raise HTTPException(status_code=404, detail="段落不存在")
@@ -50,19 +51,19 @@ async def update_paragraph(paragraph_id: UUID, paragraph_in: ParagraphUpdate, db
 
 
 @router.delete("/paragraphs/{paragraph_id}", summary="删除段落")
-async def delete_paragraph(paragraph_id: UUID, db: AsyncSession = Depends(get_db)):
+async def delete_paragraph(paragraph_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await ParagraphService.delete_paragraph(db, paragraph_id)
     return success_response(message=result["message"])
 
 
 @router.post("/paragraphs/{paragraph_id}/insert-after", summary="在当前段落后插入新段落", response_model=ResponseModel[ParagraphResponse])
-async def insert_paragraph_after(paragraph_id: UUID, paragraph_in: ParagraphCreate, db: AsyncSession = Depends(get_db)):
+async def insert_paragraph_after(paragraph_id: UUID, paragraph_in: ParagraphCreate, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     new_paragraph = await ParagraphService.insert_paragraph_after(db, paragraph_id, paragraph_in)
     return success_response(data=_para_response(new_paragraph))
 
 
 @router.get("/chapters/{chapter_id}/paragraphs", summary="获取章节的段落列表", response_model=ResponseModel[ParagraphListResponse])
-async def get_paragraphs_by_chapter(chapter_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_paragraphs_by_chapter(chapter_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     paragraphs = await ParagraphService.get_paragraphs_by_chapter_id(db, chapter_id)
     return success_response(data=ParagraphListResponse(
         paragraphs=[_para_response(p) for p in paragraphs]
@@ -70,7 +71,7 @@ async def get_paragraphs_by_chapter(chapter_id: UUID, db: AsyncSession = Depends
 
 
 @router.post("/paragraphs/{paragraph_id}/ai/assist", summary="AI 帮填段落内容")
-async def ai_assist_paragraph(paragraph_id: UUID, assist_request: AIAssistRequest, db: AsyncSession = Depends(get_db)):
+async def ai_assist_paragraph(paragraph_id: UUID, assist_request: AIAssistRequest, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     paragraph = await ParagraphService.get_paragraph_detail(db, paragraph_id)
     if not paragraph:
         raise HTTPException(status_code=404, detail="段落不存在")
@@ -87,7 +88,7 @@ async def ai_assist_paragraph(paragraph_id: UUID, assist_request: AIAssistReques
 
 
 @router.post("/paragraphs/{paragraph_id}/ai/evaluate", summary="AI 评估段落内容")
-async def ai_evaluate_paragraph(paragraph_id: UUID, db: AsyncSession = Depends(get_db)):
+async def ai_evaluate_paragraph(paragraph_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     try:
         evaluate_and_save_func = ai_service.ai_evaluate_paragraph(paragraph_id)
 
@@ -105,7 +106,7 @@ async def ai_evaluate_paragraph(paragraph_id: UUID, db: AsyncSession = Depends(g
 
 
 @router.post("/paragraphs/{paragraph_id}/ai/apply", summary="应用AI帮填结果", response_model=ResponseModel[ParagraphResponse])
-async def apply_ai_assist_result(paragraph_id: UUID, db: AsyncSession = Depends(get_db)):
+async def apply_ai_assist_result(paragraph_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     try:
         updated = await ParagraphService.apply_ai_assist_result(db, paragraph_id)
         return success_response(data=_para_response(updated))
@@ -116,7 +117,7 @@ async def apply_ai_assist_result(paragraph_id: UUID, db: AsyncSession = Depends(
 
 
 @router.get("/paragraphs/{paragraph_id}/summaries", summary="获取段落关联的摘要信息", response_model=ResponseModel[ParagraphRelatedSummariesResponse])
-async def get_paragraph_summaries(paragraph_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_paragraph_summaries(paragraph_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     summaries = await ParagraphService.get_paragraph_related_summaries(db, paragraph_id)
     return success_response(data=ParagraphRelatedSummariesResponse(
         summaries=[RelatedSummaryItem(**s) for s in summaries]

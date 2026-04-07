@@ -35,6 +35,7 @@ class SummaryService:
             summary_id=summary_id,
             version=old_summary.version,
             title=old_summary.title,
+            field_key=old_summary.field_key,
             content=old_summary.content,
         )
         db.add(history)
