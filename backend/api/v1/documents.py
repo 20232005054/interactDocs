@@ -47,6 +47,7 @@ async def list_documents(
         DocumentListItem(
             document_id=item["doc"].document_id,
             title=item["doc"].title,
+            purpose=item["doc"].purpose,
             template_purpose=item["purpose"],
             template_name=item["display_name"],
             created_at=item["doc"].created_at,
@@ -157,6 +158,9 @@ async def apply_core_info_template(document_id: UUID, db: AsyncSession = Depends
             field_type=item.field_type,
             content=item.content,
             order_index=item.order_index,
+            is_locked=item.is_locked,
+            is_required=item.is_required,
+            is_change=item.is_change,
             children=[]
         )
 
@@ -213,6 +217,8 @@ async def apply_structure_template(document_id: UUID, db: AsyncSession = Depends
         items=[
             ApplyStructureItem(
                 chapter_id=str(item["chapter"].chapter_id),
+                parent_id=str(item["chapter"].parent_id) if item["chapter"].parent_id else None,
+                field_key=item["chapter"].field_key,
                 title=item["chapter"].title,
                 order_index=item["chapter"].order_index,
                 generation_mode=item["generation_mode"],

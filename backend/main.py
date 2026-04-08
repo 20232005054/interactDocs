@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, Depends
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer
 from api.v1 import documents, chapters, paragraphs, ai, endpoints, summaries, templates, core_info, core_info_templates, summary_templates, structure_templates
-from api.v1 import auth, upload, events
+from api.v1 import auth, upload, events, export
 from api.v1.admin import users as admin_users, documents as admin_documents, stats as admin_stats
 from core.response import generic_exception_handler
 from core.security import decode_token
@@ -82,6 +82,7 @@ app.include_router(summary_templates.router, dependencies=_auth_dep)
 app.include_router(structure_templates.router, dependencies=_auth_dep)
 app.include_router(upload.router, dependencies=_auth_dep)
 app.include_router(events.router, dependencies=_auth_dep)
+app.include_router(export.router, dependencies=_auth_dep)
 # 用户认证（公开，不加 Bearer）
 app.include_router(auth.router)
 # 管理员（已有 get_admin_user Depends，不需要额外加）

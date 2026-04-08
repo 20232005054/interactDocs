@@ -24,6 +24,7 @@ class DocumentDetailResponse(DocumentResponse):
 class DocumentListItem(BaseModel):
     document_id: UUID
     title: str
+    purpose: Optional[str] = None
     template_purpose: Optional[str] = None
     template_name: Optional[str] = None
     created_at: datetime
@@ -307,6 +308,9 @@ class ApplyCoreInfoItem(BaseModel):
     field_type: str
     content: str
     order_index: int
+    is_locked: bool = False
+    is_required: bool = True
+    is_change: int = 0
     children: List['ApplyCoreInfoItem'] = []
 
 
@@ -337,6 +341,8 @@ class ApplySummaryResponse(BaseModel):
 
 class ApplyStructureItem(BaseModel):
     chapter_id: str
+    parent_id: Optional[str] = None
+    field_key: Optional[str] = None
     title: str
     order_index: int
     generation_mode: int
@@ -381,6 +387,7 @@ class RelatedSummaryItem(BaseModel):
     summary_id: UUID
     document_id: UUID
     title: str
+    field_key: Optional[str] = None
     content: str
     version: int
     created_at: datetime

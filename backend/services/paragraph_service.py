@@ -224,6 +224,7 @@ class ParagraphService:
                     "summary_id": summary.summary_id,
                     "document_id": summary.document_id,
                     "title": summary.title,
+                    "field_key": summary.field_key,
                     "content": summary.content,
                     "version": summary.version,
                     "created_at": summary.created_at,
