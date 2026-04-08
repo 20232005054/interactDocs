@@ -115,7 +115,7 @@ class DocumentSummary(Base):
     field_key = Column(String(50), nullable=False)
     content = Column(Text, nullable=False)
     version = Column(Integer, nullable=False, default=1)
-    is_change = Column(Integer, nullable=False, default=0)  # 0-无变更，1-有变更
+    is_change = Column(Integer, nullable=False, default=0)  # 0=无变更 1=有变更(待处理) 2=已联动更新(核心信息/摘要变更触发) 3=下游段落变更后AI重新生成(待用户确认)
     ai_generate = Column(Text, nullable=True)  # AI生成的内容
     order_index = Column(Integer, nullable=False, default=0)  # 排序索引
     created_at = Column(TIMESTAMP, server_default=func.now())

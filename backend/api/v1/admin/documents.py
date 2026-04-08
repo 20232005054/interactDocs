@@ -34,6 +34,7 @@ async def list_all_documents(
         DocumentListItem(
             document_id=item["doc"].document_id,
             title=item["doc"].title,
+            purpose=item["doc"].purpose,
             template_purpose=item["purpose"],
             template_name=item["display_name"],
             created_at=item["doc"].created_at,

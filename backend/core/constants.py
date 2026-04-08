@@ -12,14 +12,13 @@ class UserRole(str, Enum):
     ADMIN = "admin"
 
 
-class EdgeSourceType:
+class EdgeSourceType(str, Enum):
     PARAGRAPH = "paragraph"
     CHAPTER = "chapter"
     SUMMARY = "summary"
 
 
-class EdgeTargetType:
-    CORE_INFO = "core_info"   # 原 document_entity，指向 DocumentCoreInfo
+class EdgeTargetType(str, Enum):
+    CORE_INFO = "core_info"
     SUMMARY   = "summary"
     CHAPTER   = "chapter"
-    KEYWORD   = "keyword"
