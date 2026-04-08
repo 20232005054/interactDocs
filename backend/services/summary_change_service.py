@@ -162,6 +162,12 @@ async def _handle_chapter_downstream(db, chapter_id: UUID, document, structure_t
                     "ischange": 2
                 })
                 logger.info("章节 %s 段落 (mode=1) AI 重新生成完成", chapter_id)
+                from services.event_bus import publish
+                await publish(str(document.document_id), {
+                    "type": "paragraph_updated",
+                    "chapter_id": str(chapter_id),
+                    "paragraph_id": str(target_paragraph.paragraph_id),
+                })
             else:
                 logger.warning("章节 %s 段落 (mode=1) AI 返回空内容", chapter_id)
         except Exception as e:

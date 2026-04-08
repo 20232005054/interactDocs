@@ -155,6 +155,11 @@ async def _handle_summary_downstream(db, summary_id: UUID, document, old_content
                     "is_change": 2
                 })
                 logger.info("摘要 %s (mode=1) AI 重新生成完成", summary_id)
+                from services.event_bus import publish
+                await publish(str(document.document_id), {
+                    "type": "summary_updated",
+                    "summary_id": str(summary_id),
+                })
             else:
                 logger.warning("摘要 %s (mode=1) AI 返回空内容", summary_id)
         except Exception as e:
@@ -220,6 +225,12 @@ async def _handle_chapter_downstream(db, chapter_id: UUID, document, old_content
                     "ischange": 2
                 })
                 logger.info("章节 %s 段落 (mode=1) AI 重新生成完成", chapter_id)
+                from services.event_bus import publish
+                await publish(str(document.document_id), {
+                    "type": "paragraph_updated",
+                    "chapter_id": str(chapter_id),
+                    "paragraph_id": str(target_paragraph.paragraph_id),
+                })
             else:
                 logger.warning("章节 %s 段落 (mode=1) AI 返回空内容", chapter_id)
         except Exception as e:

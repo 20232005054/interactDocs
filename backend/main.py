@@ -1,7 +1,8 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPBearer
 from api.v1 import documents, chapters, paragraphs, ai, endpoints, summaries, templates, core_info, core_info_templates, summary_templates, structure_templates
-from api.v1 import auth, upload
+from api.v1 import auth, upload, events
 from api.v1.admin import users as admin_users, documents as admin_documents, stats as admin_stats
 from core.response import generic_exception_handler
 from core.security import decode_token
@@ -15,7 +16,16 @@ try:
 except ImportError:
     pass
 
-app = FastAPI(title="方案生成系统", version="1.0.0", timeout=300)
+# 全局 Bearer security scheme，让 Swagger 对所有业务接口显示锁图标
+# auto_error=False 表示不在这里报错，实际鉴权由 Middleware 处理
+_bearer = HTTPBearer(auto_error=False)
+
+app = FastAPI(
+    title="方案生成系统",
+    version="1.0.0",
+    timeout=300,
+    swagger_ui_parameters={"persistAuthorization": True},  # Swagger 刷新后保留 token
+)
 
 app.add_exception_handler(Exception, generic_exception_handler)
 
@@ -57,22 +67,24 @@ async def auth_middleware(request: Request, call_next):
 
 
 
-app.include_router(documents.router)
-app.include_router(chapters.router)
-app.include_router(paragraphs.router)
-app.include_router(ai.router)
-app.include_router(endpoints.router)
-app.include_router(summaries.router)
-app.include_router(templates.router)
-app.include_router(core_info.router)
-app.include_router(core_info_templates.router)
-app.include_router(summary_templates.router)
-app.include_router(structure_templates.router)
-# 用户认证
+# 业务路由统一加 Bearer security scheme（让 Swagger Authorize 生效）
+_auth_dep = [Depends(_bearer)]
+app.include_router(documents.router, dependencies=_auth_dep)
+app.include_router(chapters.router, dependencies=_auth_dep)
+app.include_router(paragraphs.router, dependencies=_auth_dep)
+app.include_router(ai.router, dependencies=_auth_dep)
+app.include_router(endpoints.router, dependencies=_auth_dep)
+app.include_router(summaries.router, dependencies=_auth_dep)
+app.include_router(templates.router, dependencies=_auth_dep)
+app.include_router(core_info.router, dependencies=_auth_dep)
+app.include_router(core_info_templates.router, dependencies=_auth_dep)
+app.include_router(summary_templates.router, dependencies=_auth_dep)
+app.include_router(structure_templates.router, dependencies=_auth_dep)
+app.include_router(upload.router, dependencies=_auth_dep)
+app.include_router(events.router, dependencies=_auth_dep)
+# 用户认证（公开，不加 Bearer）
 app.include_router(auth.router)
-# 文件上传
-app.include_router(upload.router)
-# 管理员
+# 管理员（已有 get_admin_user Depends，不需要额外加）
 app.include_router(admin_users.router)
 app.include_router(admin_documents.router)
 app.include_router(admin_stats.router)

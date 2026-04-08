@@ -116,9 +116,25 @@ async def create_document_snapshot(document_id: UUID, db: AsyncSession = Depends
 
 
 @router.put("/snapshots/{snapshot_id}", summary="更新快照信息", response_model=ResponseModel[SnapshotResponse])
-async def update_snapshot(snapshot_id: UUID, snapshot_in: SnapshotUpdate, db: AsyncSession = Depends(get_db)):
+async def update_snapshot(
+    snapshot_id: UUID,
+    snapshot_in: SnapshotUpdate,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     snapshot = await DocumentService.update_snapshot(db, snapshot_id, snapshot_in.description)
     return success_response(data=SnapshotResponse(**snapshot))
+
+
+@router.post("/{document_id}/snapshots/{snapshot_id}/restore", summary="从快照恢复文档")
+async def restore_snapshot(
+    document_id: UUID,
+    snapshot_id: UUID,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await DocumentService.restore_snapshot(db, document_id, snapshot_id)
+    return success_response(message=result["message"])
 
 
 @router.get("/{document_id}/template-info", summary="获取文档关联的模板完整信息", response_model=ResponseModel[TemplateInfoResponse])
