@@ -29,3 +29,6 @@ weasyprint>=62.0
 
 # Environment
 python-dotenv>=1.0.0
+
+# Redis
+redis[asyncio]>=5.0.0

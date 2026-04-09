@@ -8,7 +8,7 @@ from schemas.response_schemas import OperationHistoryItem, OperationHistoryListR
 from core.constants import EdgeSourceType, EdgeTargetType
 from core.auth import get_current_user
 from uuid import UUID
-from typing import Optional
+from typing import Optional, Union
 
 router = APIRouter(prefix="/api/v1")
 

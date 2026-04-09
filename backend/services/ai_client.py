@@ -6,35 +6,10 @@ from http import HTTPStatus
 from typing import Any, AsyncGenerator, Dict, Optional, Tuple
 
 import dashscope
+from core.config import AI_MODEL, AI_TIMEOUT_SECONDS, AI_MAX_RETRIES, AI_RETRY_BACKOFF_SECONDS, AI_MAX_CONCURRENCY
 
 logger = logging.getLogger(__name__)
 
-
-def _get_int_env(name: str, default: int) -> int:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return default
-
-
-def _get_float_env(name: str, default: float) -> float:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return default
-
-
-AI_MODEL = os.getenv("AI_MODEL", "qwen-max")
-AI_TIMEOUT_SECONDS = _get_float_env("AI_TIMEOUT_SECONDS", 30.0)
-AI_MAX_RETRIES = max(_get_int_env("AI_MAX_RETRIES", 2), 0)
-AI_RETRY_BACKOFF_SECONDS = max(_get_float_env("AI_RETRY_BACKOFF_SECONDS", 0.8), 0.0)
-AI_MAX_CONCURRENCY = max(_get_int_env("AI_MAX_CONCURRENCY", 5), 1)
 _AI_SEMAPHORE = asyncio.Semaphore(AI_MAX_CONCURRENCY)
 
 

@@ -14,6 +14,7 @@ import uuid
 from datetime import datetime
 
 import oss2
+from core.config import OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET, OSS_ENDPOINT, OSS_BUCKET_NAME, OSS_BASE_URL
 
 # 允许的图片类型
 ALLOWED_CONTENT_TYPES = {
@@ -26,16 +27,9 @@ MAX_FILE_SIZE = 10 * 1024 * 1024
 
 
 def _get_bucket() -> oss2.Bucket:
-    """获取 OSS Bucket 实例（每次调用时读取环境变量，确保 .env 已加载）"""
-    auth = oss2.Auth(
-        os.getenv("OSS_ACCESS_KEY_ID", ""),
-        os.getenv("OSS_ACCESS_KEY_SECRET", ""),
-    )
-    return oss2.Bucket(
-        auth,
-        os.getenv("OSS_ENDPOINT", "oss-cn-beijing.aliyuncs.com"),
-        os.getenv("OSS_BUCKET_NAME", ""),
-    )
+    """获取 OSS Bucket 实例"""
+    auth = oss2.Auth(OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET)
+    return oss2.Bucket(auth, OSS_ENDPOINT, OSS_BUCKET_NAME)
 
 
 def _build_object_key(filename: str) -> str:
@@ -47,12 +41,9 @@ def _build_object_key(filename: str) -> str:
 
 def _build_url(object_key: str) -> str:
     """拼接图片访问 URL"""
-    base_url = os.getenv("OSS_BASE_URL", "")
-    if base_url:
-        return f"{base_url.rstrip('/')}/{object_key}"
-    bucket_name = os.getenv("OSS_BUCKET_NAME", "")
-    endpoint = os.getenv("OSS_ENDPOINT", "oss-cn-beijing.aliyuncs.com")
-    return f"https://{bucket_name}.{endpoint}/{object_key}"
+    if OSS_BASE_URL:
+        return f"{OSS_BASE_URL.rstrip('/')}/{object_key}"
+    return f"https://{OSS_BUCKET_NAME}.{OSS_ENDPOINT}/{object_key}"
 
 
 async def upload_image(file_content: bytes, filename: str, content_type: str) -> str:
