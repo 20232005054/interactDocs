@@ -6,14 +6,21 @@ from services.endpoint_service import EndpointService
 from services.dependency_service import DependencyService
 from schemas.response_schemas import OperationHistoryItem, OperationHistoryListResponse, DependencyEdgeItem, DependenciesResponse
 from core.constants import EdgeSourceType, EdgeTargetType
+from core.auth import get_current_user
 from uuid import UUID
-from typing import Union
+from typing import Optional
 
 router = APIRouter(prefix="/api/v1")
 
 @router.get("/history", summary="获取操作历史记录", response_model=ResponseModel[OperationHistoryListResponse])
-async def get_operation_history(page: int = 1, page_size: int = 10, db: AsyncSession = Depends(get_db)):
-    total, items = await EndpointService.get_operation_history(db, page, page_size)
+async def get_operation_history(
+    document_id: UUID = None,
+    page: int = 1,
+    page_size: int = 10,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    total, items = await EndpointService.get_operation_history(db, page, page_size, document_id=document_id)
     return success_response(data=OperationHistoryListResponse(
         total=total,
         items=[OperationHistoryItem(**item) for item in items]

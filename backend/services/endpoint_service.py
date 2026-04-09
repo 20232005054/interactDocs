@@ -5,16 +5,18 @@ from uuid import UUID
 
 class EndpointService:
     @staticmethod
-    async def get_operation_history(db: AsyncSession, page: int = 1, page_size: int = 10):
-        """
-        获取操作历史记录
-        """
-        total, history = await OperationHistoryMapper.get_operation_history(db, page, page_size)
-        
-        # 构建返回数据
-        items = []
-        for item in history:
-            items.append({
+    async def get_operation_history(
+        db: AsyncSession,
+        page: int = 1,
+        page_size: int = 10,
+        document_id: UUID = None,
+    ):
+        """获取操作历史记录，支持按 document_id 过滤"""
+        total, history = await OperationHistoryMapper.get_operation_history(
+            db, page, page_size, document_id=document_id
+        )
+        items = [
+            {
                 "history_id": item.history_id,
                 "chapter_id": item.chapter_id,
                 "document_id": item.document_id,
@@ -22,9 +24,10 @@ class EndpointService:
                 "action": item.action,
                 "content_before": item.content_before,
                 "content_after": item.content_after,
-                "created_at": item.created_at
-            })
-        
+                "created_at": item.created_at,
+            }
+            for item in history
+        ]
         return total, items
     
     @staticmethod
