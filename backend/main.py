@@ -32,6 +32,12 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(Exception, generic_exception_handler)
 
+
+@app.on_event("startup")
+async def startup():
+    from services import event_bus
+    await event_bus.init()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
