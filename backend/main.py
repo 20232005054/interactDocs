@@ -1,10 +1,11 @@
 from fastapi import FastAPI, Request, Depends
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer
+from fastapi.exceptions import HTTPException, RequestValidationError
 from api.v1 import documents, chapters, paragraphs, ai, endpoints, summaries, templates, core_info, core_info_templates, summary_templates, structure_templates
 from api.v1 import auth, upload, events, export
 from api.v1.admin import users as admin_users, documents as admin_documents, stats as admin_stats
-from core.response import generic_exception_handler
+from core.response import http_exception_handler, validation_exception_handler, generic_exception_handler
 from core.security import decode_token
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,6 +28,8 @@ app = FastAPI(
     swagger_ui_parameters={"persistAuthorization": True},  # Swagger 刷新后保留 token
 )
 
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(Exception, generic_exception_handler)
 
 app.add_middleware(
@@ -55,13 +58,13 @@ async def auth_middleware(request: Request, call_next):
 
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
-        return JSONResponse(status_code=401, content={"code": 401, "message": "未提供认证凭据", "data": None})
+        return JSONResponse(status_code=200, content={"code": 401, "message": "未提供认证凭据", "data": None})
 
     token = auth_header.removeprefix("Bearer ").strip()
     try:
         decode_token(token)
     except Exception:
-        return JSONResponse(status_code=401, content={"code": 401, "message": "无效的认证凭据", "data": None})
+        return JSONResponse(status_code=200, content={"code": 401, "message": "无效的认证凭据", "data": None})
 
     return await call_next(request)
 
