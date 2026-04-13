@@ -90,8 +90,8 @@ CREATE TABLE IF NOT EXISTS operation_history (
 CREATE TABLE IF NOT EXISTS chat_records (
     chat_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(user_id),
-    document_id UUID REFERENCES documents(document_id),
-    chapter_id UUID REFERENCES chapters(chapter_id),
+    document_id UUID REFERENCES documents(document_id) ON DELETE CASCADE,
+    chapter_id UUID REFERENCES chapters(chapter_id) ON DELETE SET NULL,
     chapter_content JSONB,
     role VARCHAR(20) DEFAULT 'user',
     message TEXT NOT NULL,

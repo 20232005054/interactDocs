@@ -206,6 +206,9 @@ class TemplateDetailResponse(TemplateResponse):
 
 
 class TemplateListResponse(BaseModel):
+    page: int
+    page_size: int
+    total: int
     items: List[TemplateResponse]
 
 

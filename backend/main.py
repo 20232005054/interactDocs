@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Depends
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer
@@ -21,22 +22,25 @@ except ImportError:
 # auto_error=False 表示不在这里报错，实际鉴权由 Middleware 处理
 _bearer = HTTPBearer(auto_error=False)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from services import event_bus
+    await event_bus.init()
+    yield
+
+
 app = FastAPI(
     title="方案生成系统",
     version="1.0.0",
     timeout=300,
     swagger_ui_parameters={"persistAuthorization": True},  # Swagger 刷新后保留 token
+    lifespan=lifespan,
 )
 
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(Exception, generic_exception_handler)
-
-
-@app.on_event("startup")
-async def startup():
-    from services import event_bus
-    await event_bus.init()
 
 app.add_middleware(
     CORSMiddleware,

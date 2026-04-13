@@ -95,8 +95,8 @@ class ChatRecord(Base):
     __tablename__ = "chat_records"
     chat_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"))
-    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.document_id"))
-    chapter_id = Column(UUID(as_uuid=True), ForeignKey("chapters.chapter_id"), nullable=True)
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.document_id", ondelete="CASCADE"))
+    chapter_id = Column(UUID(as_uuid=True), ForeignKey("chapters.chapter_id", ondelete="SET NULL"), nullable=True)
     chapter_content = Column(JSONB, nullable=True)
     role = Column(String(20), default="user")  # user / assistant
     message = Column(Text, nullable=False)
