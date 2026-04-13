@@ -19,7 +19,9 @@ function CreateDocumentModal({ onClose, onCreated }: CreateDocumentModalProps) {
   const [title, setTitle] = useState("")
   const [purpose, setPurpose] = useState("")
   const [templateId, setTemplateId] = useState("")
+  const [purposes, setPurposes] = useState<string[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
+  const [filteredTemplates, setFilteredTemplates] = useState<Template[]>([])
   const [loadingTemplates, setLoadingTemplates] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -27,8 +29,13 @@ function CreateDocumentModal({ onClose, onCreated }: CreateDocumentModalProps) {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await templateService.list({ is_system: true, is_active: true, page_size: 100 })
-        setTemplates(res.items)
+        const [purposeRes, templateRes] = await Promise.all([
+          templateService.getPurposes(true),
+          templateService.list({ is_system: true, is_active: true, page_size: 100 }),
+        ])
+        setPurposes(purposeRes.purposes)
+        setTemplates(templateRes.items)
+        setFilteredTemplates(templateRes.items)
       } finally {
         setLoadingTemplates(false)
       }
@@ -36,18 +43,35 @@ function CreateDocumentModal({ onClose, onCreated }: CreateDocumentModalProps) {
     load()
   }, [])
 
+  // 选择用途时过滤模板列表
+  const handlePurposeChange = (val: string) => {
+    setPurpose(val)
+    setTemplateId("")
+    setFilteredTemplates(val ? templates.filter(t => t.purpose === val) : templates)
+  }
+
+  // 选择模板时自动填充用途
+  const handleTemplateChange = (val: string) => {
+    setTemplateId(val)
+    if (val) {
+      const tpl = templates.find(t => t.template_id === val)
+      if (tpl && !purpose) setPurpose(tpl.purpose)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!title.trim() || !purpose.trim() || !templateId) {
-      setError("请填写所有必填项")
+    if (!title.trim() || !templateId) {
+      setError("请填写文档标题并选择模板")
       return
     }
     setLoading(true)
     setError(null)
     try {
+      const tpl = templates.find(t => t.template_id === templateId)
       const doc = await documentService.create({
         title: title.trim(),
-        purpose: purpose.trim(),
+        purpose: tpl?.purpose ?? purpose,
         template_id: templateId,
       })
       onCreated(doc)
@@ -84,13 +108,20 @@ function CreateDocumentModal({ onClose, onCreated }: CreateDocumentModalProps) {
 
           <div className="flex flex-col gap-1.5">
             <label className="text-sm text-gray-600">用途 <span className="text-red-500">*</span></label>
-            <input
-              type="text"
-              value={purpose}
-              onChange={e => setPurpose(e.target.value)}
-              placeholder="如：临床研究方案"
-              className={inputCls}
-            />
+            {loadingTemplates ? (
+              <div className="h-9 bg-gray-100 rounded animate-pulse" />
+            ) : (
+              <select
+                value={purpose}
+                onChange={e => handlePurposeChange(e.target.value)}
+                className={selectCls}
+              >
+                <option value="">全部用途</option>
+                {purposes.map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            )}
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -100,13 +131,13 @@ function CreateDocumentModal({ onClose, onCreated }: CreateDocumentModalProps) {
             ) : (
               <select
                 value={templateId}
-                onChange={e => setTemplateId(e.target.value)}
+                onChange={e => handleTemplateChange(e.target.value)}
                 className={selectCls}
               >
                 <option value="">请选择模板</option>
-                {templates.map(t => (
+                {filteredTemplates.map(t => (
                   <option key={t.template_id} value={t.template_id}>
-                    {t.display_name}（{t.purpose}）
+                    {t.display_name}
                   </option>
                 ))}
               </select>

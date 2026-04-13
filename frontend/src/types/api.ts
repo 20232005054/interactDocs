@@ -316,3 +316,133 @@ export interface StructureTemplateReorderPayload {
   parent_id: string | null
   ordered_ids: string[]
 }
+
+// ============================================================
+// 段落
+// ============================================================
+export type ParaType = "paragraph" | "heading1" | "heading2" | "heading3"
+
+export interface Paragraph {
+  paragraph_id: string
+  chapter_id: string
+  content: string
+  para_type: ParaType
+  order_index: number
+  ai_eval: string | null
+  ai_suggestion: string | null
+  ai_generate: string | null
+  ischange: number
+}
+
+export interface ParagraphListResponse {
+  paragraphs: Paragraph[]
+}
+
+export interface CreateParagraphPayload {
+  content: string
+  para_type?: ParaType
+}
+
+export interface UpdateParagraphPayload {
+  content?: string
+  para_type?: ParaType
+  order_index?: number
+  ai_eval?: string | null
+  ai_suggestion?: string | null
+  ai_generate?: string | null
+  ischange?: number
+}
+
+// ============================================================
+// 章节
+// ============================================================
+export interface Chapter {
+  chapter_id: string
+  document_id: string
+  parent_id: string | null
+  title: string
+  field_key: string | null
+  status: number
+  order_index: number
+  updated_at: string
+  paragraphs?: Paragraph[]
+}
+
+export interface ChapterTreeNode extends Chapter {
+  children: ChapterTreeNode[]
+  paragraphs: Paragraph[]
+}
+
+export interface ChapterTreeResponse {
+  tree: ChapterTreeNode[]
+}
+
+export interface FullContentResponse {
+  document_id: string
+  tree: ChapterTreeNode[]
+}
+
+export interface UpdateChapterPayload {
+  title?: string
+  status?: number
+  parent_id?: string | null
+}
+
+// ============================================================
+// 摘要（文档实例）
+// ============================================================
+export interface Summary {
+  summary_id: string
+  document_id: string
+  title: string
+  field_key: string
+  content: string
+  is_change: number
+  version: number
+  order_index: number
+  created_at: string
+  updated_at: string
+}
+
+export interface SummaryListResponse {
+  summaries: Summary[]
+}
+
+export interface UpdateSummaryPayload {
+  title?: string
+  field_key?: string
+  content?: string
+}
+
+// ============================================================
+// 核心信息（文档实例）
+// ============================================================
+export interface CoreInfo {
+  core_info_id: string
+  document_id: string
+  parent_id: string | null
+  title: string
+  field_key: string | null
+  content: string
+  field_type: string
+  options: string[] | null
+  is_required: boolean
+  order_index: number
+  is_locked: boolean
+  is_change: number
+  created_at: string
+  updated_at: string
+  children: CoreInfo[]
+}
+
+export interface CoreInfoTreeResponse {
+  items: CoreInfo[]
+}
+
+export interface UpdateCoreInfoPayload {
+  title?: string
+  content?: string
+  parent_id?: string | null
+  is_locked?: boolean
+  is_change?: number
+}
