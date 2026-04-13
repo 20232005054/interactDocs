@@ -6,6 +6,18 @@ from uuid import UUID
 
 class ParagraphMapper:
     @staticmethod
+    async def get_paragraphs_by_document_id(db: AsyncSession, document_id: UUID):
+        """一次查出文档下所有段落，避免 N+1"""
+        from db.models import Chapter
+        result = await db.execute(
+            select(Paragraph)
+            .join(Chapter, Paragraph.chapter_id == Chapter.chapter_id)
+            .where(Chapter.document_id == document_id)
+            .order_by(Paragraph.chapter_id, Paragraph.order_index)
+        )
+        return result.scalars().all()
+
+    @staticmethod
     async def get_paragraphs_by_chapter_id(db: AsyncSession, chapter_id: UUID):
         result = await db.execute(
             select(Paragraph).where(Paragraph.chapter_id == chapter_id).order_by(Paragraph.order_index)

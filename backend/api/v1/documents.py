@@ -8,7 +8,7 @@ from schemas.response_schemas import (
     DocumentResponse, DocumentDetailResponse, DocumentListResponse,
     SnapshotResponse, SnapshotListResponse,
     ApplyCoreInfoResponse, ApplySummaryResponse, ApplyStructureResponse, ApplyCoreInfoItem,
-    TemplateInfoResponse
+    TemplateInfoResponse, FullContentResponse, FullContentChapter, FullContentParagraph
 )
 from core.response import success_response, ResponseModel
 from core.auth import get_current_user
@@ -136,6 +136,44 @@ async def restore_snapshot(
 ):
     result = await DocumentService.restore_snapshot(db, document_id, snapshot_id)
     return success_response(message=result["message"])
+
+
+@router.get("/{document_id}/full-content", summary="获取文档全量内容（章节树+段落）", response_model=ResponseModel[FullContentResponse])
+async def get_full_content(document_id: UUID, db: AsyncSession = Depends(get_db)):
+    doc_id, tree = await DocumentService.get_full_content(db, document_id)
+
+    def build_chapter_node(node) -> FullContentChapter:
+        chapter = node["chapter"]
+        return FullContentChapter(
+            chapter_id=chapter.chapter_id,
+            document_id=chapter.document_id,
+            parent_id=chapter.parent_id,
+            title=chapter.title,
+            field_key=chapter.field_key,
+            status=chapter.status,
+            order_index=chapter.order_index,
+            updated_at=chapter.updated_at,
+            paragraphs=[
+                FullContentParagraph(
+                    paragraph_id=p.paragraph_id,
+                    chapter_id=p.chapter_id,
+                    content=p.content,
+                    para_type=p.para_type,
+                    order_index=p.order_index,
+                    ai_eval=p.ai_eval,
+                    ai_suggestion=p.ai_suggestion,
+                    ai_generate=p.ai_generate,
+                    ischange=p.ischange,
+                )
+                for p in node["paragraphs"]
+            ],
+            children=[build_chapter_node(child) for child in node["children"]],
+        )
+
+    return success_response(data=FullContentResponse(
+        document_id=doc_id,
+        tree=[build_chapter_node(n) for n in tree],
+    ))
 
 
 @router.get("/{document_id}/template-info", summary="获取文档关联的模板完整信息", response_model=ResponseModel[TemplateInfoResponse])

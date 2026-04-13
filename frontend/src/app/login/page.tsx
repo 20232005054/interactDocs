@@ -25,7 +25,7 @@ export default function LoginPage() {
       localStorage.setItem("token", token.access_token)
       const user = await authService.getMe()
       setAuth(token.access_token, user)
-      router.push(user.role === "admin" ? "/admin" : "/")
+      router.push(user.role === "admin" ? "/admin" : "/documents")
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "登录失败")
     } finally {

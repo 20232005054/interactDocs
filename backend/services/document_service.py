@@ -699,6 +699,49 @@ class DocumentService:
         return created_chapters
 
     @staticmethod
+    async def get_full_content(db: AsyncSession, document_id: UUID):
+        """
+        获取文档全量内容：章节树 + 每个章节的段落
+        两次查询解决 N+1：一次拉所有章节，一次拉所有段落
+        """
+        from db.mappers.chapter_mapper import ChapterMapper
+        from db.mappers.paragraph_mapper import ParagraphMapper
+
+        document = await DocumentMapper.get_document_by_id(db, document_id)
+        if not document:
+            raise HTTPException(status_code=404, detail="文档不存在")
+
+        chapters = await ChapterMapper.get_chapters_by_document_id(db, document_id)
+        paragraphs = await ParagraphMapper.get_paragraphs_by_document_id(db, document_id)
+
+        # 按 chapter_id 分组段落
+        para_map: dict = {}
+        for p in paragraphs:
+            para_map.setdefault(p.chapter_id, []).append(p)
+
+        # 构建章节树
+        chapter_map = {c.chapter_id: c for c in chapters}
+
+        def build_node(chapter):
+            return {
+                "chapter": chapter,
+                "paragraphs": para_map.get(chapter.chapter_id, []),
+                "children": [
+                    build_node(chapter_map[c.chapter_id])
+                    for c in chapters
+                    if c.parent_id == chapter.chapter_id
+                ],
+            }
+
+        tree = [
+            build_node(c)
+            for c in chapters
+            if c.parent_id is None
+        ]
+
+        return document_id, tree
+
+    @staticmethod
     async def _get_core_info_map(db: AsyncSession, document_id: UUID) -> dict:
         """获取文档核心信息的键值对映射，key 为 field_key，value 为 content"""
         result = await db.execute(

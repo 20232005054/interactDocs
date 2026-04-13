@@ -73,24 +73,24 @@ function SourceRow({ source, coreInfoOptions, summaryOptions, structureOptions, 
     sourceType === "summary" ? summaryOptions :
     structureOptions
 
-  const selectedKey = source.match_keys[0]?.value ?? ""
+  const selectedKeys = source.match_keys.map(k => k.value)
 
-  const selectKey = (opt: VariableOption) => {
-    onChange({
-      ...source,
-      match_keys: [{ value: opt.fieldKey, label: opt.label }],
-      target_field: opt.fieldKey,
-    })
+  const toggleKey = (opt: VariableOption) => {
+    const exists = selectedKeys.includes(opt.fieldKey)
+    const newKeys = exists
+      ? source.match_keys.filter(k => k.value !== opt.fieldKey)
+      : [...source.match_keys, { value: opt.fieldKey, label: opt.label }]
+    onChange({ ...source, match_keys: newKeys })
   }
 
-  const clearKey = () => {
-    onChange({ ...source, match_keys: [], target_field: "" })
+  const removeKey = (val: string) => {
+    onChange({ ...source, match_keys: source.match_keys.filter(k => k.value !== val) })
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-start gap-2">
       {/* 拖拽图标占位 */}
-      <span className="text-gray-300 cursor-grab select-none">≡</span>
+      <span className="mt-2 text-gray-300 cursor-grab select-none">≡</span>
 
       {/* 来源类型 */}
       <select
@@ -99,7 +99,6 @@ function SourceRow({ source, coreInfoOptions, summaryOptions, structureOptions, 
           ...source,
           source: { value: e.target.value, label: SOURCE_TYPE_OPTIONS.find(o => o.value === e.target.value)?.label ?? e.target.value },
           match_keys: [],
-          target_field: "",
         })}
         className="h-9 rounded border border-gray-300 bg-white px-2 text-sm outline-none focus:border-green-400 transition w-32"
       >
@@ -119,28 +118,29 @@ function SourceRow({ source, coreInfoOptions, summaryOptions, structureOptions, 
         ))}
       </select>
 
-      {/* 匹配字段单选 tag */}
-      <div className="flex-1 min-h-9 rounded border border-gray-300 bg-white px-2 py-1 flex items-center gap-1">
-        {selectedKey ? (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-yellow-100 text-yellow-800 text-xs font-medium">
-            {source.match_keys[0].label}
-            <button type="button" onClick={clearKey} className="hover:text-red-500 leading-none">×</button>
+      {/* 匹配字段多选 tag */}
+      <div className="flex-1 min-h-9 rounded border border-gray-300 bg-white px-2 py-1 flex flex-wrap gap-1 items-center relative">
+        {source.match_keys.map(k => (
+          <span key={k.value} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-yellow-100 text-yellow-800 text-xs font-medium">
+            {k.label}
+            <button type="button" onClick={() => removeKey(k.value)} className="hover:text-red-500 leading-none">×</button>
           </span>
-        ) : null}
-        <MatchKeyDropdown options={matchKeyOptions} selectedKey={selectedKey} onSelect={selectKey} />
+        ))}
+        {/* 下拉选择器 */}
+        <MatchKeyDropdown options={matchKeyOptions} selectedKeys={selectedKeys} onToggle={toggleKey} />
       </div>
 
       {/* 删除行 */}
-      <button type="button" onClick={onRemove} className="text-gray-300 hover:text-red-400 text-lg leading-none">×</button>
+      <button type="button" onClick={onRemove} className="mt-2 text-gray-300 hover:text-red-400 text-lg leading-none">×</button>
     </div>
   )
 }
 
-// 匹配字段单选下拉
-function MatchKeyDropdown({ options, selectedKey, onSelect }: {
+// 匹配字段下拉
+function MatchKeyDropdown({ options, selectedKeys, onToggle }: {
   options: VariableOption[]
-  selectedKey: string
-  onSelect: (opt: VariableOption) => void
+  selectedKeys: string[]
+  onToggle: (opt: VariableOption) => void
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -157,7 +157,7 @@ function MatchKeyDropdown({ options, selectedKey, onSelect }: {
     <div ref={ref} className="relative">
       <button
         type="button"
-        onMouseDown={(e) => { e.preventDefault(); setOpen(v => !v) }}
+        onClick={() => setOpen(v => !v)}
         className="h-6 px-2 text-xs text-gray-400 hover:text-gray-600 border border-dashed border-gray-300 rounded"
       >
         ▾
@@ -168,10 +168,10 @@ function MatchKeyDropdown({ options, selectedKey, onSelect }: {
             <button
               key={opt.fieldKey}
               type="button"
-              onMouseDown={(e) => { e.preventDefault(); onSelect(opt); setOpen(false) }}
+              onClick={() => onToggle(opt)}
               className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 flex items-center gap-2"
             >
-              <span className={`w-3 h-3 rounded-full border flex-shrink-0 ${selectedKey === opt.fieldKey ? "bg-green-500 border-green-500" : "border-gray-300"}`} />
+              <span className={`w-3 h-3 rounded-sm border flex-shrink-0 ${selectedKeys.includes(opt.fieldKey) ? "bg-green-500 border-green-500" : "border-gray-300"}`} />
               {opt.label}
             </button>
           ))}

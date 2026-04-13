@@ -49,11 +49,28 @@ export interface DocumentListItem {
   updated_at: string
 }
 
+export interface DocumentDetail extends DocumentListItem {
+  template_id: string | null
+  template_name: string | null
+}
+
 export interface DocumentListResponse {
   page: number
   page_size: number
   total: number
   items: DocumentListItem[]
+}
+
+export interface CreateDocumentPayload {
+  title: string
+  purpose: string
+  template_id: string
+}
+
+export interface UpdateDocumentPayload {
+  title?: string
+  purpose?: string
+  template_id?: string
 }
 
 // ============================================================

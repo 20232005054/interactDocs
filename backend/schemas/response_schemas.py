@@ -454,6 +454,43 @@ class OperationHistoryListResponse(BaseModel):
 
 
 # ============================================================
+# 文档全量内容
+# ============================================================
+
+class FullContentParagraph(BaseModel):
+    paragraph_id: UUID
+    chapter_id: UUID
+    content: str
+    para_type: str
+    order_index: int
+    ai_eval: Optional[str] = None
+    ai_suggestion: Optional[str] = None
+    ai_generate: Optional[str] = None
+    ischange: int
+
+
+class FullContentChapter(BaseModel):
+    chapter_id: UUID
+    document_id: UUID
+    parent_id: Optional[UUID] = None
+    title: str
+    field_key: Optional[str] = None
+    status: int
+    order_index: int
+    updated_at: datetime
+    paragraphs: List[FullContentParagraph] = []
+    children: List['FullContentChapter'] = []
+
+
+FullContentChapter.model_rebuild()
+
+
+class FullContentResponse(BaseModel):
+    document_id: UUID
+    tree: List[FullContentChapter]
+
+
+# ============================================================
 # 模板完整信息相关
 # ============================================================
 

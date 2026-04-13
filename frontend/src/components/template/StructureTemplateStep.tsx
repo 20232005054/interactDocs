@@ -57,12 +57,12 @@ function countTree(nodes: StructureTemplate[]): number {
 }
 
 // ----------------------------------------------------------------
-// 匹配字段单选下拉
+// 匹配字段下拉
 // ----------------------------------------------------------------
-function MatchKeyDropdown({ options, selectedKey, onSelect }: {
+function MatchKeyDropdown({ options, selectedKeys, onToggle }: {
   options: VariableOption[]
-  selectedKey: string
-  onSelect: (opt: VariableOption) => void
+  selectedKeys: string[]
+  onToggle: (opt: VariableOption) => void
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -77,17 +77,16 @@ function MatchKeyDropdown({ options, selectedKey, onSelect }: {
 
   return (
     <div ref={ref} className="relative">
-      <button type="button" onMouseDown={(e) => { e.preventDefault(); setOpen(v => !v) }}
+      <button type="button" onClick={() => setOpen(v => !v)}
         className="h-6 px-2 text-xs text-gray-400 hover:text-gray-600 border border-dashed border-gray-300 rounded">
         ▾
       </button>
       {open && options.length > 0 && (
         <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-gray-200 rounded shadow-md min-w-36 py-1 max-h-48 overflow-y-auto">
           {options.map(opt => (
-            <button key={opt.fieldKey} type="button"
-              onMouseDown={(e) => { e.preventDefault(); onSelect(opt); setOpen(false) }}
+            <button key={opt.fieldKey} type="button" onClick={() => onToggle(opt)}
               className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 flex items-center gap-2">
-              <span className={`w-3 h-3 rounded-full border flex-shrink-0 ${selectedKey === opt.fieldKey ? "bg-green-500 border-green-500" : "border-gray-300"}`} />
+              <span className={`w-3 h-3 rounded-sm border flex-shrink-0 ${selectedKeys.includes(opt.fieldKey) ? "bg-green-500 border-green-500" : "border-gray-300"}`} />
               {opt.label}
             </button>
           ))}
@@ -115,30 +114,17 @@ function SourceRow({ source, coreInfoOptions, summaryOptions, structureOptions, 
     sourceType === "keyinfo" ? coreInfoOptions :
     sourceType === "summary" ? summaryOptions :
     structureOptions
-  const selectedKey = source.match_keys[0]?.value ?? ""
-
-  const selectKey = (opt: VariableOption) => {
-    onChange({
-      ...source,
-      match_keys: [{ value: opt.fieldKey, label: opt.label }],
-      target_field: opt.fieldKey,
-    })
-  }
-
-  const clearKey = () => {
-    onChange({ ...source, match_keys: [], target_field: "" })
-  }
+  const selectedKeys = source.match_keys.map(k => k.value)
 
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-gray-300 cursor-grab select-none text-base">≡</span>
+    <div className="flex items-start gap-2">
+      <span className="mt-2 text-gray-300 cursor-grab select-none text-base">≡</span>
       <select
         value={sourceType}
         onChange={e => onChange({
           ...source,
           source: { value: e.target.value, label: SOURCE_TYPE_OPTIONS.find(o => o.value === e.target.value)?.label ?? e.target.value },
           match_keys: [],
-          target_field: "",
         })}
         className="h-9 rounded border border-gray-300 bg-white px-2 text-sm outline-none focus:border-green-400 transition w-28"
       >
@@ -151,16 +137,27 @@ function SourceRow({ source, coreInfoOptions, summaryOptions, structureOptions, 
       >
         {MATCH_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
-      <div className="flex-1 min-h-9 rounded border border-gray-300 bg-white px-2 py-1 flex items-center gap-1">
-        {selectedKey ? (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-yellow-100 text-yellow-800 text-xs font-medium">
-            {source.match_keys[0].label}
-            <button type="button" onClick={clearKey} className="hover:text-red-500 leading-none">×</button>
+      <div className="flex-1 min-h-9 rounded border border-gray-300 bg-white px-2 py-1 flex flex-wrap gap-1 items-center">
+        {source.match_keys.map(k => (
+          <span key={k.value} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-yellow-100 text-yellow-800 text-xs font-medium">
+            {k.label}
+            <button type="button" onClick={() => onChange({ ...source, match_keys: source.match_keys.filter(mk => mk.value !== k.value) })}
+              className="hover:text-red-500 leading-none">×</button>
           </span>
-        ) : null}
-        <MatchKeyDropdown options={matchKeyOptions} selectedKey={selectedKey} onSelect={selectKey} />
+        ))}
+        <MatchKeyDropdown
+          options={matchKeyOptions}
+          selectedKeys={selectedKeys}
+          onToggle={opt => {
+            const exists = selectedKeys.includes(opt.fieldKey)
+            const newKeys = exists
+              ? source.match_keys.filter(k => k.value !== opt.fieldKey)
+              : [...source.match_keys, { value: opt.fieldKey, label: opt.label }]
+            onChange({ ...source, match_keys: newKeys })
+          }}
+        />
       </div>
-      <button type="button" onClick={onRemove} className="text-gray-300 hover:text-red-400 text-lg leading-none">×</button>
+      <button type="button" onClick={onRemove} className="mt-2 text-gray-300 hover:text-red-400 text-lg leading-none">×</button>
     </div>
   )
 }
@@ -198,14 +195,10 @@ function EditPanel({ node, coreInfoOptions, summaryOptions, structureOptions, va
   }, [node.structure_template_id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // 记录最新待保存的 patch，供 cleanup flush 使用
-  const pendingPatch = useRef<Record<string, unknown> | null>(null)
 
   const save = useCallback((patch: Record<string, unknown>) => {
-    pendingPatch.current = patch
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(async () => {
-      pendingPatch.current = null
       setSaving(true)
       try {
         await structureTemplateService.update(node.structure_template_id, patch)
@@ -213,17 +206,6 @@ function EditPanel({ node, coreInfoOptions, summaryOptions, structureOptions, va
         setSaving(false)
       }
     }, 600)
-  }, [node.structure_template_id])
-
-  // 组件销毁（切换节点）时立即 flush 未保存的修改
-  useEffect(() => {
-    return () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current)
-      if (pendingPatch.current) {
-        structureTemplateService.update(node.structure_template_id, pendingPatch.current)
-        pendingPatch.current = null
-      }
-    }
   }, [node.structure_template_id])
 
   const handleDelete = async () => {
