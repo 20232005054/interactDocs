@@ -16,7 +16,7 @@ import CoreInfoPanel from "@/components/editor/CoreInfoPanel"
 import SummaryPanel from "@/components/editor/SummaryPanel"
 import AIChatPanel from "@/components/editor/AIChatPanel"
 import { useDocumentSSE } from "@/hooks/useDocumentSSE"
-import ApplyTemplatePanel from "@/components/editor/ApplyTemplatePanel"
+import ApplyTemplateModal from "@/components/editor/ApplyTemplateModal"
 
 // 占位组件，后续步骤替换
 function DocumentBodyPlaceholder() {
@@ -45,6 +45,7 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showApplyTemplate, setShowApplyTemplate] = useState(false)
+  const [templateId, setTemplateId] = useState<string | null>(null)
 
   // SSE 订阅文档变更事件
   useDocumentSSE({ documentId, enabled: !loading && !error })
@@ -62,6 +63,7 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
       setFullContent(documentId, docDetail.title, fullContent.tree)
       setSummaries(summaryRes.summaries)
       setCoreInfoTree(coreInfoRes.items)
+      setTemplateId(docDetail.template_id ?? null)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "加载失败")
     } finally {
@@ -120,10 +122,12 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
         documentId={documentId}
       />
 
-      {/* 应用模板面板 */}
-      {showApplyTemplate && (
-        <ApplyTemplatePanel
+      {/* 应用模板弹窗 */}
+      {showApplyTemplate && templateId && (
+        <ApplyTemplateModal
           documentId={documentId}
+          templateId={templateId}
+          docTitle={documentTitle ?? ""}
           onClose={() => setShowApplyTemplate(false)}
           onApplied={load}
         />
