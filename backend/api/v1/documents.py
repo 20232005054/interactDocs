@@ -1,4 +1,6 @@
 from services.document_service import DocumentService
+from services.template_apply_service import TemplateApplyService
+from services.document_snapshot_service import DocumentSnapshotService
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
@@ -98,7 +100,7 @@ async def delete_document(document_id: UUID, db: AsyncSession = Depends(get_db))
 
 @router.get("/{document_id}/snapshots", summary="获取文档快照列表", response_model=ResponseModel[SnapshotListResponse])
 async def get_document_snapshots(document_id: UUID, db: AsyncSession = Depends(get_db)):
-    snapshots = await DocumentService.get_document_snapshots(db, document_id)
+    snapshots = await DocumentSnapshotService.get_document_snapshots(db, document_id)
     return success_response(data=SnapshotListResponse(
         snapshots=[SnapshotResponse(**s) for s in snapshots]
     ))
@@ -106,13 +108,13 @@ async def get_document_snapshots(document_id: UUID, db: AsyncSession = Depends(g
 
 @router.get("/{document_id}/snapshots/detail/{snapshot_id}", summary="获取快照详情", response_model=ResponseModel[SnapshotResponse])
 async def get_snapshot_detail(document_id: UUID, snapshot_id: UUID, db: AsyncSession = Depends(get_db)):
-    snapshot = await DocumentService.get_snapshot_detail(db, document_id, snapshot_id)
+    snapshot = await DocumentSnapshotService.get_snapshot_detail(db, document_id, snapshot_id)
     return success_response(data=SnapshotResponse(**snapshot))
 
 
 @router.post("/{document_id}/snapshots", summary="创建文档快照", response_model=ResponseModel[SnapshotResponse])
 async def create_document_snapshot(document_id: UUID, db: AsyncSession = Depends(get_db)):
-    snapshot = await DocumentService.create_document_snapshot(db, document_id)
+    snapshot = await DocumentSnapshotService.create_document_snapshot(db, document_id)
     return success_response(data=SnapshotResponse(**snapshot))
 
 
@@ -123,7 +125,7 @@ async def update_snapshot(
     current_user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    snapshot = await DocumentService.update_snapshot(db, snapshot_id, snapshot_in.description)
+    snapshot = await DocumentSnapshotService.update_snapshot(db, snapshot_id, snapshot_in.description)
     return success_response(data=SnapshotResponse(**snapshot))
 
 
@@ -134,7 +136,7 @@ async def restore_snapshot(
     current_user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await DocumentService.restore_snapshot(db, document_id, snapshot_id)
+    result = await DocumentSnapshotService.restore_snapshot(db, document_id, snapshot_id)
     return success_response(message=result["message"])
 
 
@@ -184,7 +186,7 @@ async def get_template_info(document_id: UUID, db: AsyncSession = Depends(get_db
 
 @router.post("/{document_id}/apply-core-info-template", summary="应用核心信息模板", response_model=ResponseModel[ApplyCoreInfoResponse])
 async def apply_core_info_template(document_id: UUID, db: AsyncSession = Depends(get_db)):
-    created_items = await DocumentService.apply_core_info_template(db, document_id)
+    created_items = await TemplateApplyService.apply_core_info_template(db, document_id)
 
     info_dict_map = {}
     for item in created_items:
@@ -226,7 +228,7 @@ async def apply_core_info_template(document_id: UUID, db: AsyncSession = Depends
 @router.post("/{document_id}/apply-summary-template", summary="应用摘要模板", response_model=ResponseModel[ApplySummaryResponse])
 async def apply_summary_template(document_id: UUID, db: AsyncSession = Depends(get_db)):
     from schemas.response_schemas import ApplySummaryItem
-    created_items = await DocumentService.apply_summary_template(db, document_id)
+    created_items = await TemplateApplyService.apply_summary_template(db, document_id)
     return success_response(data=ApplySummaryResponse(
         message=f"成功创建 {len(created_items)} 个摘要",
         items=[
@@ -249,7 +251,7 @@ async def apply_summary_template(document_id: UUID, db: AsyncSession = Depends(g
 @router.post("/{document_id}/apply-structure-template", summary="应用文章结构模板", response_model=ResponseModel[ApplyStructureResponse])
 async def apply_structure_template(document_id: UUID, db: AsyncSession = Depends(get_db)):
     from schemas.response_schemas import ApplyStructureItem
-    created_items = await DocumentService.apply_structure_template(db, document_id)
+    created_items = await TemplateApplyService.apply_structure_template(db, document_id)
     return success_response(data=ApplyStructureResponse(
         message=f"成功创建 {len(created_items)} 个章节",
         items=[
