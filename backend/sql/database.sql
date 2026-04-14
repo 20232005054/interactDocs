@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS chapters (
     document_id UUID NOT NULL REFERENCES documents(document_id) ON DELETE CASCADE,
     parent_id UUID REFERENCES chapters(chapter_id) ON DELETE CASCADE,
     title VARCHAR(200) NOT NULL DEFAULT '',
+    field_key VARCHAR(50),
     status INTEGER DEFAULT 0,
     order_index INTEGER NOT NULL DEFAULT 0,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
