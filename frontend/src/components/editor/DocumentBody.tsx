@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useCallback, useState } from "react"
+import { useRef, useCallback, useState, useEffect } from "react"
 import { paragraphService } from "@/services/paragraphService"
 import { chapterService } from "@/services/chapterService"
 import { useDocumentStore } from "@/store/documentStore"
@@ -48,7 +48,17 @@ function ParagraphRow({ paragraph, chapterId, onReload }: ParagraphRowProps) {
   const [saving, setSaving] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const isActive = activeParagraphId === paragraph.paragraph_id
+
+  // 初始渲染后自动撑高 textarea
+  useEffect(() => {
+    const el = textareaRef.current
+    if (el) {
+      el.style.height = "auto"
+      el.style.height = `${el.scrollHeight}px`
+    }
+  }, [localContent])
 
   const handleChange = (val: string) => {
     setLocalContent(val)
@@ -148,6 +158,7 @@ function ParagraphRow({ paragraph, chapterId, onReload }: ParagraphRowProps) {
       {/* 编辑区 */}
       <div className="flex-1 min-w-0">
         <textarea
+          ref={textareaRef}
           value={localContent}
           onChange={e => handleChange(e.target.value)}
           onFocus={() => setActiveParagraphId(paragraph.paragraph_id)}
