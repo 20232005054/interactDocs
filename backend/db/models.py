@@ -31,6 +31,7 @@ class Document(Base):
     versions = relationship("DocumentVersion", back_populates="document", cascade="all, delete-orphan")
     chat_records = relationship("ChatRecord", back_populates="document", cascade="all, delete-orphan")
     summaries = relationship("DocumentSummary", back_populates="document", cascade="all, delete-orphan")
+    core_info = relationship("DocumentCoreInfo", back_populates="document", cascade="all, delete-orphan")
 
 
 class Chapter(Base):
@@ -158,7 +159,7 @@ class DocumentCoreInfo(Base):
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
     
     # 关系
-    document = relationship("Document", backref="core_info")
+    document = relationship("Document", back_populates="core_info")
     parent = relationship("DocumentCoreInfo", remote_side=[core_info_id], backref="children")
 
 class Template(Base):

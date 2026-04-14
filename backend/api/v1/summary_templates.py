@@ -5,13 +5,23 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from core.response import success_response, ResponseModel
-from core.auth import get_editor_user
+from core.auth import get_editor_user, get_current_user
+from core.constants import UserRole
 from db.session import get_db
 from services.summary_template_service import SummaryTemplateService
+from services.template_service import TemplateService
 from schemas.schemas import SummaryTemplateCreate, SummaryTemplateUpdate
 from schemas.response_schemas import SummaryTemplateResponse, SummaryTemplateListResponse
 
 router = APIRouter(prefix="/api/v1/summary-templates", tags=["摘要模板管理"])
+
+
+async def _check_template_permission(db, template_id: UUID, current_user):
+    """系统模板只有 editor/admin 可写，私有模板所有登录用户可写"""
+    tpl = await TemplateService.get_template(db, template_id)
+    if tpl and tpl.is_system and current_user.role not in (UserRole.EDITOR, UserRole.ADMIN):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="系统模板需要编辑权限")
 
 
 class SummaryTemplateInsertAfter(BaseModel):
@@ -60,7 +70,8 @@ async def get_by_id(summary_template_id: UUID, db: AsyncSession = Depends(get_db
 
 
 @router.post("", summary="创建摘要模板", response_model=ResponseModel[SummaryTemplateResponse])
-async def create(data: SummaryTemplateCreate, editor=Depends(get_editor_user), db: AsyncSession = Depends(get_db)):
+async def create(data: SummaryTemplateCreate, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await _check_template_permission(db, data.template_id, current_user)
     template = await SummaryTemplateService.create(
         db,
         template_id=data.template_id,
@@ -76,7 +87,10 @@ async def create(data: SummaryTemplateCreate, editor=Depends(get_editor_user), d
 
 
 @router.put("/{summary_template_id}", summary="更新摘要模板", response_model=ResponseModel[SummaryTemplateResponse])
-async def update(summary_template_id: UUID, data: SummaryTemplateUpdate, editor=Depends(get_editor_user), db: AsyncSession = Depends(get_db)):
+async def update(summary_template_id: UUID, data: SummaryTemplateUpdate, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    template_rec = await SummaryTemplateService.get_by_id(db, summary_template_id)
+    if template_rec:
+        await _check_template_permission(db, template_rec.template_id, current_user)
     update_data = data.dict(exclude_unset=True)
     if not update_data:
         raise HTTPException(status_code=400, detail="没有要更新的数据")
@@ -88,13 +102,17 @@ async def update(summary_template_id: UUID, data: SummaryTemplateUpdate, editor=
 
 
 @router.delete("/{summary_template_id}", summary="删除摘要模板")
-async def delete(summary_template_id: UUID, editor=Depends(get_editor_user), db: AsyncSession = Depends(get_db)):
+async def delete(summary_template_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    template_rec = await SummaryTemplateService.get_by_id(db, summary_template_id)
+    if template_rec:
+        await _check_template_permission(db, template_rec.template_id, current_user)
     await SummaryTemplateService.delete(db, summary_template_id)
     return success_response(message="删除成功")
 
 
 @router.post("/template/{template_id}/insert-after", summary="在指定节点后插入摘要模板", response_model=ResponseModel[SummaryTemplateResponse])
-async def insert_after(template_id: UUID, data: SummaryTemplateInsertAfter, editor=Depends(get_editor_user), db: AsyncSession = Depends(get_db)):
+async def insert_after(template_id: UUID, data: SummaryTemplateInsertAfter, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await _check_template_permission(db, template_id, current_user)
     try:
         template = await SummaryTemplateService.insert_after(
             db, template_id, data.after_id, data.model_dump(exclude={"after_id"})
@@ -105,6 +123,7 @@ async def insert_after(template_id: UUID, data: SummaryTemplateInsertAfter, edit
 
 
 @router.post("/template/{template_id}/reorder", summary="拖拽重排摘要模板")
-async def reorder(template_id: UUID, data: SummaryTemplateReorder, editor=Depends(get_editor_user), db: AsyncSession = Depends(get_db)):
+async def reorder(template_id: UUID, data: SummaryTemplateReorder, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await _check_template_permission(db, template_id, current_user)
     await SummaryTemplateService.reorder(db, template_id, data.ordered_ids)
     return success_response(message="排序更新成功")

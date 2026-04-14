@@ -33,7 +33,7 @@ export function useDocumentSSE({ documentId, enabled = true }: UseDocumentSSEOpt
         const updated = await summaryService.get(event.summary_id)
         updateSummary(updated.summary_id, updated)
       } catch {
-        // 静默失败，不影响主流程
+        // 静默失败
       }
     }
 
@@ -62,31 +62,36 @@ export function useDocumentSSE({ documentId, enabled = true }: UseDocumentSSEOpt
       .then(async res => {
         if (!res.ok || !res.body) throw new Error(`SSE 连接失败: ${res.status}`)
 
-        retryCountRef.current = 0 // 连接成功，重置重试计数
+        retryCountRef.current = 0
         const reader = res.body.getReader()
         readerRef.current = reader
         const decoder = new TextDecoder()
         let buffer = ""
 
-        while (mountedRef.current) {
-          const { done, value } = await reader.read()
-          if (done) break
+        try {
+          while (mountedRef.current) {
+            const { done, value } = await reader.read()
+            if (done) break
+            buffer += decoder.decode(value, { stream: true })
+            const lines = buffer.split("\n")
+            buffer = lines.pop() ?? ""
 
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split("\n")
-          buffer = lines.pop() ?? ""
-
-          for (const line of lines) {
-            if (!line.startsWith("data: ")) continue
-            const raw = line.slice(6).trim()
-            if (!raw || raw === "[DONE]") continue
-            try {
-              const event: SSEEvent = JSON.parse(raw)
-              handleEvent(event)
-            } catch {
-              // 忽略解析错误
+            for (const line of lines) {
+              if (!line.startsWith("data: ")) continue
+              const raw = line.slice(6).trim()
+              if (!raw || raw === "[DONE]") continue
+              try {
+                const event: SSEEvent = JSON.parse(raw)
+                handleEvent(event)
+              } catch {
+                // 忽略解析错误
+              }
             }
           }
+        } catch (err: unknown) {
+          // 主动 abort 触发的 AbortError 静默忽略，不往上抛
+          if ((err as Error)?.name === "AbortError") return
+          throw err
         }
       })
       .catch(err => {
@@ -109,7 +114,7 @@ export function useDocumentSSE({ documentId, enabled = true }: UseDocumentSSEOpt
     return () => {
       mountedRef.current = false
       abortRef.current?.abort()
-      readerRef.current?.cancel()
+      readerRef.current?.cancel().catch(() => {})
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
     }
   }, [connect, enabled])
