@@ -14,14 +14,13 @@ from uuid import UUID
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import HTTPException, status
-
-# JWT 配置，从环境变量读取
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-this-in-production")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "10080"))  # 默认 7 天
+from core.config import JWT_SECRET_KEY, JWT_ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 
 # bcrypt 密码哈希上下文
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+SECRET_KEY = JWT_SECRET_KEY
+ALGORITHM = JWT_ALGORITHM
 
 
 def hash_password(password: str) -> str:

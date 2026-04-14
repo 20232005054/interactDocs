@@ -1,10 +1,12 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Depends
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer
+from fastapi.exceptions import HTTPException, RequestValidationError
 from api.v1 import documents, chapters, paragraphs, ai, endpoints, summaries, templates, core_info, core_info_templates, summary_templates, structure_templates
-from api.v1 import auth, upload, events
+from api.v1 import auth, upload, events, export
 from api.v1.admin import users as admin_users, documents as admin_documents, stats as admin_stats
-from core.response import generic_exception_handler
+from core.response import http_exception_handler, validation_exception_handler, generic_exception_handler
 from core.security import decode_token
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,13 +22,24 @@ except ImportError:
 # auto_error=False 表示不在这里报错，实际鉴权由 Middleware 处理
 _bearer = HTTPBearer(auto_error=False)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from services import event_bus
+    await event_bus.init()
+    yield
+
+
 app = FastAPI(
     title="方案生成系统",
     version="1.0.0",
     timeout=300,
     swagger_ui_parameters={"persistAuthorization": True},  # Swagger 刷新后保留 token
+    lifespan=lifespan,
 )
 
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(Exception, generic_exception_handler)
 
 app.add_middleware(
@@ -56,21 +69,14 @@ async def auth_middleware(request: Request, call_next):
         return await call_next(request)
 
     auth_header = request.headers.get("Authorization", "")
-    scheme, _, token = auth_header.partition(" ")
+    if not auth_header.startswith("Bearer "):
+        return JSONResponse(status_code=200, content={"code": 401, "message": "未提供认证凭据", "data": None})
 
-    if scheme.lower() != "bearer" or not token.strip():
-        return JSONResponse(
-            status_code=401,
-            content={"code": 401, "message": "未提供认证凭据", "data": None},
-        )
-
+    token = auth_header.removeprefix("Bearer ").strip()
     try:
         decode_token(token.strip())
     except Exception:
-        return JSONResponse(
-            status_code=401,
-            content={"code": 401, "message": "无效的认证凭据", "data": None},
-        )
+        return JSONResponse(status_code=200, content={"code": 401, "message": "无效的认证凭据", "data": None})
 
     return await call_next(request)
 
@@ -92,6 +98,7 @@ app.include_router(summary_templates.router, dependencies=_auth_dep)
 app.include_router(structure_templates.router, dependencies=_auth_dep)
 app.include_router(upload.router, dependencies=_auth_dep)
 app.include_router(events.router, dependencies=_auth_dep)
+app.include_router(export.router, dependencies=_auth_dep)
 # 用户认证（公开，不加 Bearer）
 app.include_router(auth.router)
 # 管理员（已有 get_admin_user Depends，不需要额外加）

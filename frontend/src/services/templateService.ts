@@ -1,192 +1,156 @@
-export interface Template {
-  template_id: string;
-  group_id: string;
-  purpose: string;
-  display_name: string;
-  content: {
-    description: string;
-    default_prompt: string;
-  };
-  version: number;
-  is_system: boolean;
-  user_id: string | null;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
+import request from "@/lib/request"
+import type {
+  Template,
+  TemplateDetail,
+  TemplateListResponse,
+  TemplateListParams,
+  CreateTemplatePayload,
+  UpdateTemplatePayload,
+  CoreInfoTemplate,
+  CoreInfoTemplateListResponse,
+  CreateCoreInfoTemplatePayload,
+  UpdateCoreInfoTemplatePayload,
+  CoreInfoTemplateReorderPayload,
+  SummaryTemplate,
+  SummaryTemplateListResponse,
+  CreateSummaryTemplatePayload,
+  UpdateSummaryTemplatePayload,
+  StructureTemplate,
+  StructureTemplateTreeResponse,
+  CreateStructureTemplatePayload,
+  UpdateStructureTemplatePayload,
+  StructureTemplateReorderPayload,
+} from "@/types/api"
 
-export interface TemplateListResponse {
-  items: Template[];
-}
-
-export interface PurposeListResponse {
-  purposes: string[];
-}
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
-
+// ============================================================
+// 模板主表
+// ============================================================
 export const templateService = {
-  // 获取模板列表
-  async getTemplates(
-    purpose?: string,
-    is_system?: boolean,
-    is_active?: boolean
-  ): Promise<Template[]> {
-    try {
-      const params = new URLSearchParams();
-      if (purpose) params.append('purpose', purpose);
-      if (is_system !== undefined) params.append('is_system', is_system.toString());
-      if (is_active !== undefined) params.append('is_active', is_active.toString());
+  list: (params?: TemplateListParams): Promise<TemplateListResponse> =>
+    request.get("/api/v1/templates", { params }),
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/templates?${params.toString()}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch templates');
-      }
+  get: (templateId: string): Promise<TemplateDetail> =>
+    request.get(`/api/v1/templates/${templateId}`),
 
-      const data = await response.json();
-      return data.data.items;
-    } catch (error) {
-      console.error('Error fetching templates:', error);
-      return [];
-    }
-  },
+  create: (payload: CreateTemplatePayload): Promise<TemplateDetail> =>
+    request.post("/api/v1/templates", null, { params: {
+      purpose: payload.purpose,
+      display_name: payload.display_name,
+      content: payload.content,
+      is_system: payload.is_system ?? false,
+    }}),
 
-  // 获取模板详情
-  async getTemplate(templateId: string): Promise<Template | null> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/templates/${templateId}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch template');
-      }
+  update: (templateId: string, payload: UpdateTemplatePayload): Promise<Template> =>
+    request.put(`/api/v1/templates/${templateId}`, null, { params: payload }),
 
-      const data = await response.json();
-      return data.data;
-    } catch (error) {
-      console.error('Error fetching template:', error);
-      return null;
-    }
-  },
+  delete: (templateId: string): Promise<void> =>
+    request.delete(`/api/v1/templates/${templateId}`),
 
-  // 获取所有模板用途
-  async getPurposes(is_system: boolean = true): Promise<string[]> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/templates/purposes/list?${new URLSearchParams({ is_system: is_system.toString() })}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch purposes');
-      }
+  rollback: (templateId: string): Promise<Template> =>
+    request.post(`/api/v1/templates/rollback/${templateId}`),
 
-      const data = await response.json();
-      return data.data.purposes;
-    } catch (error) {
-      console.error('Error fetching purposes:', error);
-      return [];
-    }
-  },
+  getPurposes: (isSystem = true): Promise<{ purposes: string[] }> =>
+    request.get("/api/v1/templates/purposes/list", { params: { is_system: isSystem } }),
+}
 
-  // 创建模板
-  async createTemplate(
-    purpose: string,
-    display_name: string,
-    content: { description: string; default_prompt: string },
-    is_system: boolean = false,
-    user_id: string | null = null
-  ): Promise<Template | null> {
-    try {
-      const params = new URLSearchParams();
-      params.append('purpose', purpose);
-      params.append('display_name', display_name);
-      params.append('content', JSON.stringify(content));
-      params.append('is_system', is_system.toString());
-      if (user_id) params.append('user_id', user_id);
+// ============================================================
+// 核心信息模板
+// ============================================================
+export const coreInfoTemplateService = {
+  getByTemplate: (templateId: string): Promise<CoreInfoTemplateListResponse> =>
+    request.get(`/api/v1/core-info-templates/template/${templateId}`),
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/templates?${params.toString()}`, {
-        method: 'POST',
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to create template');
-      }
+  getById: (coreTemplateId: string): Promise<CoreInfoTemplate> =>
+    request.get(`/api/v1/core-info-templates/${coreTemplateId}`),
 
-      const data = await response.json();
-      return data.data;
-    } catch (error) {
-      console.error('Error creating template:', error);
-      return null;
-    }
-  },
+  create: (payload: CreateCoreInfoTemplatePayload): Promise<CoreInfoTemplate> =>
+    request.post("/api/v1/core-info-templates", payload),
 
-  // 更新模板
-  async updateTemplate(
-    templateId: string,
-    updates: Partial<{
-      purpose: string;
-      display_name: string;
-      content: { description: string; default_prompt: string };
-      is_system: boolean;
-      is_active: boolean;
-    }>
-  ): Promise<Template | null> {
-    try {
-      const params = new URLSearchParams();
-      if (updates.purpose) params.append('purpose', updates.purpose);
-      if (updates.display_name) params.append('display_name', updates.display_name);
-      if (updates.content) params.append('content', JSON.stringify(updates.content));
-      if (updates.is_system !== undefined) params.append('is_system', updates.is_system.toString());
-      if (updates.is_active !== undefined) params.append('is_active', updates.is_active.toString());
+  insertAfter: (templateId: string, payload: {
+    after_id: string
+    field_name: string
+    field_type?: string
+    default_value?: string | null
+    options?: string[] | null
+    is_required?: boolean
+  }): Promise<CoreInfoTemplate> =>
+    request.post(`/api/v1/core-info-templates/template/${templateId}/insert-after`, payload),
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/templates/${templateId}?${params.toString()}`, {
-        method: 'PUT',
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to update template');
-      }
+  update: (coreTemplateId: string, payload: UpdateCoreInfoTemplatePayload): Promise<CoreInfoTemplate> =>
+    request.put(`/api/v1/core-info-templates/${coreTemplateId}`, payload),
 
-      const data = await response.json();
-      return data.data;
-    } catch (error) {
-      console.error('Error updating template:', error);
-      return null;
-    }
-  },
+  delete: (coreTemplateId: string): Promise<void> =>
+    request.delete(`/api/v1/core-info-templates/${coreTemplateId}`),
 
-  // 删除模板
-  async deleteTemplate(templateId: string): Promise<boolean> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/templates/${templateId}`, {
-        method: 'DELETE',
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to delete template');
-      }
+  reorder: (templateId: string, payload: CoreInfoTemplateReorderPayload): Promise<void> =>
+    request.post(`/api/v1/core-info-templates/template/${templateId}/reorder`, payload),
+}
 
-      return true;
-    } catch (error) {
-      console.error('Error deleting template:', error);
-      return false;
-    }
-  },
+// ============================================================
+// 摘要模板
+// ============================================================
+export const summaryTemplateService = {
+  getByTemplate: (templateId: string): Promise<SummaryTemplateListResponse> =>
+    request.get(`/api/v1/summary-templates/template/${templateId}`),
 
-  // 回退模板
-  async rollbackTemplate(templateId: string): Promise<Template | null> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/templates/rollback/${templateId}`, {
-        method: 'POST',
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to rollback template');
-      }
+  getById: (summaryTemplateId: string): Promise<SummaryTemplate> =>
+    request.get(`/api/v1/summary-templates/${summaryTemplateId}`),
 
-      const data = await response.json();
-      return data.data;
-    } catch (error) {
-      console.error('Error rolling back template:', error);
-      return null;
-    }
-  },
-};
+  create: (payload: CreateSummaryTemplatePayload): Promise<SummaryTemplate> =>
+    request.post("/api/v1/summary-templates", payload),
+
+  insertAfter: (templateId: string, payload: {
+    after_id: string
+    title: string
+    generation_mode?: number
+    content_template?: string | null
+    sources?: unknown[] | null
+    default_prompt?: string | null
+    custom_prompt?: string | null
+  }): Promise<SummaryTemplate> =>
+    request.post(`/api/v1/summary-templates/template/${templateId}/insert-after`, payload),
+
+  update: (summaryTemplateId: string, payload: UpdateSummaryTemplatePayload): Promise<SummaryTemplate> =>
+    request.put(`/api/v1/summary-templates/${summaryTemplateId}`, payload),
+
+  delete: (summaryTemplateId: string): Promise<void> =>
+    request.delete(`/api/v1/summary-templates/${summaryTemplateId}`),
+
+  reorder: (templateId: string, payload: { ordered_ids: string[] }): Promise<void> =>
+    request.post(`/api/v1/summary-templates/template/${templateId}/reorder`, payload),
+}
+
+// ============================================================
+// 章节结构模板
+// ============================================================
+export const structureTemplateService = {
+  getByTemplate: (templateId: string): Promise<StructureTemplateTreeResponse> =>
+    request.get(`/api/v1/structure-templates/template/${templateId}/tree`),
+
+  getById: (structureTemplateId: string): Promise<StructureTemplate> =>
+    request.get(`/api/v1/structure-templates/${structureTemplateId}`),
+
+  create: (payload: CreateStructureTemplatePayload): Promise<StructureTemplate> =>
+    request.post("/api/v1/structure-templates", payload),
+
+  insertAfter: (templateId: string, payload: {
+    after_id: string
+    title: string
+    level: number
+    generation_mode?: number
+    content_template?: string | null
+    sources?: unknown[] | null
+    default_prompt?: string | null
+    custom_prompt?: string | null
+  }): Promise<StructureTemplate> =>
+    request.post(`/api/v1/structure-templates/template/${templateId}/insert-after`, payload),
+
+  update: (structureTemplateId: string, payload: UpdateStructureTemplatePayload): Promise<StructureTemplate> =>
+    request.put(`/api/v1/structure-templates/${structureTemplateId}`, payload),
+
+  delete: (structureTemplateId: string): Promise<void> =>
+    request.delete(`/api/v1/structure-templates/${structureTemplateId}`),
+
+  reorder: (templateId: string, payload: StructureTemplateReorderPayload): Promise<void> =>
+    request.post(`/api/v1/structure-templates/template/${templateId}/reorder`, payload),
+}

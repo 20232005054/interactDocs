@@ -51,14 +51,9 @@ class DependencyService:
     ):
         """
         获取上游依赖（当前实体依赖了什么）
-        
+
         Args:
-            db: 数据库会话
-            entity_type: 实体类型 (paragraph/summary/keyword)
-            entity_id: 实体ID
-            
-        Returns:
-            上游依赖列表，每个元素包含 target_type, target_id, edge_id, relevance_score
+            entity_type: 实体类型 (paragraph/chapter/summary/core_info)
         """
         # 查找当前实体作为源的依赖边
         # 即：source_type = entity_type, source_id = entity_id
@@ -86,14 +81,9 @@ class DependencyService:
     ):
         """
         获取下游依赖（什么依赖了当前实体）
-        
+
         Args:
-            db: 数据库会话
-            entity_type: 实体类型 (paragraph/summary/keyword)
-            entity_id: 实体ID
-            
-        Returns:
-            下游依赖列表，每个元素包含 source_type, source_id, edge_id, relevance_score
+            entity_type: 实体类型 (paragraph/chapter/summary/core_info)
         """
         # 查找当前实体作为目标的依赖边
         # 即：target_type = entity_type, target_id = entity_id
@@ -131,21 +121,7 @@ class DependencyService:
         entity_type: str,
         entity_id: UUID
     ):
-        """
-        同时获取上下游依赖
-        
-        Args:
-            db: 数据库会话
-            entity_type: 实体类型 (paragraph/summary/keyword)
-            entity_id: 实体ID
-            
-        Returns:
-            包含上游和下游依赖的字典
-            {
-                "upstream": [...],  # 上游依赖列表
-                "downstream": [...]  # 下游依赖列表
-            }
-        """
+        """同时获取上下游依赖，entity_type 支持 paragraph/chapter/summary/core_info"""
         # 并行获取上下游依赖
         upstream = await DependencyService.get_upstream_dependencies(
             db, entity_type, entity_id

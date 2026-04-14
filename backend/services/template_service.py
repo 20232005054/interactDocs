@@ -37,11 +37,19 @@ class TemplateService:
         return await TemplateMapper.get_template(db, template_id)
     
     @staticmethod
-    async def list_templates(db: AsyncSession, purpose: str = None, is_system: bool = None, is_active: bool = None):
+    async def list_templates(
+        db: AsyncSession,
+        purpose: str = None,
+        is_system: bool = None,
+        is_active: bool = None,
+        keyword: str = None,
+        page: int = 1,
+        page_size: int = 20,
+    ):
         """
-        获取模板列表
+        获取模板列表（支持分页和关键词搜索）
         """
-        return await TemplateMapper.list_templates(db, purpose, is_system, is_active)
+        return await TemplateMapper.list_templates(db, purpose, is_system, is_active, keyword, page, page_size)
     
     @staticmethod
     async def get_distinct_purposes(db: AsyncSession, is_system: bool = True):

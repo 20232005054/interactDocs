@@ -5,13 +5,22 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from core.response import success_response, ResponseModel
-from core.auth import get_editor_user
+from core.auth import get_editor_user, get_current_user
+from core.constants import UserRole
 from db.session import get_db
 from services.structure_template_service import StructureTemplateService
+from services.template_service import TemplateService
 from schemas.schemas import StructureTemplateCreate, StructureTemplateUpdate
 from schemas.response_schemas import StructureTemplateResponse, StructureTemplateListResponse, StructureTemplateTreeResponse
 
 router = APIRouter(prefix="/api/v1/structure-templates", tags=["文章结构模板管理"])
+
+
+async def _check_template_permission(db, template_id: UUID, current_user):
+    tpl = await TemplateService.get_template(db, template_id)
+    if tpl and tpl.is_system and current_user.role not in (UserRole.EDITOR, UserRole.ADMIN):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="系统模板需要编辑权限")
 
 
 class StructureTemplateInsertAfter(BaseModel):
@@ -88,7 +97,8 @@ async def get_by_id(structure_template_id: UUID, db: AsyncSession = Depends(get_
 
 
 @router.post("", summary="创建结构模板", response_model=ResponseModel[StructureTemplateResponse])
-async def create(data: StructureTemplateCreate, editor=Depends(get_editor_user), db: AsyncSession = Depends(get_db)):
+async def create(data: StructureTemplateCreate, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await _check_template_permission(db, data.template_id, current_user)
     template = await StructureTemplateService.create(
         db,
         template_id=data.template_id,
@@ -106,7 +116,10 @@ async def create(data: StructureTemplateCreate, editor=Depends(get_editor_user),
 
 
 @router.put("/{structure_template_id}", summary="更新结构模板", response_model=ResponseModel[StructureTemplateResponse])
-async def update(structure_template_id: UUID, data: StructureTemplateUpdate, editor=Depends(get_editor_user), db: AsyncSession = Depends(get_db)):
+async def update(structure_template_id: UUID, data: StructureTemplateUpdate, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    tpl_rec = await StructureTemplateService.get_by_id(db, structure_template_id)
+    if tpl_rec:
+        await _check_template_permission(db, tpl_rec.template_id, current_user)
     update_data = {}
     for k, v in data.dict(exclude_unset=True).items():
         if k == "sources" and v is not None:
@@ -123,13 +136,17 @@ async def update(structure_template_id: UUID, data: StructureTemplateUpdate, edi
 
 
 @router.delete("/{structure_template_id}", summary="删除结构模板")
-async def delete(structure_template_id: UUID, editor=Depends(get_editor_user), db: AsyncSession = Depends(get_db)):
+async def delete(structure_template_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    tpl_rec = await StructureTemplateService.get_by_id(db, structure_template_id)
+    if tpl_rec:
+        await _check_template_permission(db, tpl_rec.template_id, current_user)
     await StructureTemplateService.delete(db, structure_template_id)
     return success_response(message="删除成功")
 
 
 @router.post("/template/{template_id}/insert-after", summary="在指定节点后插入结构模板", response_model=ResponseModel[StructureTemplateResponse])
-async def insert_after(template_id: UUID, data: StructureTemplateInsertAfter, editor=Depends(get_editor_user), db: AsyncSession = Depends(get_db)):
+async def insert_after(template_id: UUID, data: StructureTemplateInsertAfter, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await _check_template_permission(db, template_id, current_user)
     try:
         template = await StructureTemplateService.insert_after(
             db, template_id, data.after_id, data.model_dump(exclude={"after_id"})
@@ -140,7 +157,8 @@ async def insert_after(template_id: UUID, data: StructureTemplateInsertAfter, ed
 
 
 @router.post("/template/{template_id}/reorder", summary="拖拽重排结构模板（支持跨父节点移动）")
-async def reorder(template_id: UUID, data: StructureTemplateReorder, editor=Depends(get_editor_user), db: AsyncSession = Depends(get_db)):
+async def reorder(template_id: UUID, data: StructureTemplateReorder, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await _check_template_permission(db, template_id, current_user)
     try:
         await StructureTemplateService.reorder(db, template_id, data.parent_id, data.ordered_ids)
     except ValueError as e:

@@ -4,13 +4,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
 from core.response import success_response, ResponseModel
-from core.auth import get_editor_user
+from core.auth import get_editor_user, get_current_user
+from core.constants import UserRole
 from db.session import get_db
 from services.core_info_template_service import CoreInfoTemplateService
+from services.template_service import TemplateService
 from schemas.schemas import CoreInfoTemplateCreate, CoreInfoTemplateUpdate, CoreInfoTemplateInsertAfter, CoreInfoTemplateReorder
 from schemas.response_schemas import CoreInfoTemplateResponse, CoreInfoTemplateListResponse
 
 router = APIRouter(prefix="/api/v1/core-info-templates", tags=["核心信息模板管理"])
+
+
+async def _check_template_permission(db, template_id: UUID, current_user):
+    tpl = await TemplateService.get_template(db, template_id)
+    if tpl and tpl.is_system and current_user.role not in (UserRole.EDITOR, UserRole.ADMIN):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="系统模板需要编辑权限")
 
 
 def _ci_template_response(t) -> CoreInfoTemplateResponse:
@@ -64,7 +73,8 @@ async def get_by_id(core_template_id: UUID, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("", summary="创建核心信息模板（追加到同级末尾）", response_model=ResponseModel[CoreInfoTemplateResponse])
-async def create(data: CoreInfoTemplateCreate, editor=Depends(get_editor_user), db: AsyncSession = Depends(get_db)):
+async def create(data: CoreInfoTemplateCreate, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await _check_template_permission(db, data.template_id, current_user)
     template = await CoreInfoTemplateService.create(
         db,
         template_id=data.template_id,
@@ -80,7 +90,8 @@ async def create(data: CoreInfoTemplateCreate, editor=Depends(get_editor_user), 
 
 
 @router.post("/template/{template_id}/insert-after", summary="在指定节点之后插入新节点（同级）", response_model=ResponseModel[CoreInfoTemplateResponse])
-async def insert_after(template_id: UUID, data: CoreInfoTemplateInsertAfter, editor=Depends(get_editor_user), db: AsyncSession = Depends(get_db)):
+async def insert_after(template_id: UUID, data: CoreInfoTemplateInsertAfter, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await _check_template_permission(db, template_id, current_user)
     try:
         template = await CoreInfoTemplateService.insert_after(
             db,
@@ -98,7 +109,8 @@ async def insert_after(template_id: UUID, data: CoreInfoTemplateInsertAfter, edi
 
 
 @router.post("/template/{template_id}/reorder", summary="拖拽重排（同级节点重新排序，支持跨父节点移动）")
-async def reorder(template_id: UUID, data: CoreInfoTemplateReorder, editor=Depends(get_editor_user), db: AsyncSession = Depends(get_db)):
+async def reorder(template_id: UUID, data: CoreInfoTemplateReorder, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await _check_template_permission(db, template_id, current_user)
     try:
         await CoreInfoTemplateService.reorder(db, template_id=template_id, parent_id=data.parent_id, ordered_ids=data.ordered_ids)
     except ValueError as e:
@@ -107,7 +119,10 @@ async def reorder(template_id: UUID, data: CoreInfoTemplateReorder, editor=Depen
 
 
 @router.put("/{core_template_id}", summary="更新核心信息模板", response_model=ResponseModel[CoreInfoTemplateResponse])
-async def update(core_template_id: UUID, data: CoreInfoTemplateUpdate, editor=Depends(get_editor_user), db: AsyncSession = Depends(get_db)):
+async def update(core_template_id: UUID, data: CoreInfoTemplateUpdate, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    tpl_rec = await CoreInfoTemplateService.get_by_id(db, core_template_id)
+    if tpl_rec:
+        await _check_template_permission(db, tpl_rec.template_id, current_user)
     update_data = data.dict(exclude_unset=True)
     if not update_data:
         raise HTTPException(status_code=400, detail="没有要更新的数据")
@@ -119,6 +134,9 @@ async def update(core_template_id: UUID, data: CoreInfoTemplateUpdate, editor=De
 
 
 @router.delete("/{core_template_id}", summary="删除核心信息模板（同级后续节点自动补位）")
-async def delete(core_template_id: UUID, editor=Depends(get_editor_user), db: AsyncSession = Depends(get_db)):
+async def delete(core_template_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    tpl_rec = await CoreInfoTemplateService.get_by_id(db, core_template_id)
+    if tpl_rec:
+        await _check_template_permission(db, tpl_rec.template_id, current_user)
     await CoreInfoTemplateService.delete(db, core_template_id)
     return success_response(message="删除成功")

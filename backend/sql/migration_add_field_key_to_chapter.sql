@@ -1,1 +1,0 @@
-ALTER TABLE chapters ADD COLUMN field_key VARCHAR(50);

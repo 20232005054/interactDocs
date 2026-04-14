@@ -151,7 +151,6 @@ class AIChatRequest(BaseModel):
     document_id: UUID = Field(..., description="所属文档 ID")
     current_chapter_id: Optional[UUID] = None
     selected_paragraphs: Optional[List[Dict]] = Field(None, description="选中的段落信息列表")
-    selected_keywords: Optional[List[Dict]] = Field(None, description="选中的关键词信息列表")
     selected_summaries: Optional[List[Dict]] = Field(None, description="选中的摘要信息列表")
 
 class AIChatResponse(BaseModel):
@@ -163,7 +162,6 @@ class AIRevisionRequest(BaseModel):
     chapter_id: UUID = Field(..., description="章节 ID")
     instruction: str = Field(..., description="修订指令")
     selected_paragraphs: Optional[List[Dict]] = Field(None, description="选中的段落信息列表")
-    selected_keywords: Optional[List[Dict]] = Field(None, description="选中的关键词信息列表")
     selected_summaries: Optional[List[Dict]] = Field(None, description="选中的摘要信息列表")
 
 class AIRevisionResponse(BaseModel):

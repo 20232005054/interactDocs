@@ -288,7 +288,7 @@ async def assist_single_summary(db: AsyncSession, summary_id: UUID, downstream_p
         if new_content:
             await SummaryMapper.update_summary(db, summary_id, {
                 "ai_generate": new_content,
-                "is_change": 3
+                "is_change": 3  # 下游段落变更后 AI 重新生成了摘要建议，置3待用户确认是否采用
             })
         return new_content
     except Exception as e:

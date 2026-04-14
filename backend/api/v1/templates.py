@@ -59,11 +59,19 @@ async def get_template(template_id: UUID, db: AsyncSession = Depends(get_db)):
 
 @router.get("", summary="获取模板列表", response_model=ResponseModel[TemplateListResponse])
 async def list_templates(
-    purpose: Optional[str] = None, is_system: Optional[bool] = None,
-    is_active: Optional[bool] = None, db: AsyncSession = Depends(get_db)
+    purpose: Optional[str] = None,
+    is_system: Optional[bool] = None,
+    is_active: Optional[bool] = None,
+    keyword: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20,
+    db: AsyncSession = Depends(get_db)
 ):
-    templates = await TemplateService.list_templates(db, purpose, is_system, is_active)
-    return success_response(data=TemplateListResponse(items=[_template_response(t) for t in templates]))
+    items, total = await TemplateService.list_templates(db, purpose, is_system, is_active, keyword, page, page_size)
+    return success_response(data=TemplateListResponse(
+        page=page, page_size=page_size, total=total,
+        items=[_template_response(t) for t in items]
+    ))
 
 
 @router.put("/{template_id}", summary="管理员更新模板", response_model=ResponseModel[TemplateResponse])

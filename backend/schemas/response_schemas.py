@@ -24,6 +24,7 @@ class DocumentDetailResponse(DocumentResponse):
 class DocumentListItem(BaseModel):
     document_id: UUID
     title: str
+    purpose: Optional[str] = None
     template_purpose: Optional[str] = None
     template_name: Optional[str] = None
     created_at: datetime
@@ -205,6 +206,9 @@ class TemplateDetailResponse(TemplateResponse):
 
 
 class TemplateListResponse(BaseModel):
+    page: int
+    page_size: int
+    total: int
     items: List[TemplateResponse]
 
 
@@ -307,6 +311,9 @@ class ApplyCoreInfoItem(BaseModel):
     field_type: str
     content: str
     order_index: int
+    is_locked: bool = False
+    is_required: bool = True
+    is_change: int = 0
     children: List['ApplyCoreInfoItem'] = []
 
 
@@ -337,6 +344,8 @@ class ApplySummaryResponse(BaseModel):
 
 class ApplyStructureItem(BaseModel):
     chapter_id: str
+    parent_id: Optional[str] = None
+    field_key: Optional[str] = None
     title: str
     order_index: int
     generation_mode: int
@@ -381,6 +390,7 @@ class RelatedSummaryItem(BaseModel):
     summary_id: UUID
     document_id: UUID
     title: str
+    field_key: Optional[str] = None
     content: str
     version: int
     created_at: datetime
@@ -441,6 +451,43 @@ class OperationHistoryItem(BaseModel):
 class OperationHistoryListResponse(BaseModel):
     total: int
     items: List[OperationHistoryItem]
+
+
+# ============================================================
+# 文档全量内容
+# ============================================================
+
+class FullContentParagraph(BaseModel):
+    paragraph_id: UUID
+    chapter_id: UUID
+    content: str
+    para_type: str
+    order_index: int
+    ai_eval: Optional[str] = None
+    ai_suggestion: Optional[str] = None
+    ai_generate: Optional[str] = None
+    ischange: int
+
+
+class FullContentChapter(BaseModel):
+    chapter_id: UUID
+    document_id: UUID
+    parent_id: Optional[UUID] = None
+    title: str
+    field_key: Optional[str] = None
+    status: int
+    order_index: int
+    updated_at: datetime
+    paragraphs: List[FullContentParagraph] = []
+    children: List['FullContentChapter'] = []
+
+
+FullContentChapter.model_rebuild()
+
+
+class FullContentResponse(BaseModel):
+    document_id: UUID
+    tree: List[FullContentChapter]
 
 
 # ============================================================

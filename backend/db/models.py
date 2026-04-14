@@ -31,6 +31,7 @@ class Document(Base):
     versions = relationship("DocumentVersion", back_populates="document", cascade="all, delete-orphan")
     chat_records = relationship("ChatRecord", back_populates="document", cascade="all, delete-orphan")
     summaries = relationship("DocumentSummary", back_populates="document", cascade="all, delete-orphan")
+    core_info = relationship("DocumentCoreInfo", back_populates="document", cascade="all, delete-orphan")
 
 
 class Chapter(Base):
@@ -95,8 +96,8 @@ class ChatRecord(Base):
     __tablename__ = "chat_records"
     chat_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"))
-    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.document_id"))
-    chapter_id = Column(UUID(as_uuid=True), ForeignKey("chapters.chapter_id"), nullable=True)
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.document_id", ondelete="CASCADE"))
+    chapter_id = Column(UUID(as_uuid=True), ForeignKey("chapters.chapter_id", ondelete="SET NULL"), nullable=True)
     chapter_content = Column(JSONB, nullable=True)
     role = Column(String(20), default="user")  # user / assistant
     message = Column(Text, nullable=False)
@@ -115,7 +116,7 @@ class DocumentSummary(Base):
     field_key = Column(String(50), nullable=False)
     content = Column(Text, nullable=False)
     version = Column(Integer, nullable=False, default=1)
-    is_change = Column(Integer, nullable=False, default=0)  # 0-无变更，1-有变更
+    is_change = Column(Integer, nullable=False, default=0)  # 0=无变更 1=有变更(待处理) 2=已联动更新(核心信息/摘要变更触发) 3=下游段落变更后AI重新生成(待用户确认)
     ai_generate = Column(Text, nullable=True)  # AI生成的内容
     order_index = Column(Integer, nullable=False, default=0)  # 排序索引
     created_at = Column(TIMESTAMP, server_default=func.now())
@@ -158,7 +159,7 @@ class DocumentCoreInfo(Base):
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
     
     # 关系
-    document = relationship("Document", backref="core_info")
+    document = relationship("Document", back_populates="core_info")
     parent = relationship("DocumentCoreInfo", remote_side=[core_info_id], backref="children")
 
 class Template(Base):
