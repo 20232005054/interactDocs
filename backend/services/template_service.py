@@ -138,6 +138,44 @@ class TemplateService:
         return template
     
     @staticmethod
+    async def list_templates_for_user(
+        db: AsyncSession,
+        user_id: UUID,
+        purpose: str = None,
+        is_active: bool = None,
+        keyword: str = None,
+        page: int = 1,
+        page_size: int = 20,
+    ):
+        """
+        返回系统模板 + 当前用户个人模板库（document_id IS NULL）的合并列表
+        """
+        from sqlalchemy import func, or_, and_
+
+        base_filter = or_(
+            and_(Template.is_system == True, Template.is_active == True),
+            and_(Template.is_system == False, Template.user_id == user_id, Template.document_id == None, Template.is_active == True),
+        )
+
+        query = select(Template).where(base_filter).order_by(Template.is_system.desc(), Template.updated_at.desc())
+
+        if purpose:
+            query = query.where(Template.purpose == purpose)
+        if is_active is not None:
+            # 已在 base_filter 里限定了 is_active=True，此处可额外过滤
+            query = query.where(Template.is_active == is_active)
+        if keyword:
+            query = query.where(Template.display_name.ilike(f"%{keyword}%"))
+
+        count_query = select(func.count()).select_from(query.subquery())
+        total_result = await db.execute(count_query)
+        total = total_result.scalar() or 0
+
+        query = query.offset((page - 1) * page_size).limit(page_size)
+        result = await db.execute(query)
+        return result.scalars().all(), total
+
+    @staticmethod
     async def get_templates_by_purpose(db: AsyncSession, purpose: str, is_system: bool = None, is_active: bool = None):
         """
         根据用途获取模板列表

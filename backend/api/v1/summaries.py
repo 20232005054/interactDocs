@@ -66,7 +66,7 @@ async def update_summary(summary_id: UUID, summary_in: DocumentSummaryUpdate, db
     return success_response(data=_summary_response(updated))
 
 
-@router.delete("/summaries/{summary_id}", summary="删除摘要")
+@router.delete("/summaries/{summary_id}", summary="删除摘要", response_model=ResponseModel[None])
 async def delete_summary(summary_id: UUID, db: AsyncSession = Depends(get_db)):
     result = await SummaryService.delete_summary(db, summary_id)
     return success_response(message=result["message"])

@@ -104,7 +104,7 @@ async def create_sub_chapter(document_id: UUID, parent_id: UUID, db: AsyncSessio
     ))
 
 
-@router.delete("/chapters/{chapter_id}", summary="删除章节")
+@router.delete("/chapters/{chapter_id}", summary="删除章节", response_model=ResponseModel[None])
 async def delete_chapter(chapter_id: UUID, db: AsyncSession = Depends(get_db)):
     result = await ChapterService.delete_chapter(db, chapter_id)
     return success_response(message=result["message"])
@@ -126,7 +126,7 @@ async def insert_chapter_after(document_id: UUID, after_chapter_id: UUID, db: As
     ))
 
 
-@router.post("/chapters/{document_id}/reorder", summary="拖拽重排章节（支持跨父节点移动）")
+@router.post("/chapters/{document_id}/reorder", summary="拖拽重排章节（支持跨父节点移动）", response_model=ResponseModel[None])
 async def reorder_chapters(document_id: UUID, data: ChapterReorder, db: AsyncSession = Depends(get_db)):
     try:
         await ChapterService.reorder_chapters(db, document_id, data.parent_id, data.ordered_ids)

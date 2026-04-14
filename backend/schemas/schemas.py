@@ -347,3 +347,8 @@ class StructureTemplateUpdate(BaseModel):
     order_index: Optional[int] = Field(None, description="排序")
 
 
+# --- 模板导出到个人库 ---
+class ExportTemplatePayload(BaseModel):
+    display_name: Optional[str] = Field(None, description="自定义模板名称，不传则沿用原名")
+
+
