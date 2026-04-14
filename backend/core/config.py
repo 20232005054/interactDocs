@@ -12,7 +12,7 @@ import os
 # ============================================================
 DATABASE_URL: str = os.getenv(
     "DATABASE_URL",
-    "postgresql+asyncpg://postgres:123456@192.168.104.52:5432/agent02"
+    "postgresql+asyncpg://postgres:nrryyn8426@127.0.0.1:5432/inter"
 )
 
 # ============================================================
