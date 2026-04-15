@@ -1,8 +1,7 @@
 "use client"
 
-import { useRef, useCallback, useState, useEffect } from "react"
+import { useRef, useState, useEffect } from "react"
 import { paragraphService } from "@/services/paragraphService"
-import { chapterService } from "@/services/chapterService"
 import { useDocumentStore } from "@/store/documentStore"
 import { useEditorStore } from "@/store/editorStore"
 import type { ChapterTreeNode, Paragraph } from "@/types/api"
@@ -10,7 +9,6 @@ import { cn } from "@/lib/utils"
 import ParagraphToolbar from "@/components/editor/ParagraphToolbar"
 
 interface DocumentBodyProps {
-  documentId: string
   onReload: () => void
 }
 
@@ -115,13 +113,13 @@ function ParagraphRow({ paragraph, chapterId, onReload }: ParagraphRowProps) {
   return (
     <div
       className={cn(
-        "group relative flex gap-2 py-0.5",
+        "group/paragraph relative flex gap-2 py-0.5",
         isActive && "bg-blue-50/40 rounded"
       )}
       onClick={() => setActiveParagraphId(paragraph.paragraph_id)}
     >
       {/* 左侧操作区 */}
-      <div className="w-6 shrink-0 flex items-start justify-center pt-1.5 opacity-0 group-hover:opacity-100 transition">
+      <div className="w-6 shrink-0 flex items-start justify-center pt-1.5 opacity-0 group-hover/paragraph:opacity-100 transition">
         <div className="relative">
           <button
             type="button"
@@ -156,7 +154,7 @@ function ParagraphRow({ paragraph, chapterId, onReload }: ParagraphRowProps) {
       </div>
 
       {/* 编辑区 */}
-      <div className="flex-1 min-w-0">
+      <div className="relative flex-1 min-w-0">
         <textarea
           ref={textareaRef}
           value={localContent}
@@ -166,6 +164,7 @@ function ParagraphRow({ paragraph, chapterId, onReload }: ParagraphRowProps) {
           className={cn(
             "w-full resize-none bg-transparent outline-none leading-relaxed",
             "overflow-hidden",
+            paragraph.para_type === "paragraph" && "pr-32",
             paragraph.para_type === "heading1" && "text-xl font-bold text-gray-900",
             paragraph.para_type === "heading2" && "text-lg font-semibold text-gray-800",
             paragraph.para_type === "heading3" && "text-base font-medium text-gray-700",
@@ -198,7 +197,7 @@ function ParagraphRow({ paragraph, chapterId, onReload }: ParagraphRowProps) {
 
       {/* 保存状态 */}
       {saving && (
-        <span className="absolute right-2 top-1.5 text-xs text-gray-300">保存中</span>
+        <span className="absolute right-28 top-2 text-xs text-gray-300">保存中</span>
       )}
     </div>
   )
@@ -209,11 +208,10 @@ function ParagraphRow({ paragraph, chapterId, onReload }: ParagraphRowProps) {
 // ----------------------------------------------------------------
 interface ChapterBlockProps {
   flatChapter: FlatChapter
-  documentId: string
   onReload: () => void
 }
 
-function ChapterBlock({ flatChapter, documentId, onReload }: ChapterBlockProps) {
+function ChapterBlock({ flatChapter, onReload }: ChapterBlockProps) {
   const { node, depth } = flatChapter
   const { activeChapterId } = useEditorStore()
   const isActive = activeChapterId === node.chapter_id
@@ -290,7 +288,7 @@ function ChapterBlock({ flatChapter, documentId, onReload }: ChapterBlockProps) 
             <button
               onClick={handleAddParagraph}
               disabled={addingPara}
-              className="text-xs text-gray-300 hover:text-gray-400 text-left py-1 transition opacity-0 hover:opacity-100 group-hover:opacity-100"
+              className="text-xs text-gray-300 hover:text-gray-400 text-left py-1 transition opacity-0 hover:opacity-100 group-hover/paragraph:opacity-100"
             >
               + 添加段落
             </button>
@@ -304,7 +302,7 @@ function ChapterBlock({ flatChapter, documentId, onReload }: ChapterBlockProps) 
 // ----------------------------------------------------------------
 // 主组件
 // ----------------------------------------------------------------
-export default function DocumentBody({ documentId, onReload }: DocumentBodyProps) {
+export default function DocumentBody({ onReload }: DocumentBodyProps) {
   const { tree } = useDocumentStore()
   const flatList = flattenTree(tree)
 
@@ -323,7 +321,6 @@ export default function DocumentBody({ documentId, onReload }: DocumentBodyProps
         <ChapterBlock
           key={fc.node.chapter_id}
           flatChapter={fc}
-          documentId={documentId}
           onReload={onReload}
         />
       ))}

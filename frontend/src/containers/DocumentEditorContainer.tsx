@@ -16,21 +16,6 @@ import CoreInfoPanel from "@/components/editor/CoreInfoPanel"
 import SummaryPanel from "@/components/editor/SummaryPanel"
 import AIChatPanel from "@/components/editor/AIChatPanel"
 import { useDocumentSSE } from "@/hooks/useDocumentSSE"
-import ApplyTemplateModal from "@/components/editor/ApplyTemplateModal"
-
-// 占位组件，后续步骤替换
-function DocumentBodyPlaceholder() {
-  return <div className="p-8 text-sm text-gray-400">全文编辑区（第五步）</div>
-}
-function CoreInfoPanelPlaceholder() {
-  return <div className="p-4 text-sm text-gray-400">核心信息（第六步）</div>
-}
-function SummaryPanelPlaceholder() {
-  return <div className="p-4 text-sm text-gray-400">摘要（第七步）</div>
-}
-function AIChatPanelPlaceholder() {
-  return <div className="p-4 text-sm text-gray-400">AI 对话（第九步）</div>
-}
 
 interface DocumentEditorContainerProps {
   documentId: string
@@ -44,7 +29,6 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showApplyTemplate, setShowApplyTemplate] = useState(false)
   const [templateId, setTemplateId] = useState<string | null>(null)
 
   // SSE 订阅文档变更事件
@@ -118,20 +102,11 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
         title={documentTitle ?? ""}
         onBack={() => router.push("/documents")}
         userName={user?.name}
-        onApplyTemplate={() => setShowApplyTemplate(true)}
+        onApplyTemplate={() => {
+          if (templateId) router.push(`/documents/${documentId}/apply-template`)
+        }}
         documentId={documentId}
       />
-
-      {/* 应用模板弹窗 */}
-      {showApplyTemplate && templateId && (
-        <ApplyTemplateModal
-          documentId={documentId}
-          templateId={templateId}
-          docTitle={documentTitle ?? ""}
-          onClose={() => setShowApplyTemplate(false)}
-          onApplied={load}
-        />
-      )}
 
       {/* 三栏主体 */}
       <div className="flex flex-1 overflow-hidden">
@@ -142,7 +117,7 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
 
         {/* 中间：全文编辑区 */}
         <main className="flex-1 overflow-y-auto bg-white">
-          <DocumentBody documentId={documentId} onReload={load} />
+          <DocumentBody onReload={load} />
         </main>
 
         {/* 右侧：信息面板 */}

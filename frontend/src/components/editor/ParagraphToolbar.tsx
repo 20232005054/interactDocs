@@ -82,8 +82,14 @@ export default function ParagraphToolbar({ paragraphId, chapterId, hasContent }:
   return (
     <div className="flex flex-col gap-1">
       {/* 工具栏按钮 */}
-      <div className="flex items-center gap-1">
-        {/* AI 帮填 */}
+      <div
+        className={cn(
+          "absolute right-2 top-2 z-10 flex items-center gap-1 rounded-lg border border-gray-200 bg-white/95 px-2 py-1 shadow-sm transition",
+          "opacity-0 pointer-events-none group-hover/paragraph:opacity-100 group-hover/paragraph:pointer-events-auto",
+          "group-focus-within/paragraph:opacity-100 group-focus-within/paragraph:pointer-events-auto",
+          (isAssisting || showEval) && "opacity-100 pointer-events-auto"
+        )}
+      >
         {!isAssisting ? (
           <button
             type="button"
@@ -116,7 +122,6 @@ export default function ParagraphToolbar({ paragraphId, chapterId, hasContent }:
           </div>
         )}
 
-        {/* AI 评估 */}
         <button
           type="button"
           onClick={handleEvaluate}
@@ -134,7 +139,7 @@ export default function ParagraphToolbar({ paragraphId, chapterId, hasContent }:
 
       {/* AI 帮填预览 */}
       {isAssisting && aiAssistPreview && (
-        <div className="mt-1 p-2 rounded-md bg-blue-50 border border-blue-200 text-xs text-gray-700 leading-relaxed">
+        <div className="mt-8 p-2 rounded-md bg-blue-50 border border-blue-200 text-xs text-gray-700 leading-relaxed">
           <div className="text-xs text-blue-500 mb-1 font-medium">AI 生成预览</div>
           <p className="whitespace-pre-wrap">{aiAssistPreview}</p>
           {!hasPreview && (
@@ -145,7 +150,7 @@ export default function ParagraphToolbar({ paragraphId, chapterId, hasContent }:
 
       {/* AI 评估结果 */}
       {showEval && (evalPreview || evalResult) && (
-        <div className="mt-1 p-2 rounded-md bg-purple-50 border border-purple-200 text-xs leading-relaxed">
+        <div className={cn("p-2 rounded-md bg-purple-50 border border-purple-200 text-xs leading-relaxed", isAssisting && aiAssistPreview ? "mt-2" : "mt-8")}>
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs text-purple-500 font-medium">AI 评估结果</span>
             <button

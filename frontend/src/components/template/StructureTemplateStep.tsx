@@ -2,9 +2,15 @@
 
 import { useEffect, useState, useCallback, useRef } from "react"
 import { structureTemplateService, coreInfoTemplateService, summaryTemplateService } from "@/services/templateService"
-import type { StructureTemplate, CoreInfoTemplate, SummaryTemplate, SourceInfo, GenerationMode } from "@/types/api"
+import type { StructureTemplate, CoreInfoTemplate, SourceInfo, GenerationMode } from "@/types/api"
 import RichTextEditor from "@/components/editor/RichTextEditor"
 import { cn } from "@/lib/utils"
+import {
+  applyCoreInfoToSource,
+  appendVariableText,
+  createCoreInfoSource,
+  getCoreInfoDragData,
+} from "@/lib/templateDrag"
 
 interface StructureTemplateStepProps {
   templateId: string
@@ -110,6 +116,7 @@ interface SourceRowProps {
 
 function SourceRow({ source, coreInfoOptions, summaryOptions, structureOptions, onChange, onRemove }: SourceRowProps) {
   const sourceType = source.source.value
+  const [dragActive, setDragActive] = useState(false)
   const matchKeyOptions =
     sourceType === "keyinfo" ? coreInfoOptions :
     sourceType === "summary" ? summaryOptions :
@@ -137,7 +144,28 @@ function SourceRow({ source, coreInfoOptions, summaryOptions, structureOptions, 
       >
         {MATCH_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
-      <div className="flex-1 min-h-9 rounded border border-gray-300 bg-white px-2 py-1 flex flex-wrap gap-1 items-center">
+      <div
+        className={cn(
+          "flex-1 min-h-9 rounded border bg-white px-2 py-1 flex flex-wrap gap-1 items-center transition",
+          dragActive ? "border-green-400 ring-2 ring-green-100" : "border-gray-300"
+        )}
+        onDragOver={(event) => {
+          const dropped = getCoreInfoDragData(event)
+          if (!dropped) return
+          event.preventDefault()
+          if (!dragActive) setDragActive(true)
+        }}
+        onDragLeave={() => {
+          if (dragActive) setDragActive(false)
+        }}
+        onDrop={(event) => {
+          const dropped = getCoreInfoDragData(event)
+          if (!dropped) return
+          event.preventDefault()
+          setDragActive(false)
+          onChange(applyCoreInfoToSource(source, dropped))
+        }}
+      >
         {source.match_keys.map(k => (
           <span key={k.value} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-yellow-100 text-yellow-800 text-xs font-medium">
             {k.label}
@@ -145,6 +173,9 @@ function SourceRow({ source, coreInfoOptions, summaryOptions, structureOptions, 
               className="hover:text-red-500 leading-none">×</button>
           </span>
         ))}
+        {source.match_keys.length === 0 && (
+          <span className="text-xs text-gray-400">拖拽核心信息字段到这里自动填入</span>
+        )}
         <MatchKeyDropdown
           options={matchKeyOptions}
           selectedKeys={selectedKeys}
@@ -183,6 +214,7 @@ function EditPanel({ node, coreInfoOptions, summaryOptions, structureOptions, va
   const [customPrompt, setCustomPrompt] = useState(node.custom_prompt ?? "")
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [sourceDropActive, setSourceDropActive] = useState(false)
 
   // 切换节点时重置状态
   useEffect(() => {
@@ -297,6 +329,34 @@ function EditPanel({ node, coreInfoOptions, summaryOptions, structureOptions, va
               }}
             />
           ))}
+          <div
+            className={cn(
+              "rounded-lg border border-dashed px-3 py-3 text-sm transition",
+              sourceDropActive
+                ? "border-green-400 bg-green-50 text-green-700"
+                : "border-gray-300 bg-gray-50 text-gray-500"
+            )}
+            onDragOver={(event) => {
+              const dropped = getCoreInfoDragData(event)
+              if (!dropped) return
+              event.preventDefault()
+              if (!sourceDropActive) setSourceDropActive(true)
+            }}
+            onDragLeave={() => {
+              if (sourceDropActive) setSourceDropActive(false)
+            }}
+            onDrop={(event) => {
+              const dropped = getCoreInfoDragData(event)
+              if (!dropped) return
+              event.preventDefault()
+              setSourceDropActive(false)
+              const next = [...sources, createCoreInfoSource(dropped)]
+              setSources(next)
+              save({ sources: next })
+            }}
+          >
+            拖拽核心信息字段到这里，可自动新增一条来源
+          </div>
           <button type="button" onClick={addSource}
             className="self-start text-sm text-green-600 hover:text-green-700 font-medium">
             + 添加来源
@@ -312,6 +372,7 @@ function EditPanel({ node, coreInfoOptions, summaryOptions, structureOptions, va
         placeholder="这里是一大段模板文字，可插入 {{变量}} 占位符..."
         minHeight="120px"
       />
+      <p className="text-xs text-gray-400">支持将核心信息字段拖入编辑区，自动插入变量占位符。</p>
 
       {/* AI 模式：提示词双栏 */}
       {generationMode === 1 && (
@@ -326,6 +387,19 @@ function EditPanel({ node, coreInfoOptions, summaryOptions, structureOptions, va
               <textarea
                 value={defaultPrompt}
                 onChange={e => { setDefaultPrompt(e.target.value); save({ default_prompt: e.target.value }) }}
+                onDragOver={(event) => {
+                  const dropped = getCoreInfoDragData(event)
+                  if (!dropped) return
+                  event.preventDefault()
+                }}
+                onDrop={(event) => {
+                  const dropped = getCoreInfoDragData(event)
+                  if (!dropped) return
+                  event.preventDefault()
+                  const next = appendVariableText(defaultPrompt, dropped)
+                  setDefaultPrompt(next)
+                  save({ default_prompt: next })
+                }}
                 rows={6}
                 className="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-green-400 resize-none"
               />
@@ -335,6 +409,19 @@ function EditPanel({ node, coreInfoOptions, summaryOptions, structureOptions, va
               <textarea
                 value={customPrompt}
                 onChange={e => { setCustomPrompt(e.target.value); save({ custom_prompt: e.target.value }) }}
+                onDragOver={(event) => {
+                  const dropped = getCoreInfoDragData(event)
+                  if (!dropped) return
+                  event.preventDefault()
+                }}
+                onDrop={(event) => {
+                  const dropped = getCoreInfoDragData(event)
+                  if (!dropped) return
+                  event.preventDefault()
+                  const next = appendVariableText(customPrompt, dropped)
+                  setCustomPrompt(next)
+                  save({ custom_prompt: next })
+                }}
                 rows={6}
                 className="rounded border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-green-400 resize-none"
               />

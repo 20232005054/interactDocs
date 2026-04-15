@@ -4,10 +4,12 @@ import { useEffect, useState, useCallback } from "react"
 import { coreInfoTemplateService } from "@/services/templateService"
 import type { CoreInfoTemplate, FieldType } from "@/types/api"
 import { cn } from "@/lib/utils"
+import { setCoreInfoDragData } from "@/lib/templateDrag"
 
 interface CoreInfoTemplateStepProps {
   templateId: string
   onCountChange?: (count: number) => void
+  enableDrag?: boolean
 }
 
 // ----------------------------------------------------------------
@@ -148,9 +150,10 @@ interface TreeNodeProps {
   templateId: string
   depth: number
   onRefresh: () => void
+  enableDrag: boolean
 }
 
-function TreeNode({ node, templateId, depth, onRefresh }: TreeNodeProps) {
+function TreeNode({ node, templateId, depth, onRefresh, enableDrag }: TreeNodeProps) {
   const [editing, setEditing] = useState(false)
   const [addingChild, setAddingChild] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -184,6 +187,19 @@ function TreeNode({ node, templateId, depth, onRefresh }: TreeNodeProps) {
         />
       ) : (
         <div className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted/40 group">
+          {enableDrag && node.field_type !== "group" && (
+            <button
+              type="button"
+              draggable
+              onDragStart={(event) =>
+                setCoreInfoDragData(event, { fieldKey: node.field_key, label: node.field_name })
+              }
+              className="h-6 shrink-0 rounded border border-dashed border-green-300 px-2 text-[11px] font-medium text-green-700 cursor-grab active:cursor-grabbing"
+              title="拖拽到摘要模板或章节结构模板中自动填入"
+            >
+              拖拽
+            </button>
+          )}
           <span className="text-sm font-medium text-foreground flex-1">{node.field_name}</span>
           <span className="text-xs text-muted-foreground px-1.5 py-0.5 rounded bg-muted">
             {fieldTypeLabel[node.field_type]}
@@ -243,6 +259,7 @@ function TreeNode({ node, templateId, depth, onRefresh }: TreeNodeProps) {
           templateId={templateId}
           depth={depth + 1}
           onRefresh={onRefresh}
+          enableDrag={enableDrag}
         />
       ))}
     </div>
@@ -252,7 +269,7 @@ function TreeNode({ node, templateId, depth, onRefresh }: TreeNodeProps) {
 // ----------------------------------------------------------------
 // 主组件
 // ----------------------------------------------------------------
-export default function CoreInfoTemplateStep({ templateId, onCountChange }: CoreInfoTemplateStepProps) {
+export default function CoreInfoTemplateStep({ templateId, onCountChange, enableDrag = false }: CoreInfoTemplateStepProps) {
   const [items, setItems] = useState<CoreInfoTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -295,7 +312,9 @@ export default function CoreInfoTemplateStep({ templateId, onCountChange }: Core
         <div>
           <h3 className="text-sm font-medium text-foreground">核心信息字段</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            定义文档的核心信息结构，支持文本、下拉选择和分组类型
+            {enableDrag
+              ? "定义核心信息结构，并可将字段拖到摘要模板或章节结构模板中自动填入"
+              : "定义文档的核心信息结构，支持文本、下拉选择和分组类型"}
           </p>
         </div>
         <button
@@ -319,7 +338,7 @@ export default function CoreInfoTemplateStep({ templateId, onCountChange }: Core
       {/* 字段树 */}
       {items.length === 0 && !addingRoot ? (
         <div className="py-8 text-center text-sm text-muted-foreground border border-dashed border-border rounded-lg">
-          暂无字段，点击"添加字段"开始配置
+          暂无字段，点击添加字段开始配置
         </div>
       ) : (
         <div className="flex flex-col gap-0.5">
@@ -330,6 +349,7 @@ export default function CoreInfoTemplateStep({ templateId, onCountChange }: Core
               templateId={templateId}
               depth={0}
               onRefresh={load}
+              enableDrag={enableDrag}
             />
           ))}
         </div>

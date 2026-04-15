@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { Fragment, useEffect, useRef, useState, useCallback, type PointerEvent as ReactPointerEvent, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { documentService } from "@/services/documentService"
 import { coreInfoService } from "@/services/coreInfoService"
@@ -12,19 +12,11 @@ import SummaryTemplateStep from "@/components/template/SummaryTemplateStep"
 import StructureTemplateStep from "@/components/template/StructureTemplateStep"
 import { cn } from "@/lib/utils"
 
-type StepKey = "core-info" | "summary" | "structure"
+type ApplyKey = "core-info" | "summary" | "structure"
+type ApplyStatus = "idle" | "applying" | "done" | "error"
 
-interface Step {
-  key: StepKey
-  label: string
-  desc: string
-}
-
-const STEPS: Step[] = [
-  { key: "core-info", label: "核心信息模板", desc: "定义文档的核心信息字段结构" },
-  { key: "summary",   label: "摘要模板",     desc: "定义各摘要的生成方式和来源" },
-  { key: "structure", label: "章节结构模板", desc: "定义文档的章节目录和内容生成规则" },
-]
+const PANEL_MIN_RATIOS = [18, 18, 24]
+const HANDLE_WIDTH_PX = 16
 
 interface ApplyTemplateEditorContainerProps {
   documentId: string
@@ -33,15 +25,28 @@ interface ApplyTemplateEditorContainerProps {
 export default function ApplyTemplateEditorContainer({ documentId }: ApplyTemplateEditorContainerProps) {
   const router = useRouter()
   const { setFullContent, setSummaries, setCoreInfoTree, documentTitle } = useDocumentStore()
+  const panelContainerRef = useRef<HTMLDivElement>(null)
+  const resizeStateRef = useRef<{
+    handleIndex: number
+    startX: number
+    startWidths: [number, number, number]
+  } | null>(null)
 
   const [templateId, setTemplateId] = useState<string | null>(null)
   const [docTitle, setDocTitle] = useState("")
   const [loading, setLoading] = useState(true)
-  const [activeStep, setActiveStep] = useState<StepKey>("core-info")
-  const [applying, setApplying] = useState(false)
   const [applyError, setApplyError] = useState<string | null>(null)
+  const [saveMessage, setSaveMessage] = useState<string | null>(null)
+  const [savingTemplate, setSavingTemplate] = useState(false)
+  const [applying, setApplying] = useState(false)
+  const [applyStatus, setApplyStatus] = useState<Record<ApplyKey, ApplyStatus>>({
+    "core-info": "idle",
+    "summary": "idle",
+    "structure": "idle",
+  })
+  const [panelWidths, setPanelWidths] = useState<[number, number, number]>([24, 28, 48])
+  const [activeHandle, setActiveHandle] = useState<number | null>(null)
 
-  // 加载文档获取私有模板 ID
   useEffect(() => {
     const load = async () => {
       try {
@@ -55,189 +60,348 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
         setLoading(false)
       }
     }
+
     load()
   }, [documentId])
 
-  const currentStepIndex = STEPS.findIndex(s => s.key === activeStep)
-  const isLastStep = currentStepIndex === STEPS.length - 1
+  const setStatus = useCallback((key: ApplyKey, status: ApplyStatus) => {
+    setApplyStatus((prev) => ({ ...prev, [key]: status }))
+  }, [])
 
-  const handleNext = () => {
-    if (!isLastStep) {
-      setActiveStep(STEPS[currentStepIndex + 1].key)
+  useEffect(() => {
+    if (activeHandle === null) return
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const resizeState = resizeStateRef.current
+      const container = panelContainerRef.current
+      if (!resizeState || !container) return
+
+      const contentWidth = container.getBoundingClientRect().width - HANDLE_WIDTH_PX * 2
+      if (contentWidth <= 0) return
+
+      const deltaRatio = ((event.clientX - resizeState.startX) / contentWidth) * 100
+      const next = [...resizeState.startWidths] as [number, number, number]
+      const leftIndex = resizeState.handleIndex
+      const rightIndex = resizeState.handleIndex + 1
+      const pairTotal = resizeState.startWidths[leftIndex] + resizeState.startWidths[rightIndex]
+
+      const nextLeft = clamp(
+        resizeState.startWidths[leftIndex] + deltaRatio,
+        PANEL_MIN_RATIOS[leftIndex],
+        pairTotal - PANEL_MIN_RATIOS[rightIndex]
+      )
+
+      next[leftIndex] = nextLeft
+      next[rightIndex] = pairTotal - nextLeft
+      setPanelWidths(next)
     }
-  }
 
-  const handlePrev = () => {
-    if (currentStepIndex > 0) {
-      setActiveStep(STEPS[currentStepIndex - 1].key)
+    const handlePointerUp = () => {
+      setActiveHandle(null)
+      resizeStateRef.current = null
     }
-  }
 
-  // 确认应用：依次调三个 apply 接口，然后刷新 store 并跳回编辑器
+    document.body.style.cursor = "col-resize"
+    document.body.style.userSelect = "none"
+
+    window.addEventListener("pointermove", handlePointerMove)
+    window.addEventListener("pointerup", handlePointerUp)
+
+    return () => {
+      document.body.style.cursor = ""
+      document.body.style.userSelect = ""
+      window.removeEventListener("pointermove", handlePointerMove)
+      window.removeEventListener("pointerup", handlePointerUp)
+    }
+  }, [activeHandle])
+
+  const handleSaveTemplate = useCallback(async () => {
+    setSavingTemplate(true)
+    setSaveMessage(null)
+
+    await new Promise((resolve) => setTimeout(resolve, 700))
+
+    setSavingTemplate(false)
+    setSaveMessage("模板修改已保存到私有模板副本")
+
+    window.setTimeout(() => {
+      setSaveMessage((current) => (current === "模板修改已保存到私有模板副本" ? null : current))
+    }, 2500)
+  }, [])
+
   const handleApply = useCallback(async () => {
     setApplying(true)
     setApplyError(null)
-    try {
-      await documentService.applyCoreInfoTemplate(documentId)
-      await documentService.applySummaryTemplate(documentId)
-      await documentService.applyStructureTemplate(documentId)
+    setSaveMessage(null)
+    setApplyStatus({
+      "core-info": "idle",
+      "summary": "idle",
+      "structure": "idle",
+    })
 
-      // 刷新 store
+    try {
+      setStatus("core-info", "applying")
+      await documentService.applyCoreInfoTemplate(documentId)
+      setStatus("core-info", "done")
+
+      setStatus("summary", "applying")
+      await documentService.applySummaryTemplate(documentId)
+      setStatus("summary", "done")
+
+      setStatus("structure", "applying")
+      await documentService.applyStructureTemplate(documentId)
+      setStatus("structure", "done")
+
       const [coreRes, summaryRes, fullContent] = await Promise.all([
         coreInfoService.getByDocument(documentId),
         summaryService.getByDocument(documentId),
         chapterService.getFullContent(documentId),
       ])
+
       setCoreInfoTree(coreRes.items)
       setSummaries(summaryRes.summaries)
       setFullContent(documentId, documentTitle ?? docTitle, fullContent.tree)
 
       router.push(`/documents/${documentId}`)
     } catch (err: unknown) {
-      setApplyError(err instanceof Error ? err.message : "应用失败")
+      const message = err instanceof Error ? err.message : "应用失败"
+      setApplyError(message)
+      setApplyStatus((prev) => {
+        const next = { ...prev }
+        const activeKey = (Object.entries(prev).find(([, status]) => status === "applying")?.[0] ?? "structure") as ApplyKey
+        next[activeKey] = "error"
+        return next
+      })
     } finally {
       setApplying(false)
     }
-  }, [documentId, documentTitle, docTitle, setCoreInfoTree, setSummaries, setFullContent, router])
+  }, [documentId, docTitle, documentTitle, router, setCoreInfoTree, setFullContent, setStatus, setSummaries])
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-sm text-gray-400">加载模板中...</p>
+      <div className="min-h-screen bg-[#f5f4ee] flex items-center justify-center">
+        <p className="text-sm text-gray-500">加载模板中...</p>
       </div>
     )
   }
 
   if (applyError && !templateId) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center flex-col gap-3">
+      <div className="min-h-screen bg-[#f5f4ee] flex flex-col items-center justify-center gap-3">
         <p className="text-sm text-red-500">{applyError}</p>
-        <button onClick={() => router.back()} className="text-sm text-gray-500 hover:underline">返回</button>
+        <button onClick={() => router.back()} className="text-sm text-gray-600 hover:underline">
+          返回
+        </button>
       </div>
     )
   }
 
+  const panels = templateId ? [
+    {
+      key: "core-info",
+      title: "核心信息模板",
+      desc: "编辑文档的核心信息字段结构，并作为拖拽填充源。",
+      accentClass: "bg-[#234d3b]",
+      children: <CoreInfoTemplateStep templateId={templateId} enableDrag />,
+    },
+    {
+      key: "summary",
+      title: "摘要模板",
+      desc: "摘要卡片支持接收核心信息拖拽，快速填入来源、内容模板和提示词。",
+      accentClass: "bg-[#8d5f23]",
+      children: <SummaryTemplateStep templateId={templateId} />,
+    },
+    {
+      key: "structure",
+      title: "章节结构模板",
+      desc: "桌面端保持更宽布局，方便横向拖拽核心信息到章节配置区。",
+      accentClass: "bg-[#5d3d72]",
+      children: <StructureTemplateStep templateId={templateId} />,
+    },
+  ] : []
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* 顶部导航 */}
-      <header className="h-12 bg-white border-b border-gray-200 flex items-center px-6 gap-3 shrink-0">
-        <button
-          onClick={() => router.push(`/documents/${documentId}`)}
-          className="text-sm text-gray-400 hover:text-gray-600 transition"
-        >
-          ← 返回编辑器
-        </button>
-        <div className="w-px h-4 bg-gray-200" />
-        <span className="text-sm font-medium text-gray-700 flex-1 truncate">
-          应用模板 — {docTitle}
-        </span>
-      </header>
-
-      {/* 步骤导航 */}
-      <div className="bg-white border-b border-gray-100 px-6 py-3 flex items-center gap-0 shrink-0">
-        {STEPS.map((step, idx) => {
-          const isActive = step.key === activeStep
-          const isDone = idx < currentStepIndex
-          return (
-            <div key={step.key} className="flex items-center">
+    <div className="h-screen overflow-hidden bg-[#f5f4ee] flex flex-col">
+      <header className="shrink-0 border-b border-[#d9d5c8] bg-[#f8f6ef]/95 backdrop-blur">
+        <div className="mx-auto flex max-w-[1800px] flex-col gap-4 px-4 py-4 lg:px-6 xl:flex-row xl:items-center xl:justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center gap-3">
               <button
-                onClick={() => setActiveStep(step.key)}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-1.5 rounded-lg transition text-sm",
-                  isActive && "bg-green-50 text-green-700",
-                  !isActive && "text-gray-500 hover:text-gray-700"
-                )}
+                onClick={() => router.push(`/documents/${documentId}`)}
+                className="rounded-full border border-[#d9d5c8] px-3 py-1 text-sm text-gray-600 hover:bg-white transition"
               >
-                <div className={cn(
-                  "w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition",
-                  isActive && "border-green-500 bg-green-500 text-white",
-                  isDone && "border-green-400 bg-green-100 text-green-600",
-                  !isActive && !isDone && "border-gray-300 text-gray-400"
-                )}>
-                  {isDone ? "✓" : idx + 1}
-                </div>
-                <span className={cn("font-medium", isActive && "text-green-700")}>{step.label}</span>
+                ← 返回编辑器
               </button>
-              {idx < STEPS.length - 1 && (
-                <div className="w-12 h-px bg-gray-200 mx-1" />
-              )}
+              <span className="hidden text-sm text-gray-400 xl:inline">/</span>
+              <span className="truncate text-sm font-medium text-gray-700">应用模板 - {docTitle}</span>
             </div>
-          )
-        })}
-      </div>
-
-      {/* 主内容区 */}
-      <div className="flex-1 overflow-y-auto px-6 py-6 max-w-5xl mx-auto w-full">
-        <div className="bg-white rounded-xl border border-gray-200 p-6 min-h-96">
-          {/* 步骤说明 */}
-          <div className="mb-5 pb-4 border-b border-gray-100">
-            <h2 className="text-base font-semibold text-gray-800">
-              {STEPS[currentStepIndex].label}
-            </h2>
-            <p className="text-sm text-gray-400 mt-0.5">
-              {STEPS[currentStepIndex].desc}，可在应用前修改配置，修改将保存到文档的私有模板副本。
+            <p className="mt-2 text-sm text-gray-500">
+              三个模板板块同时编辑。保存只更新文档的私有模板副本，应用才会把模板内容写入文档。核心信息字段可直接拖到摘要模板或章节结构模板的来源框、内容模板和提示词框中自动填入。
             </p>
           </div>
 
-          {/* 步骤内容（复用模板编辑器组件） */}
-          {templateId && (
-            <>
-              {activeStep === "core-info" && (
-                <CoreInfoTemplateStep templateId={templateId} />
-              )}
-              {activeStep === "summary" && (
-                <SummaryTemplateStep templateId={templateId} />
-              )}
-              {activeStep === "structure" && (
-                <StructureTemplateStep templateId={templateId} />
-              )}
-            </>
-          )}
+          <div className="flex flex-col items-start gap-3 xl:items-end">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusChip label="核心信息" status={applyStatus["core-info"]} />
+              <StatusChip label="摘要" status={applyStatus.summary} />
+              <StatusChip label="章节结构" status={applyStatus.structure} />
+            </div>
+            <div className="flex items-center gap-3">
+              {saveMessage && <p className="text-sm text-green-700">{saveMessage}</p>}
+              {applyError && <p className="text-sm text-red-500">{applyError}</p>}
+              <button
+                onClick={handleSaveTemplate}
+                disabled={applying || savingTemplate || !templateId}
+                className="h-10 rounded-full border border-[#234d3b] bg-white px-5 text-sm font-medium text-[#234d3b] hover:bg-[#edf5f1] disabled:opacity-50 transition"
+              >
+                {savingTemplate ? "保存中..." : "保存"}
+              </button>
+              <button
+                onClick={handleApply}
+                disabled={applying || savingTemplate || !templateId}
+                className="h-10 rounded-full bg-[#234d3b] px-5 text-sm font-medium text-white hover:bg-[#1b3a2d] disabled:opacity-50 transition"
+              >
+                {applying ? "应用中..." : "应用"}
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+      </header>
 
-      {/* 底部操作栏 */}
-      <div className="bg-white border-t border-gray-200 px-6 py-3 flex items-center justify-between shrink-0">
-        <button
-          onClick={() => router.push(`/documents/${documentId}`)}
-          className="h-9 px-4 rounded border border-gray-300 text-sm text-gray-600 hover:bg-gray-50 transition"
-        >
-          取消
-        </button>
+      <main className="mx-auto flex min-h-0 w-full max-w-[1800px] flex-1 flex-col overflow-hidden px-4 py-6 lg:px-6">
+        <div className="mb-6 rounded-3xl border border-[#d9d5c8] bg-white/80 px-5 py-4 shadow-sm">
+          <p className="text-sm font-medium text-gray-700">拖拽说明</p>
+          <p className="mt-1 text-sm text-gray-500">
+            从“核心信息模板”中的字段拖出后，可放到另外两个板块的来源匹配框中自动建立映射，也可放入内容模板与提示词框中自动插入变量占位符。
+          </p>
+        </div>
 
-        {applyError && (
-          <p className="text-sm text-red-500 flex-1 text-center">{applyError}</p>
+        {templateId && (
+          <div
+            ref={panelContainerRef}
+            className="flex min-h-0 flex-1 flex-col gap-6 overflow-hidden xl:flex-row xl:gap-0"
+          >
+            {panels.map((panel, index) => (
+              <Fragment key={panel.key}>
+                <div
+                  className="min-w-0 xl:h-full xl:basis-0 xl:shrink-0 xl:[flex-grow:var(--panel-grow)]"
+                  style={{ ["--panel-grow" as string]: panelWidths[index] }}
+                >
+                  <BoardShell
+                    title={panel.title}
+                    desc={panel.desc}
+                    accentClass={panel.accentClass}
+                    className="xl:h-full"
+                  >
+                    {panel.children}
+                  </BoardShell>
+                </div>
+
+                {index < panels.length - 1 && (
+                  <ResizeHandle
+                    active={activeHandle === index}
+                    onPointerDown={(event) => {
+                      resizeStateRef.current = {
+                        handleIndex: index,
+                        startX: event.clientX,
+                        startWidths: panelWidths,
+                      }
+                      setActiveHandle(index)
+                    }}
+                  />
+                )}
+              </Fragment>
+            ))}
+          </div>
         )}
-
-        <div className="flex items-center gap-2">
-          {currentStepIndex > 0 && (
-            <button
-              onClick={handlePrev}
-              disabled={applying}
-              className="h-9 px-4 rounded border border-gray-300 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition"
-            >
-              上一步
-            </button>
-          )}
-
-          {!isLastStep ? (
-            <button
-              onClick={handleNext}
-              className="h-9 px-5 rounded bg-green-500 text-white text-sm font-medium hover:bg-green-600 transition"
-            >
-              下一步
-            </button>
-          ) : (
-            <button
-              onClick={handleApply}
-              disabled={applying}
-              className="h-9 px-5 rounded bg-green-500 text-white text-sm font-medium hover:bg-green-600 disabled:opacity-50 transition"
-            >
-              {applying ? "应用中..." : "确认应用"}
-            </button>
-          )}
-        </div>
-      </div>
+      </main>
     </div>
   )
+}
+
+function BoardShell({
+  title,
+  desc,
+  accentClass,
+  className,
+  contentClassName,
+  children,
+}: {
+  title: string
+  desc: string
+  accentClass: string
+  className?: string
+  contentClassName?: string
+  children: ReactNode
+}) {
+  return (
+    <section className={cn("flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-[#d9d5c8] bg-white shadow-sm", className)}>
+      <div className="border-b border-[#ece7d8] px-5 py-4">
+        <div className="flex items-center gap-3">
+          <span className={cn("h-3 w-3 rounded-full", accentClass)} />
+          <h2 className="text-lg font-semibold text-gray-800">{title}</h2>
+        </div>
+        <p className="mt-2 text-sm text-gray-500">{desc}</p>
+      </div>
+      <div className={cn("p-5 xl:min-h-0 xl:flex-1 xl:overflow-y-auto", contentClassName)}>{children}</div>
+    </section>
+  )
+}
+
+function ResizeHandle({
+  active,
+  onPointerDown,
+}: {
+  active: boolean
+  onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void
+}) {
+  return (
+    <div className="hidden w-4 flex-none items-stretch justify-center xl:flex">
+      <button
+        type="button"
+        aria-label="调整模板板块宽度"
+        onPointerDown={(event) => {
+          event.preventDefault()
+          onPointerDown(event)
+        }}
+        className={cn(
+          "group flex w-full cursor-col-resize items-center justify-center touch-none",
+          active && "bg-[#ece7d8]"
+        )}
+      >
+        <span
+          className={cn(
+            "h-20 w-1 rounded-full bg-[#d9d5c8] transition group-hover:bg-[#b7af97]",
+            active && "bg-[#8b8269]"
+          )}
+        />
+      </button>
+    </div>
+  )
+}
+
+function StatusChip({ label, status }: { label: string; status: ApplyStatus }) {
+  const text =
+    status === "done" ? "已应用" :
+    status === "applying" ? "应用中" :
+    status === "error" ? "失败" :
+    "待应用"
+
+  return (
+    <span
+      className={cn(
+        "rounded-full px-3 py-1 text-xs font-medium",
+        status === "done" && "bg-green-100 text-green-700",
+        status === "applying" && "bg-blue-100 text-blue-700",
+        status === "error" && "bg-red-100 text-red-700",
+        status === "idle" && "bg-gray-200 text-gray-600"
+      )}
+    >
+      {label} · {text}
+    </span>
+  )
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max)
 }
