@@ -8,6 +8,8 @@
 4. 对每个章节，找对应 StructureTemplate，取 generation_mode：
    - mode=0：复制模式重新生成段落
    - mode=1：render_ai_content 重新生成段落
+   - mode=2：直接使用，跳过联动
+   - mode=3：以 content_template 为草稿调 AI 修改
 5. 更新段落内容，ischange=2
 6. is_change=0 重置
 """
@@ -15,14 +17,19 @@
 import logging
 from uuid import UUID
 
+from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from db.session import AsyncSessionLocal
 from db.mappers.dependency_edge_mapper import DependencyEdgeMapper
 from db.mappers.summary_mapper import SummaryMapper
 from db.mappers.structure_template_mapper import StructureTemplateMapper
 from db.mappers.paragraph_mapper import ParagraphMapper
 from db.mappers.document_mapper import DocumentMapper
+from db.models import DocumentSummary, Chapter
 from core.constants import EdgeTargetType, EdgeSourceType
 from services.summary_template_service import SummaryTemplateService
+from services.event_bus import publish
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +42,7 @@ async def _is_substantial_change(old_content: str, new_content: str) -> bool:
     if old_content.strip() == new_content.strip():
         return False
     try:
-        from services.ai_client import get_embedding, cosine_similarity
+        from services.ai_client import get_embedding, cosine_similarity  # 避免循环依赖
         vec_old = await get_embedding(old_content)
         vec_new = await get_embedding(new_content)
         sim = await cosine_similarity(vec_old, vec_new)
@@ -54,11 +61,8 @@ async def handle_summary_change_async(
     """后台任务入口：处理摘要变更后的下游章节联动更新"""
     async with AsyncSessionLocal() as db:
         try:
-            # embedding 判断是否实质变更
             is_substantial = await _is_substantial_change(old_content, new_content)
             if not is_substantial:
-                from sqlalchemy import update
-                from db.models import DocumentSummary
                 await db.execute(
                     update(DocumentSummary)
                     .where(DocumentSummary.summary_id == summary_id)
@@ -70,9 +74,6 @@ async def handle_summary_change_async(
 
             await _process_downstream(db, summary_id)
 
-            # 处理完成，重置 is_change
-            from sqlalchemy import update
-            from db.models import DocumentSummary
             await db.execute(
                 update(DocumentSummary)
                 .where(DocumentSummary.summary_id == summary_id)
@@ -84,9 +85,8 @@ async def handle_summary_change_async(
             logger.error("摘要变更后台处理失败 summary_id=%s: %s", summary_id, e)
 
 
-async def _process_downstream(db, summary_id: UUID):
+async def _process_downstream(db: AsyncSession, summary_id: UUID):
     """处理所有依赖该摘要的下游章节"""
-    # 反向查：找依赖该摘要的章节边（source_type=chapter, target_type=summary）
     edges = await DependencyEdgeMapper.get_edges_by_target(
         db, EdgeTargetType.SUMMARY, summary_id
     )
@@ -95,7 +95,6 @@ async def _process_downstream(db, summary_id: UUID):
         logger.info("摘要 %s 没有下游章节依赖，跳过联动", summary_id)
         return
 
-    # 获取摘要所属文档
     summary = await SummaryMapper.get_summary_by_id(db, summary_id)
     if not summary:
         return
@@ -103,33 +102,26 @@ async def _process_downstream(db, summary_id: UUID):
     if not document:
         return
 
-    # 预加载结构模板
     structure_templates = await StructureTemplateMapper.get_by_template_id(db, document.template_id)
 
     for edge in edges:
         if edge.source_type != EdgeSourceType.CHAPTER:
             continue
-        chapter_id = edge.source_id
-        await _handle_chapter_downstream(db, chapter_id, document, structure_templates)
+        await _handle_chapter_downstream(db, edge.source_id, document, structure_templates)
 
 
-async def _handle_chapter_downstream(db, chapter_id: UUID, document, structure_templates: list):
+async def _handle_chapter_downstream(db: AsyncSession, chapter_id: UUID, document, structure_templates: list):
     """更新章节下的段落内容"""
-    from sqlalchemy import select
-    from db.models import Chapter
-
     result = await db.execute(select(Chapter).where(Chapter.chapter_id == chapter_id))
     chapter = result.scalar_one_or_none()
     if not chapter:
         return
 
-    # 通过章节 field_key 找对应的 StructureTemplate
     template = next((t for t in structure_templates if t.field_key == chapter.field_key), None)
     if not template:
         logger.warning("找不到章节 %s 对应的结构模板", chapter_id)
         return
 
-    # 取章节下第一个正文段落
     paragraphs = await ParagraphMapper.get_paragraphs_by_chapter_id(db, chapter_id)
     target_paragraph = next((p for p in paragraphs if p.para_type == "paragraph"), None)
     if not target_paragraph:
@@ -162,7 +154,6 @@ async def _handle_chapter_downstream(db, chapter_id: UUID, document, structure_t
                     "ischange": 2
                 })
                 logger.info("章节 %s 段落 (mode=1) AI 重新生成完成", chapter_id)
-                from services.event_bus import publish
                 await publish(str(document.document_id), {
                     "type": "paragraph_updated",
                     "chapter_id": str(chapter_id),
@@ -172,4 +163,35 @@ async def _handle_chapter_downstream(db, chapter_id: UUID, document, structure_t
                 logger.warning("章节 %s 段落 (mode=1) AI 返回空内容", chapter_id)
         except Exception as e:
             logger.error("章节 %s 段落 AI 重新生成失败: %s", chapter_id, e)
+            await ParagraphMapper.update_paragraph(db, target_paragraph.paragraph_id, {"ischange": 2})
+
+    elif template.generation_mode == 2:
+        # 直接使用模式：内容固定，上游变更不影响
+        logger.info("章节 %s (mode=2) 直接使用模式，跳过联动", chapter_id)
+
+    elif template.generation_mode == 3:
+        # AI修改模式：以 content_template 为草稿重新生成
+        try:
+            new_content = await SummaryTemplateService.render_ai_content(
+                db=db,
+                document=document,
+                summary_template=template,
+                draft=template.content_template,
+            )
+            if new_content:
+                await ParagraphMapper.update_paragraph(db, target_paragraph.paragraph_id, {
+                    "content": new_content,
+                    "ai_generate": new_content,
+                    "ischange": 2
+                })
+                logger.info("章节 %s 段落 (mode=3) AI 修改重新生成完成", chapter_id)
+                await publish(str(document.document_id), {
+                    "type": "paragraph_updated",
+                    "chapter_id": str(chapter_id),
+                    "paragraph_id": str(target_paragraph.paragraph_id),
+                })
+            else:
+                logger.warning("章节 %s 段落 (mode=3) AI 返回空内容", chapter_id)
+        except Exception as e:
+            logger.error("章节 %s 段落 (mode=3) AI 修改失败: %s", chapter_id, e)
             await ParagraphMapper.update_paragraph(db, target_paragraph.paragraph_id, {"ischange": 2})

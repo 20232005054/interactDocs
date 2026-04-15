@@ -329,6 +329,7 @@ class DocumentService:
             raise HTTPException(status_code=404, detail="模板不存在")
 
         # 1. 创建新模板主表（归属当前用户，不绑定文档）
+        # document_id=None：此模板归属用户个人库，不绑定任何文档（nullable 外键）
         new_template = Template(
             group_id=source.group_id,
             purpose=source.purpose,

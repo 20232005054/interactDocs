@@ -213,6 +213,11 @@ class TemplateListResponse(BaseModel):
     items: List[TemplateResponse]
 
 
+class TemplateSimpleListResponse(BaseModel):
+    """用于不分页的全量模板列表（如按用途查询）"""
+    items: List[TemplateResponse]
+
+
 class PurposeListResponse(BaseModel):
     purposes: List[str]
 

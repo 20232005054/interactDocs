@@ -74,6 +74,7 @@ class ParagraphUpdate(BaseModel):
     ai_eval: Optional[str] = None
     ai_suggestion: Optional[str] = None
     ai_generate: Optional[str] = None
+    ai_instruction: Optional[str] = None
     ischange: Optional[int] = None
 
 class ChapterBase(BaseModel):

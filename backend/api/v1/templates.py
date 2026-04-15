@@ -6,7 +6,7 @@ from uuid import UUID
 from core.response import success_response, ResponseModel
 from db.session import get_db
 from services.template_service import TemplateService
-from schemas.response_schemas import TemplateResponse, TemplateDetailResponse, TemplateListResponse, PurposeListResponse, TemplateDependenciesResponse
+from schemas.response_schemas import TemplateResponse, TemplateDetailResponse, TemplateListResponse, TemplateSimpleListResponse, PurposeListResponse, TemplateDependenciesResponse
 from core.auth import get_editor_user, get_admin_user, get_current_user
 
 router = APIRouter(prefix="/api/v1/templates", tags=["模板管理"])
@@ -136,16 +136,13 @@ async def list_purposes(is_system: bool = True, db: AsyncSession = Depends(get_d
     return success_response(data=PurposeListResponse(purposes=purposes))
 
 
-@router.get("/by-purpose/{purpose}", summary="根据用途获取模板", response_model=ResponseModel[TemplateListResponse])
+@router.get("/by-purpose/{purpose}", summary="根据用途获取模板", response_model=ResponseModel[TemplateSimpleListResponse])
 async def get_templates_by_purpose(
     purpose: str, is_system: Optional[bool] = None,
     is_active: Optional[bool] = None, db: AsyncSession = Depends(get_db)
 ):
     templates = await TemplateService.get_templates_by_purpose(db, purpose, is_system, is_active)
-    return success_response(data=TemplateListResponse(
-        page=1, page_size=len(templates), total=len(templates),
-        items=[_template_response(t) for t in templates]
-    ))
+    return success_response(data=TemplateSimpleListResponse(items=[_template_response(t) for t in templates]))
 
 
 @router.post("/rollback/{template_id}", summary="回退官方模板", response_model=ResponseModel[TemplateResponse])
