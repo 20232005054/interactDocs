@@ -287,3 +287,97 @@ class TemplateService:
         await db.refresh(source_template)
         return source_template
 
+
+    @staticmethod
+    async def get_template_dependencies(db, template_id):
+        """
+        从三类子模板的 sources 字段推导依赖关系，纯内存计算，不查 dependency_edges。
+
+        返回结构：
+        - core_info_templates: 每个字段被哪些摘要/章节引用
+        - summary_templates: 每个摘要引用了什么 + 被哪些章节引用
+        - structure_templates: 每个章节引用了什么
+        """
+        core_infos = await CoreInfoTemplateMapper.get_by_template_id(db, template_id)
+        summaries = await SummaryTemplateMapper.get_by_template_id(db, template_id)
+        structures = await StructureTemplateMapper.get_by_template_id(db, template_id)
+
+        # 构建 field_key → label 的快速查找表
+        ci_label = {ci.field_key: ci.field_name for ci in core_infos}
+        sum_label = {s.field_key: s.title for s in summaries}
+        struct_label = {st.field_key: st.title for st in structures}
+
+        def extract_refs(sources: list) -> list:
+            """从 sources 数组提取引用列表"""
+            refs = []
+            if not sources:
+                return refs
+            for src in sources:
+                source_obj = src.get("source") or {}
+                source_type = source_obj.get("value") if isinstance(source_obj, dict) else None
+                match_keys = src.get("match_keys") or []
+                for mk in match_keys:
+                    fk = mk.get("value") if isinstance(mk, dict) else None
+                    lbl = mk.get("label") if isinstance(mk, dict) else fk
+                    if not fk:
+                        continue
+                    # 用实际 label 覆盖（更准确）
+                    if source_type == "keyinfo":
+                        lbl = ci_label.get(fk, lbl)
+                    elif source_type == "summary":
+                        lbl = sum_label.get(fk, lbl)
+                    elif source_type == "chapter":
+                        lbl = struct_label.get(fk, lbl)
+                    refs.append({"type": source_type or "unknown", "field_key": fk, "label": lbl or fk})
+            return refs
+
+        # 构建被引用索引：field_key → [引用者信息]
+        ci_referenced_by: dict = {ci.field_key: [] for ci in core_infos}
+        sum_referenced_by: dict = {s.field_key: [] for s in summaries}
+
+        for s in summaries:
+            for ref in extract_refs(s.sources or []):
+                if ref["type"] == "keyinfo" and ref["field_key"] in ci_referenced_by:
+                    ci_referenced_by[ref["field_key"]].append(
+                        {"type": "summary", "field_key": s.field_key, "label": s.title}
+                    )
+
+        for st in structures:
+            for ref in extract_refs(st.sources or []):
+                if ref["type"] == "keyinfo" and ref["field_key"] in ci_referenced_by:
+                    ci_referenced_by[ref["field_key"]].append(
+                        {"type": "structure", "field_key": st.field_key, "label": st.title}
+                    )
+                if ref["type"] == "summary" and ref["field_key"] in sum_referenced_by:
+                    sum_referenced_by[ref["field_key"]].append(
+                        {"type": "structure", "field_key": st.field_key, "label": st.title}
+                    )
+
+        return {
+            "core_info_templates": [
+                {
+                    "field_key": ci.field_key,
+                    "field_name": ci.field_name,
+                    "referenced_by": ci_referenced_by.get(ci.field_key, []),
+                }
+                for ci in core_infos
+                if ci.field_type != "group"  # group 节点本身不被引用
+            ],
+            "summary_templates": [
+                {
+                    "field_key": s.field_key,
+                    "title": s.title,
+                    "references": extract_refs(s.sources or []),
+                    "referenced_by": sum_referenced_by.get(s.field_key, []),
+                }
+                for s in summaries
+            ],
+            "structure_templates": [
+                {
+                    "field_key": st.field_key,
+                    "title": st.title,
+                    "references": extract_refs(st.sources or []),
+                }
+                for st in structures
+            ],
+        }

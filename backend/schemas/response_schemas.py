@@ -500,3 +500,39 @@ class TemplateInfoResponse(BaseModel):
     core_info_templates: List[CoreInfoTemplateResponse]
     summary_templates: List[SummaryTemplateResponse]
     structure_templates: List[StructureTemplateResponse]
+
+
+# ============================================================
+# 模板依赖关系
+# ============================================================
+
+class TemplateDependencyRef(BaseModel):
+    """单条引用/被引用关系"""
+    type: str                    # keyinfo / summary / structure
+    field_key: str
+    label: str                   # field_name 或 title
+
+
+class CoreInfoDependencyItem(BaseModel):
+    field_key: str
+    field_name: str
+    referenced_by: List[TemplateDependencyRef] = []  # 被哪些摘要/章节引用
+
+
+class SummaryDependencyItem(BaseModel):
+    field_key: str
+    title: str
+    references: List[TemplateDependencyRef] = []     # 引用了哪些上游
+    referenced_by: List[TemplateDependencyRef] = []  # 被哪些章节引用
+
+
+class StructureDependencyItem(BaseModel):
+    field_key: str
+    title: str
+    references: List[TemplateDependencyRef] = []     # 引用了哪些上游
+
+
+class TemplateDependenciesResponse(BaseModel):
+    core_info_templates: List[CoreInfoDependencyItem]
+    summary_templates: List[SummaryDependencyItem]
+    structure_templates: List[StructureDependencyItem]

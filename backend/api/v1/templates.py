@@ -6,7 +6,7 @@ from uuid import UUID
 from core.response import success_response, ResponseModel
 from db.session import get_db
 from services.template_service import TemplateService
-from schemas.response_schemas import TemplateResponse, TemplateDetailResponse, TemplateListResponse, PurposeListResponse
+from schemas.response_schemas import TemplateResponse, TemplateDetailResponse, TemplateListResponse, PurposeListResponse, TemplateDependenciesResponse
 from core.auth import get_editor_user, get_admin_user, get_current_user
 
 router = APIRouter(prefix="/api/v1/templates", tags=["模板管理"])
@@ -26,6 +26,12 @@ def _template_response(t) -> TemplateResponse:
         created_at=t.created_at,
         updated_at=t.updated_at
     )
+
+
+@router.get("/{template_id}/dependencies", summary="获取模板依赖关系", response_model=ResponseModel[TemplateDependenciesResponse])
+async def get_template_dependencies(template_id: UUID, db: AsyncSession = Depends(get_db)):
+    result = await TemplateService.get_template_dependencies(db, template_id)
+    return success_response(data=result)
 
 
 @router.post("", summary="创建模板", response_model=ResponseModel[TemplateDetailResponse])
