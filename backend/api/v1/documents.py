@@ -5,12 +5,13 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
-from schemas.schemas import DocumentCreate, DocumentUpdate, SnapshotUpdate, PaginationParams
+from schemas.schemas import DocumentCreate, DocumentUpdate, SnapshotUpdate, PaginationParams, ExportTemplatePayload
 from schemas.response_schemas import (
     DocumentResponse, DocumentDetailResponse, DocumentListResponse,
     SnapshotResponse, SnapshotListResponse,
     ApplyCoreInfoResponse, ApplySummaryResponse, ApplyStructureResponse, ApplyCoreInfoItem,
-    TemplateInfoResponse, FullContentResponse, FullContentChapter, FullContentParagraph
+    TemplateInfoResponse, FullContentResponse, FullContentChapter, FullContentParagraph,
+    TemplateDetailResponse,
 )
 from core.response import success_response, ResponseModel
 from core.auth import get_current_user
@@ -92,7 +93,7 @@ async def update_document(document_id: UUID, doc_in: DocumentUpdate, db: AsyncSe
     ))
 
 
-@router.delete("/{document_id}", summary="删除文档")
+@router.delete("/{document_id}", summary="删除文档", response_model=ResponseModel[None])
 async def delete_document(document_id: UUID, db: AsyncSession = Depends(get_db)):
     result = await DocumentService.delete_document(db, document_id)
     return success_response(message=result["message"])
@@ -129,7 +130,7 @@ async def update_snapshot(
     return success_response(data=SnapshotResponse(**snapshot))
 
 
-@router.post("/{document_id}/snapshots/{snapshot_id}/restore", summary="从快照恢复文档")
+@router.post("/{document_id}/snapshots/{snapshot_id}/restore", summary="从快照恢复文档", response_model=ResponseModel[None])
 async def restore_snapshot(
     document_id: UUID,
     snapshot_id: UUID,
@@ -273,4 +274,30 @@ async def apply_structure_template(document_id: UUID, db: AsyncSession = Depends
             )
             for item in created_items
         ]
+    ))
+
+
+@router.post("/{document_id}/export-template", summary="将文档模板导出到个人模板库", response_model=ResponseModel[TemplateDetailResponse])
+async def export_template(
+    document_id: UUID,
+    payload: ExportTemplatePayload,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    template = await DocumentService.export_template(
+        db, document_id, current_user.user_id, payload.display_name
+    )
+    return success_response(data=TemplateDetailResponse(
+        template_id=template.template_id,
+        group_id=template.group_id,
+        document_id=template.document_id,
+        purpose=template.purpose,
+        display_name=template.display_name,
+        content=template.content,
+        version=template.version,
+        is_system=template.is_system,
+        user_id=template.user_id,
+        is_active=template.is_active,
+        created_at=template.created_at,
+        updated_at=template.updated_at,
     ))

@@ -7,7 +7,7 @@ from core.response import success_response, ResponseModel
 from db.session import get_db
 from services.template_service import TemplateService
 from schemas.response_schemas import TemplateResponse, TemplateDetailResponse, TemplateListResponse, PurposeListResponse
-from core.auth import get_editor_user, get_admin_user
+from core.auth import get_editor_user, get_admin_user, get_current_user
 
 router = APIRouter(prefix="/api/v1/templates", tags=["模板管理"])
 
@@ -63,11 +63,25 @@ async def list_templates(
     is_system: Optional[bool] = None,
     is_active: Optional[bool] = None,
     keyword: Optional[str] = None,
+    include_user: Optional[bool] = None,
     page: int = 1,
     page_size: int = 20,
+    current_user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    items, total = await TemplateService.list_templates(db, purpose, is_system, is_active, keyword, page, page_size)
+    """
+    获取模板列表。
+    - 普通过滤：purpose / is_system / is_active / keyword
+    - include_user=true：返回系统模板 + 当前用户个人模板库（忽略 is_system 参数）
+    """
+    if include_user:
+        items, total = await TemplateService.list_templates_for_user(
+            db, current_user.user_id, purpose, is_active, keyword, page, page_size
+        )
+    else:
+        items, total = await TemplateService.list_templates(
+            db, purpose, is_system, is_active, keyword, page, page_size
+        )
     return success_response(data=TemplateListResponse(
         page=page, page_size=page_size, total=total,
         items=[_template_response(t) for t in items]
@@ -122,7 +136,10 @@ async def get_templates_by_purpose(
     is_active: Optional[bool] = None, db: AsyncSession = Depends(get_db)
 ):
     templates = await TemplateService.get_templates_by_purpose(db, purpose, is_system, is_active)
-    return success_response(data=TemplateListResponse(items=[_template_response(t) for t in templates]))
+    return success_response(data=TemplateListResponse(
+        page=1, page_size=len(templates), total=len(templates),
+        items=[_template_response(t) for t in templates]
+    ))
 
 
 @router.post("/rollback/{template_id}", summary="回退官方模板", response_model=ResponseModel[TemplateResponse])

@@ -311,3 +311,106 @@ class DocumentService:
             ],
             "structure_templates": structure_tree
         }
+
+    @staticmethod
+    async def export_template(db: AsyncSession, document_id: UUID, user_id: UUID, display_name: str = None):
+        """
+        将文档的私有模板副本导出到用户个人模板库。
+        深拷贝主表 + 三类子模板，新记录 user_id=当前用户，document_id=null，is_system=False。
+        """
+        document = await DocumentMapper.get_document_by_id(db, document_id)
+        if not document:
+            raise HTTPException(status_code=404, detail="文档不存在")
+        if not document.template_id:
+            raise HTTPException(status_code=400, detail="文档未关联模板")
+
+        source = await TemplateMapper.get_template(db, document.template_id)
+        if not source:
+            raise HTTPException(status_code=404, detail="模板不存在")
+
+        # 1. 创建新模板主表（归属当前用户，不绑定文档）
+        new_template = Template(
+            group_id=source.group_id,
+            purpose=source.purpose,
+            display_name=display_name or source.display_name,
+            content=source.content,
+            version=1,
+            is_system=False,
+            user_id=user_id,
+            document_id=None,
+            is_active=True,
+        )
+        new_template = await TemplateMapper.create_template(db, new_template)
+
+        # 2. 深拷贝 CoreInfoTemplate
+        old_core_infos = await CoreInfoTemplateMapper.get_by_template_id(db, source.template_id)
+        if old_core_infos:
+            id_mapping = {}
+            for ci in old_core_infos:
+                id_mapping[ci.core_template_id] = uuid4()
+
+            def get_level(ci):
+                level = 0
+                curr = ci
+                while curr.parent_id:
+                    level += 1
+                    curr = next((x for x in old_core_infos if x.core_template_id == curr.parent_id), None)
+                    if not curr:
+                        break
+                return level
+
+            for ci in sorted(old_core_infos, key=get_level):
+                db.add(CoreInfoTemplate(
+                    core_template_id=id_mapping[ci.core_template_id],
+                    template_id=new_template.template_id,
+                    parent_id=id_mapping.get(ci.parent_id) if ci.parent_id else None,
+                    field_name=ci.field_name,
+                    field_key=ci.field_key,
+                    field_type=ci.field_type,
+                    default_value=ci.default_value,
+                    options=ci.options,
+                    is_required=ci.is_required,
+                    order_index=ci.order_index,
+                ))
+
+        # 3. 深拷贝 SummaryTemplate
+        old_summaries = await SummaryTemplateMapper.get_by_template_id(db, source.template_id)
+        if old_summaries:
+            for s in old_summaries:
+                db.add(SummaryTemplate(
+                    template_id=new_template.template_id,
+                    field_key=s.field_key,
+                    title=s.title,
+                    generation_mode=s.generation_mode,
+                    content_template=s.content_template,
+                    sources=s.sources,
+                    default_prompt=s.default_prompt,
+                    custom_prompt=s.custom_prompt,
+                    order_index=s.order_index,
+                ))
+
+        # 4. 深拷贝 StructureTemplate
+        old_structures = await StructureTemplateMapper.get_by_template_id(db, source.template_id)
+        if old_structures:
+            id_mapping = {}
+            for st in sorted(old_structures, key=lambda x: x.level):
+                new_id = uuid4()
+                id_mapping[st.structure_template_id] = new_id
+                db.add(StructureTemplate(
+                    structure_template_id=new_id,
+                    template_id=new_template.template_id,
+                    parent_id=id_mapping.get(st.parent_id) if st.parent_id else None,
+                    field_key=st.field_key,
+                    title=st.title,
+                    level=st.level,
+                    generation_mode=st.generation_mode,
+                    content_template=st.content_template,
+                    sources=st.sources,
+                    default_prompt=st.default_prompt,
+                    custom_prompt=st.custom_prompt,
+                    order_index=st.order_index,
+                ))
+
+        await db.commit()
+        await db.refresh(new_template)
+        return new_template
