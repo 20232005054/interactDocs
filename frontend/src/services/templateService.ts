@@ -37,7 +37,7 @@ export const templateService = {
       purpose: payload.purpose,
       display_name: payload.display_name,
       content: payload.content,
-      is_system: payload.is_system ?? false,
+      template_type: payload.template_type ?? 1,
     }}),
 
   update: (templateId: string, payload: UpdateTemplatePayload): Promise<Template> =>
@@ -49,8 +49,8 @@ export const templateService = {
   rollback: (templateId: string): Promise<Template> =>
     request.post(`/api/v1/templates/rollback/${templateId}`),
 
-  getPurposes: (isSystem = true): Promise<{ purposes: string[] }> =>
-    request.get("/api/v1/templates/purposes/list", { params: { is_system: isSystem } }),
+  getPurposes: (templateType = 1): Promise<{ purposes: string[] }> =>
+    request.get("/api/v1/templates/purposes/list", { params: { template_type: templateType } }),
 }
 
 // ============================================================

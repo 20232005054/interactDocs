@@ -7,10 +7,11 @@ from db.mappers.core_info_template_mapper import CoreInfoTemplateMapper
 from db.mappers.summary_template_mapper import SummaryTemplateMapper
 from db.mappers.structure_template_mapper import StructureTemplateMapper
 from db.models import Template, CoreInfoTemplate, SummaryTemplate, StructureTemplate
+from core.constants import TemplateType
 
 class TemplateService:
     @staticmethod
-    async def create_template(db: AsyncSession, purpose: str, display_name: str, content: dict, is_system: bool = False, user_id: UUID = None, group_id: UUID = None):
+    async def create_template(db: AsyncSession, purpose: str, display_name: str, content: dict, template_type: int = TemplateType.SYSTEM, user_id: UUID = None, group_id: UUID = None):
         """
         创建模板
         """
@@ -23,7 +24,7 @@ class TemplateService:
             display_name=display_name,
             content=content,
             version=1,
-            is_system=is_system,
+            template_type=template_type,
             user_id=user_id,
             is_active=True
         )
@@ -40,7 +41,7 @@ class TemplateService:
     async def list_templates(
         db: AsyncSession,
         purpose: str = None,
-        is_system: bool = None,
+        template_type: int = None,
         is_active: bool = None,
         keyword: str = None,
         page: int = 1,
@@ -49,14 +50,14 @@ class TemplateService:
         """
         获取模板列表（支持分页和关键词搜索）
         """
-        return await TemplateMapper.list_templates(db, purpose, is_system, is_active, keyword, page, page_size)
+        return await TemplateMapper.list_templates(db, purpose, template_type, is_active, keyword, page, page_size)
     
     @staticmethod
-    async def get_distinct_purposes(db: AsyncSession, is_system: bool = True):
+    async def get_distinct_purposes(db: AsyncSession, template_type: int = TemplateType.SYSTEM):
         """
         获取所有不同的用途
         """
-        return await TemplateMapper.get_distinct_purposes(db, is_system)
+        return await TemplateMapper.get_distinct_purposes(db, template_type)
     
    
     @staticmethod
@@ -86,7 +87,7 @@ class TemplateService:
                 display_name=kwargs.get('display_name', template.display_name),
                 content=kwargs['content'],
                 version=max_version + 1,
-                is_system=kwargs.get('is_system', template.is_system),
+                template_type=kwargs.get('template_type', template.template_type),
                 user_id=template.user_id,
                 is_active=kwargs.get('is_active', template.is_active)
             )
@@ -153,11 +154,11 @@ class TemplateService:
         from sqlalchemy import func, or_, and_
 
         base_filter = or_(
-            and_(Template.is_system == True, Template.is_active == True),
-            and_(Template.is_system == False, Template.user_id == user_id, Template.document_id == None, Template.is_active == True),
+            and_(Template.template_type == TemplateType.SYSTEM, Template.is_active == True),
+            and_(Template.template_type == TemplateType.USER_REUSABLE, Template.user_id == user_id, Template.is_active == True),
         )
 
-        query = select(Template).where(base_filter).order_by(Template.is_system.desc(), Template.updated_at.desc())
+        query = select(Template).where(base_filter).order_by(Template.template_type.asc(), Template.updated_at.desc())
 
         if purpose:
             query = query.where(Template.purpose == purpose)
@@ -176,11 +177,11 @@ class TemplateService:
         return result.scalars().all(), total
 
     @staticmethod
-    async def get_templates_by_purpose(db: AsyncSession, purpose: str, is_system: bool = None, is_active: bool = None):
+    async def get_templates_by_purpose(db: AsyncSession, purpose: str, template_type: int = None, is_active: bool = None):
         """
         根据用途获取模板列表
         """
-        return await TemplateMapper.get_templates_by_purpose(db, purpose, is_system, is_active)
+        return await TemplateMapper.get_templates_by_purpose(db, purpose, template_type, is_active)
     
     @staticmethod
     async def rollback_template(db: AsyncSession, template_id: UUID):
@@ -196,7 +197,7 @@ class TemplateService:
         result = await db.execute(
             select(Template)
             .where(Template.group_id == source_template.group_id)
-            .where(Template.is_system == True)
+            .where(Template.template_type == TemplateType.SYSTEM)
         )
         official_template = result.scalar_one_or_none()
         

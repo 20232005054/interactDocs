@@ -54,4 +54,7 @@ export const documentService = {
     if (data.code !== 200) throw new Error(data.message || "应用章节结构模板失败")
     return data.data
   },
+
+  exportTemplate: (documentId: string, displayName?: string): Promise<unknown> =>
+    request.post(`/api/v1/documents/${documentId}/export-template`, { display_name: displayName ?? null }),
 }

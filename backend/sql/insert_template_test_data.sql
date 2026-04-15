@@ -7,14 +7,14 @@
 -- =====================================================
 
 -- 1. 创建测试主模板（如果不存在）
-INSERT INTO templates (template_id, group_id, purpose, display_name, content, version, is_system, is_active)
+INSERT INTO templates (template_id, group_id, purpose, display_name, content, version, template_type, is_active)
 VALUES (
     'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
     'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
     '临床试验方案',
     '肿瘤临床试验方案模板',
     '{"description": "用于肿瘤临床试验方案的撰写", "default_prompt": "你是一位专业的临床试验方案撰写专家，请根据提供的信息撰写章节内容。"}',
-    1, TRUE, TRUE
+    1, 1, TRUE
 ) ON CONFLICT (template_id) DO NOTHING;
 
 DELETE FROM structure_templates WHERE template_id = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';

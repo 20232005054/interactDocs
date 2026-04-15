@@ -178,7 +178,8 @@ class Template(Base):
     }
     """
     version = Column(Integer, nullable=False, default=1)
-    is_system = Column(Boolean, nullable=False, default=False)
+    # template_type: 0=文档私有副本, 1=系统模板, 2=用户可复用私有模板, 3=用户公开分享(未实现)
+    template_type = Column(Integer, nullable=False, default=0)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=True)
     document_id = Column(UUID(as_uuid=True), ForeignKey("documents.document_id", ondelete="CASCADE"), nullable=True)
     is_active = Column(Boolean, nullable=False, default=True)

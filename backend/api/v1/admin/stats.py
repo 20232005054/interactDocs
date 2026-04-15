@@ -35,7 +35,7 @@ async def get_overview(
     user_count = (await db.execute(select(func.count()).select_from(User))).scalar_one()
     doc_count = (await db.execute(select(func.count()).select_from(Document))).scalar_one()
     tpl_count = (await db.execute(
-        select(func.count()).select_from(Template).where(Template.is_system == True)
+        select(func.count()).select_from(Template).where(Template.template_type == 1)
     )).scalar_one()
 
     return success_response(data=StatsOverview(

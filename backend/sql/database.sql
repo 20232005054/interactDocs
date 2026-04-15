@@ -162,7 +162,8 @@ CREATE TABLE IF NOT EXISTS templates (
     display_name VARCHAR(100) NOT NULL,
     content JSONB NOT NULL,
     version INTEGER NOT NULL DEFAULT 1,
-    is_system BOOLEAN NOT NULL DEFAULT FALSE,
+    -- template_type: 0=文档私有副本, 1=系统模板, 2=用户可复用私有模板, 3=用户公开分享(未实现)
+    template_type INTEGER NOT NULL DEFAULT 0,
     user_id UUID REFERENCES users(user_id),
     document_id UUID REFERENCES documents(document_id) ON DELETE CASCADE,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,

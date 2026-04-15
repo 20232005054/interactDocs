@@ -295,7 +295,7 @@ async def export_template(
         display_name=template.display_name,
         content=template.content,
         version=template.version,
-        is_system=template.is_system,
+        template_type=template.template_type,
         user_id=template.user_id,
         is_active=template.is_active,
         created_at=template.created_at,

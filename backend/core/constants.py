@@ -12,6 +12,21 @@ class UserRole(str, Enum):
     ADMIN = "admin"
 
 
+class TemplateType(int, Enum):
+    """模板类型枚举
+    - DOCUMENT_PRIVATE: 文档私有副本（绑定 document_id，不可复用）
+    - SYSTEM: 系统模板（editor/admin 维护，所有人可用）
+    - USER_REUSABLE: 用户导出的可复用私有模板（创建文档时可选）
+    - USER_PUBLIC: 用户公开分享模板（预留，未实现）
+    """
+    DOCUMENT_PRIVATE = 0
+    SYSTEM = 1
+    USER_REUSABLE = 2
+    USER_PUBLIC = 3
+
+
+
+
 class EdgeSourceType(str, Enum):
     PARAGRAPH = "paragraph"
     CHAPTER = "chapter"

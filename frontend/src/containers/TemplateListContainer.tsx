@@ -37,7 +37,7 @@ export default function TemplateListContainer() {
   const pageSize = 20
 
   const [keyword, setKeyword] = useState("")
-  const [isSystem, setIsSystem] = useState<boolean>(true)
+  const [isSystem, setIsSystem] = useState<boolean>(true)  // true=系统模板(type=1), false=用户模板(type!=1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -52,7 +52,7 @@ export default function TemplateListContainer() {
     try {
       const res = await templateService.list({
         keyword: debouncedKeyword || undefined,
-        is_system: isSystem,
+        template_type: isSystem ? 1 : undefined,
         is_active: true,
         page,
         page_size: pageSize,
@@ -99,7 +99,7 @@ export default function TemplateListContainer() {
           className="h-9 w-64 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring transition"
         />
 
-        {/* is_system 切换 */}
+        {/* template_type 切换 */}
         <div className="flex items-center rounded-md border border-input overflow-hidden text-sm">
           <button
             onClick={() => setIsSystem(true)}
@@ -171,7 +171,8 @@ export default function TemplateListContainer() {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex gap-1.5">
-                    {t.is_system && <Badge variant="success">系统</Badge>}
+                    {t.template_type === 1 && <Badge variant="success">系统</Badge>}
+                    {t.template_type === 2 && <Badge variant="muted">可复用</Badge>}
                     {t.is_active
                       ? <Badge variant="success">启用</Badge>
                       : <Badge variant="muted">停用</Badge>
@@ -189,7 +190,7 @@ export default function TemplateListContainer() {
                     >
                       编辑
                     </button>
-                    {!t.is_system && (
+                    {t.template_type !== 1 && (
                       <button
                         onClick={async () => {
                           if (!confirm("确认回退到官方版本？")) return

@@ -195,7 +195,7 @@ class TemplateResponse(BaseModel):
     display_name: str
     content: dict
     version: int
-    is_system: bool
+    template_type: int
     user_id: Optional[UUID] = None
     is_active: bool
     created_at: datetime

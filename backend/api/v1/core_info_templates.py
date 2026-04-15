@@ -5,7 +5,7 @@ from uuid import UUID
 
 from core.response import success_response, ResponseModel
 from core.auth import get_editor_user, get_current_user
-from core.constants import UserRole
+from core.constants import UserRole, TemplateType
 from db.session import get_db
 from services.core_info_template_service import CoreInfoTemplateService
 from services.template_service import TemplateService
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api/v1/core-info-templates", tags=["核心信息模�
 
 async def _check_template_permission(db, template_id: UUID, current_user):
     tpl = await TemplateService.get_template(db, template_id)
-    if tpl and tpl.is_system and current_user.role not in (UserRole.EDITOR, UserRole.ADMIN):
+    if tpl and tpl.template_type == TemplateType.SYSTEM and current_user.role not in (UserRole.EDITOR, UserRole.ADMIN):
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="系统模板需要编辑权限")
 

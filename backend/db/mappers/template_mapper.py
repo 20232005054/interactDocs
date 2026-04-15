@@ -49,7 +49,7 @@ class TemplateMapper:
     async def list_templates(
         db: AsyncSession,
         purpose: str = None,
-        is_system: bool = None,
+        template_type: int = None,
         is_active: bool = None,
         keyword: str = None,
         page: int = 1,
@@ -64,8 +64,8 @@ class TemplateMapper:
         query = select(Template).order_by(Template.updated_at.desc())
         if purpose:
             query = query.where(Template.purpose == purpose)
-        if is_system is not None:
-            query = query.where(Template.is_system == is_system)
+        if template_type is not None:
+            query = query.where(Template.template_type == template_type)
         if is_active is not None:
             query = query.where(Template.is_active == is_active)
         if keyword:
@@ -80,25 +80,25 @@ class TemplateMapper:
         return result.scalars().all(), total
     
     @staticmethod
-    async def get_distinct_purposes(db: AsyncSession, is_system: bool = True):
+    async def get_distinct_purposes(db: AsyncSession, template_type: int = 1):
         """
         获取所有不同的用途
         """
         query = select(Template.purpose).distinct()
-        if is_system is not None:
-            query = query.where(Template.is_system == is_system)
+        if template_type is not None:
+            query = query.where(Template.template_type == template_type)
         result = await db.execute(query)
         return [row[0] for row in result.all()]
     
     @staticmethod
-    async def get_templates_by_purpose(db: AsyncSession, purpose: str, is_system: bool = None, is_active: bool = None):
+    async def get_templates_by_purpose(db: AsyncSession, purpose: str, template_type: int = None, is_active: bool = None):
         """
         根据用途获取模板列表
         """
         query = select(Template).order_by(Template.updated_at.desc())
         query = query.where(Template.purpose == purpose)
-        if is_system is not None:
-            query = query.where(Template.is_system == is_system)
+        if template_type is not None:
+            query = query.where(Template.template_type == template_type)
         if is_active is not None:
             query = query.where(Template.is_active == is_active)
         result = await db.execute(query)

@@ -30,8 +30,8 @@ function CreateDocumentModal({ onClose, onCreated }: CreateDocumentModalProps) {
     const load = async () => {
       try {
         const [purposeRes, templateRes] = await Promise.all([
-          templateService.getPurposes(true),
-          templateService.list({ is_system: true, is_active: true, page_size: 100 }),
+          templateService.getPurposes(1),
+          templateService.list({ include_user: true, is_active: true, page_size: 100 }),
         ])
         setPurposes(purposeRes.purposes)
         setTemplates(templateRes.items)
@@ -135,11 +135,20 @@ function CreateDocumentModal({ onClose, onCreated }: CreateDocumentModalProps) {
                 className={selectCls}
               >
                 <option value="">请选择模板</option>
-                {filteredTemplates.map(t => (
-                  <option key={t.template_id} value={t.template_id}>
-                    {t.display_name}
-                  </option>
-                ))}
+                {filteredTemplates.filter(t => t.template_type === 1).length > 0 && (
+                  <optgroup label="系统模板">
+                    {filteredTemplates.filter(t => t.template_type === 1).map(t => (
+                      <option key={t.template_id} value={t.template_id}>{t.display_name}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {filteredTemplates.filter(t => t.template_type === 2).length > 0 && (
+                  <optgroup label="我的模板">
+                    {filteredTemplates.filter(t => t.template_type === 2).map(t => (
+                      <option key={t.template_id} value={t.template_id}>{t.display_name}</option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             )}
           </div>
@@ -234,6 +243,12 @@ export default function DocumentListContainer() {
               管理后台
             </button>
           )}
+          <button
+            onClick={() => router.push("/my-templates")}
+            className="text-sm text-gray-500 hover:text-gray-700 transition"
+          >
+            我的模板
+          </button>
           <span className="text-sm text-gray-500">{user?.name}</span>
           <button
             onClick={() => { clearAuth(); router.push("/login") }}

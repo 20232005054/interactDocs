@@ -8,6 +8,7 @@ from db.session import get_db
 from services.template_service import TemplateService
 from schemas.response_schemas import TemplateResponse, TemplateDetailResponse, TemplateListResponse, TemplateSimpleListResponse, PurposeListResponse, TemplateDependenciesResponse
 from core.auth import get_editor_user, get_admin_user, get_current_user
+from core.constants import TemplateType
 
 router = APIRouter(prefix="/api/v1/templates", tags=["模板管理"])
 
@@ -20,7 +21,7 @@ def _template_response(t) -> TemplateResponse:
         display_name=t.display_name,
         content=t.content,
         version=t.version,
-        is_system=t.is_system,
+        template_type=t.template_type,
         user_id=t.user_id,
         is_active=t.is_active,
         created_at=t.created_at,
@@ -37,15 +38,15 @@ async def get_template_dependencies(template_id: UUID, db: AsyncSession = Depend
 @router.post("", summary="创建模板", response_model=ResponseModel[TemplateDetailResponse])
 async def create_template(
     purpose: str, display_name: str, content: dict,
-    is_system: bool = False, user_id: Optional[UUID] = None,
+    template_type: int = TemplateType.SYSTEM, user_id: Optional[UUID] = None,
     editor=Depends(get_editor_user),
     db: AsyncSession = Depends(get_db)
 ):
-    t = await TemplateService.create_template(db, purpose, display_name, content, is_system, user_id)
+    t = await TemplateService.create_template(db, purpose, display_name, content, template_type, user_id)
     return success_response(data=TemplateDetailResponse(
         template_id=t.template_id, group_id=t.group_id, document_id=t.document_id,
         purpose=t.purpose, display_name=t.display_name, content=t.content,
-        version=t.version, is_system=t.is_system, user_id=t.user_id,
+        version=t.version, template_type=t.template_type, user_id=t.user_id,
         is_active=t.is_active, created_at=t.created_at, updated_at=t.updated_at
     ))
 
@@ -58,7 +59,7 @@ async def get_template(template_id: UUID, db: AsyncSession = Depends(get_db)):
     return success_response(data=TemplateDetailResponse(
         template_id=t.template_id, group_id=t.group_id, document_id=t.document_id,
         purpose=t.purpose, display_name=t.display_name, content=t.content,
-        version=t.version, is_system=t.is_system, user_id=t.user_id,
+        version=t.version, template_type=t.template_type, user_id=t.user_id,
         is_active=t.is_active, created_at=t.created_at, updated_at=t.updated_at
     ))
 
@@ -66,7 +67,7 @@ async def get_template(template_id: UUID, db: AsyncSession = Depends(get_db)):
 @router.get("", summary="获取模板列表", response_model=ResponseModel[TemplateListResponse])
 async def list_templates(
     purpose: Optional[str] = None,
-    is_system: Optional[bool] = None,
+    template_type: Optional[int] = None,
     is_active: Optional[bool] = None,
     keyword: Optional[str] = None,
     include_user: Optional[bool] = None,
@@ -77,8 +78,8 @@ async def list_templates(
 ):
     """
     获取模板列表。
-    - 普通过滤：purpose / is_system / is_active / keyword
-    - include_user=true：返回系统模板 + 当前用户个人模板库（忽略 is_system 参数）
+    - 普通过滤：purpose / template_type / is_active / keyword
+    - include_user=true：返回系统模板 + 当前用户个人模板库（忽略 template_type 参数）
     """
     if include_user:
         items, total = await TemplateService.list_templates_for_user(
@@ -86,7 +87,7 @@ async def list_templates(
         )
     else:
         items, total = await TemplateService.list_templates(
-            db, purpose, is_system, is_active, keyword, page, page_size
+            db, purpose, template_type, is_active, keyword, page, page_size
         )
     return success_response(data=TemplateListResponse(
         page=page, page_size=page_size, total=total,
@@ -98,12 +99,12 @@ async def list_templates(
 async def update_template(
     template_id: UUID,
     purpose: Optional[str] = None, display_name: Optional[str] = None,
-    content: Optional[dict] = None, is_system: Optional[bool] = None,
+    content: Optional[dict] = None, template_type: Optional[int] = None,
     is_active: Optional[bool] = None, editor=Depends(get_editor_user), db: AsyncSession = Depends(get_db)
 ):
     update_data = {k: v for k, v in {
         "purpose": purpose, "display_name": display_name, "content": content,
-        "is_system": is_system, "is_active": is_active
+        "template_type": template_type, "is_active": is_active
     }.items() if v is not None}
     t = await TemplateService.update_template(db, template_id, **update_data)
     if not t:
@@ -124,24 +125,24 @@ async def update_template_content(template_id: UUID, content: dict, editor=Depen
     t = await TemplateService.get_template(db, template_id)
     if not t:
         raise HTTPException(status_code=404, detail="模板不存在")
-    if t.is_system:
+    if t.template_type == TemplateType.SYSTEM:
         raise HTTPException(status_code=403, detail="不能更新官方模板")
     t = await TemplateService.update_template_content(db, template_id, content)
     return success_response(data=_template_response(t))
 
 
 @router.get("/purposes/list", summary="获取所有用途", response_model=ResponseModel[PurposeListResponse])
-async def list_purposes(is_system: bool = True, db: AsyncSession = Depends(get_db)):
-    purposes = await TemplateService.get_distinct_purposes(db, is_system)
+async def list_purposes(template_type: int = TemplateType.SYSTEM, db: AsyncSession = Depends(get_db)):
+    purposes = await TemplateService.get_distinct_purposes(db, template_type)
     return success_response(data=PurposeListResponse(purposes=purposes))
 
 
 @router.get("/by-purpose/{purpose}", summary="根据用途获取模板", response_model=ResponseModel[TemplateSimpleListResponse])
 async def get_templates_by_purpose(
-    purpose: str, is_system: Optional[bool] = None,
+    purpose: str, template_type: Optional[int] = None,
     is_active: Optional[bool] = None, db: AsyncSession = Depends(get_db)
 ):
-    templates = await TemplateService.get_templates_by_purpose(db, purpose, is_system, is_active)
+    templates = await TemplateService.get_templates_by_purpose(db, purpose, template_type, is_active)
     return success_response(data=TemplateSimpleListResponse(items=[_template_response(t) for t in templates]))
 
 

@@ -11,6 +11,7 @@ from schemas.schemas import DocumentCreate, DocumentUpdate, PaginationParams
 from uuid import UUID, uuid4
 from fastapi import HTTPException
 from services.structure_template_service import StructureTemplateService
+from core.constants import TemplateType
 
 
 class DocumentService:
@@ -22,15 +23,15 @@ class DocumentService:
         if not system_template:
             raise HTTPException(status_code=404, detail="模板不存在")
 
-        # 1. 创建新模板 (主表浅拷贝)
+        # 1. 创建新模板 (主表浅拷贝，文档私有副本)
         new_template_obj = Template(
             group_id=system_template.group_id,
             purpose=system_template.purpose,
             display_name=system_template.display_name,
             content=system_template.content,
             version=1,
-            is_system=False,
-            user_id=None,
+            template_type=TemplateType.DOCUMENT_PRIVATE,
+            user_id=user_id,
             is_active=True
         )
         new_template = await TemplateMapper.create_template(db, new_template_obj)
@@ -316,7 +317,7 @@ class DocumentService:
     async def export_template(db: AsyncSession, document_id: UUID, user_id: UUID, display_name: str = None):
         """
         将文档的私有模板副本导出到用户个人模板库。
-        深拷贝主表 + 三类子模板，新记录 user_id=当前用户，document_id=null，is_system=False。
+        深拷贝主表 + 三类子模板，新记录 template_type=USER_REUSABLE，user_id=当前用户，document_id=null。
         """
         document = await DocumentMapper.get_document_by_id(db, document_id)
         if not document:
@@ -328,7 +329,7 @@ class DocumentService:
         if not source:
             raise HTTPException(status_code=404, detail="模板不存在")
 
-        # 1. 创建新模板主表（归属当前用户，不绑定文档）
+        # 1. 创建新模板主表（归属当前用户，不绑定文档，类型为用户可复用私有模板）
         # document_id=None：此模板归属用户个人库，不绑定任何文档（nullable 外键）
         new_template = Template(
             group_id=source.group_id,
@@ -336,7 +337,7 @@ class DocumentService:
             display_name=display_name or source.display_name,
             content=source.content,
             version=1,
-            is_system=False,
+            template_type=TemplateType.USER_REUSABLE,
             user_id=user_id,
             document_id=None,
             is_active=True,

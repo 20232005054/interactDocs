@@ -105,7 +105,8 @@ export interface Template {
   display_name: string
   content: TemplateContent
   version: number
-  is_system: boolean
+  /** 0=文档私有副本 1=系统模板 2=用户可复用私有模板 3=用户公开分享(未实现) */
+  template_type: number
   user_id: string | null
   is_active: boolean
   created_at: string
@@ -125,9 +126,10 @@ export interface TemplateListResponse {
 
 export interface TemplateListParams {
   purpose?: string
-  is_system?: boolean
+  template_type?: number
   is_active?: boolean
   keyword?: string
+  include_user?: boolean
   page?: number
   page_size?: number
 }
@@ -136,14 +138,14 @@ export interface CreateTemplatePayload {
   purpose: string
   display_name: string
   content: TemplateContent
-  is_system?: boolean
+  template_type?: number
 }
 
 export interface UpdateTemplatePayload {
   purpose?: string
   display_name?: string
   content?: TemplateContent
-  is_system?: boolean
+  template_type?: number
   is_active?: boolean
 }
 

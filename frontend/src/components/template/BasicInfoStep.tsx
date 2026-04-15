@@ -27,7 +27,7 @@ const selectCls = "h-9 rounded border border-gray-300 bg-white px-2 text-sm outl
 export default function BasicInfoStep({ templateId, initialData, onSaved }: BasicInfoStepProps) {
   const [displayName, setDisplayName] = useState(initialData?.display_name ?? "")
   const [purpose, setPurpose] = useState(initialData?.purpose ?? "")
-  const [isSystem, setIsSystem] = useState(initialData?.is_system ?? true)
+  const [templateType, setTemplateType] = useState(initialData?.template_type ?? 1)
   const [isActive, setIsActive] = useState(initialData?.is_active ?? true)
 
   const [loading, setLoading] = useState(false)
@@ -47,7 +47,7 @@ export default function BasicInfoStep({ templateId, initialData, onSaved }: Basi
         result = await templateService.update(templateId, {
           display_name: displayName.trim(),
           purpose: purpose.trim(),
-          is_system: isSystem,
+          template_type: templateType,
           is_active: isActive,
         }) as unknown as TemplateDetail
         result = { ...result, document_id: initialData?.document_id ?? null }
@@ -56,7 +56,7 @@ export default function BasicInfoStep({ templateId, initialData, onSaved }: Basi
           display_name: displayName.trim(),
           purpose: purpose.trim(),
           content: {},
-          is_system: isSystem,
+          template_type: templateType,
         })
       }
       onSaved(result)
@@ -102,12 +102,13 @@ export default function BasicInfoStep({ templateId, initialData, onSaved }: Basi
       <div className="flex items-center gap-8">
         <FormRow label="模板类型">
           <select
-            value={isSystem ? "system" : "user"}
-            onChange={e => setIsSystem(e.target.value === "system")}
-            className={`${selectCls} w-32`}
+            value={templateType}
+            onChange={e => setTemplateType(Number(e.target.value))}
+            className={`${selectCls} w-36`}
           >
-            <option value="system">系统模板</option>
-            <option value="user">用户模板</option>
+            <option value={1}>系统模板</option>
+            <option value={2}>用户可复用</option>
+            <option value={0}>文档私有</option>
           </select>
         </FormRow>
         <FormRow label="模板状态">
