@@ -415,6 +415,37 @@ export interface UpdateSummaryPayload {
 }
 
 // ============================================================
+// AI 对话
+// ============================================================
+export interface AIChatSelectedParagraph {
+  paragraph_id: string
+  content: string
+  para_type?: ParaType
+}
+
+export interface AIChatSelectedSummary {
+  summary_id: string
+  title: string
+  content: string
+}
+
+export interface AIChatRequestPayload {
+  message: string
+  document_id: string
+  current_chapter_id?: string
+  selected_paragraphs?: AIChatSelectedParagraph[]
+  selected_summaries?: AIChatSelectedSummary[]
+}
+
+export interface AIChatAction {
+  type: string
+  target_type?: string
+  target_id?: string
+  suggested_content?: string
+  [key: string]: unknown
+}
+
+// ============================================================
 // 核心信息（文档实例）
 // ============================================================
 export interface CoreInfo {

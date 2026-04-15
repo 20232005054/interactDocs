@@ -4,6 +4,7 @@ import { useRef, useState, useEffect } from "react"
 import { paragraphService } from "@/services/paragraphService"
 import { useDocumentStore } from "@/store/documentStore"
 import { useEditorStore } from "@/store/editorStore"
+import { useChatStore } from "@/store/chatStore"
 import type { ChapterTreeNode, Paragraph } from "@/types/api"
 import { cn } from "@/lib/utils"
 import ParagraphToolbar from "@/components/editor/ParagraphToolbar"
@@ -35,12 +36,16 @@ function flattenTree(nodes: ChapterTreeNode[], depth = 0): FlatChapter[] {
 interface ParagraphRowProps {
   paragraph: Paragraph
   chapterId: string
+  chapterTitle: string
   onReload: () => void
 }
 
-function ParagraphRow({ paragraph, chapterId, onReload }: ParagraphRowProps) {
+function ParagraphRow({ paragraph, chapterId, chapterTitle, onReload }: ParagraphRowProps) {
   const { updateParagraph } = useDocumentStore()
   const { setActiveParagraphId, activeParagraphId } = useEditorStore()
+  const upsertSelectionParagraphContext = useChatStore((state) => state.upsertSelectionParagraphContext)
+  const updateParagraphContextContent = useChatStore((state) => state.updateParagraphContextContent)
+  const removeParagraphContexts = useChatStore((state) => state.removeParagraphContexts)
 
   const [localContent, setLocalContent] = useState(paragraph.content)
   const [saving, setSaving] = useState(false)
@@ -61,6 +66,7 @@ function ParagraphRow({ paragraph, chapterId, onReload }: ParagraphRowProps) {
   const handleChange = (val: string) => {
     setLocalContent(val)
     updateParagraph(chapterId, paragraph.paragraph_id, val)
+    updateParagraphContextContent(paragraph.paragraph_id, val)
     // 防抖保存
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(async () => {
@@ -87,6 +93,7 @@ function ParagraphRow({ paragraph, chapterId, onReload }: ParagraphRowProps) {
     setMenuOpen(false)
     try {
       await paragraphService.delete(paragraph.paragraph_id)
+      removeParagraphContexts(paragraph.paragraph_id)
       onReload()
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : "删除失败")
@@ -108,6 +115,24 @@ function ParagraphRow({ paragraph, chapterId, onReload }: ParagraphRowProps) {
     heading1: "一级标题",
     heading2: "二级标题",
     heading3: "三级标题",
+  }
+
+  const handleTextInteraction = (event: React.MouseEvent<HTMLTextAreaElement>) => {
+    const target = event.currentTarget
+    const selectionStart = target.selectionStart ?? 0
+    const selectionEnd = target.selectionEnd ?? 0
+    const selectedText = selectionStart !== selectionEnd
+      ? target.value.slice(selectionStart, selectionEnd).trim()
+      : undefined
+
+    upsertSelectionParagraphContext({
+      paragraph_id: paragraph.paragraph_id,
+      chapter_id: chapterId,
+      chapter_title: chapterTitle,
+      content: localContent,
+      para_type: paragraph.para_type,
+      selected_text: selectedText || undefined,
+    })
   }
 
   return (
@@ -160,6 +185,7 @@ function ParagraphRow({ paragraph, chapterId, onReload }: ParagraphRowProps) {
           value={localContent}
           onChange={e => handleChange(e.target.value)}
           onFocus={() => setActiveParagraphId(paragraph.paragraph_id)}
+          onMouseUp={handleTextInteraction}
           rows={1}
           className={cn(
             "w-full resize-none bg-transparent outline-none leading-relaxed",
@@ -189,6 +215,9 @@ function ParagraphRow({ paragraph, chapterId, onReload }: ParagraphRowProps) {
             <ParagraphToolbar
               paragraphId={paragraph.paragraph_id}
               chapterId={chapterId}
+              chapterTitle={chapterTitle}
+              paragraphContent={localContent}
+              paraType={paragraph.para_type}
               hasContent={localContent.trim().length > 0}
             />
           </div>
@@ -281,6 +310,7 @@ function ChapterBlock({ flatChapter, onReload }: ChapterBlockProps) {
                   key={p.paragraph_id}
                   paragraph={p}
                   chapterId={node.chapter_id}
+                  chapterTitle={node.title}
                   onReload={onReload}
                 />
               ))}

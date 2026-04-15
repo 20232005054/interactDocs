@@ -8,6 +8,7 @@ import { coreInfoService } from "@/services/coreInfoService"
 import { documentService } from "@/services/documentService"
 import { useDocumentStore } from "@/store/documentStore"
 import { useEditorStore, type RightPanelTab } from "@/store/editorStore"
+import { useChatStore } from "@/store/chatStore"
 import { useAuthStore } from "@/store/authStore"
 import { cn } from "@/lib/utils"
 import ChapterTree from "@/components/editor/ChapterTree"
@@ -26,6 +27,7 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
   const { user } = useAuthStore()
   const { setFullContent, setSummaries, setCoreInfoTree, reset, documentTitle } = useDocumentStore()
   const { rightPanelTab, setRightPanelTab } = useEditorStore()
+  const resetChat = useChatStore((state) => state.reset)
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -56,9 +58,13 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
   }, [documentId, setFullContent, setSummaries, setCoreInfoTree])
 
   useEffect(() => {
+    resetChat()
     load()
-    return () => reset()
-  }, [load, reset])
+    return () => {
+      reset()
+      resetChat()
+    }
+  }, [load, reset, resetChat])
 
   const tabs: { key: RightPanelTab; label: string }[] = [
     { key: "core-info", label: "核心信息" },

@@ -1,9 +1,12 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
+import { aiService } from "@/services/aiService"
 import { useEditorStore } from "@/store/editorStore"
-import { useDocumentStore } from "@/store/documentStore"
+import { useChatStore, type ChatContextItem } from "@/store/chatStore"
 import { cn } from "@/lib/utils"
+
+const INPUT_MAX_HEIGHT = 120
 
 interface Message {
   id: string
@@ -16,9 +19,38 @@ interface AIChatPanelProps {
   documentId: string
 }
 
+function getContextMeta(item: ChatContextItem) {
+  if (item.kind === "paragraph") {
+    const typeLabelMap: Record<string, string> = {
+      paragraph: "正文",
+      heading1: "一级标题",
+      heading2: "二级标题",
+      heading3: "三级标题",
+    }
+
+    const title = item.chapter_title ? `${item.chapter_title} · ${typeLabelMap[item.para_type ?? "paragraph"]}` : "段落上下文"
+    const previewSource = item.selected_text || item.content
+    const preview = previewSource.replace(/\s+/g, " ").trim() || "空内容"
+
+    return {
+      tag: item.source === "selection" ? "当前操作" : "手动添加",
+      title,
+      preview,
+    }
+  }
+
+  return {
+    tag: "手动添加",
+    title: item.title || "摘要上下文",
+    preview: item.content.replace(/\s+/g, " ").trim() || "空内容",
+  }
+}
+
 export default function AIChatPanel({ documentId }: AIChatPanelProps) {
-  const { activeChapterId, activeParagraphId } = useEditorStore()
-  const { tree, summaries } = useDocumentStore()
+  const { activeChapterId } = useEditorStore()
+  const contextItems = useChatStore((state) => state.contextItems)
+  const removeContext = useChatStore((state) => state.removeContext)
+  const clearContexts = useChatStore((state) => state.clearContexts)
 
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
@@ -27,24 +59,21 @@ export default function AIChatPanel({ documentId }: AIChatPanelProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // 滚动到底部
+  const adjustTextareaHeight = useCallback((element: HTMLTextAreaElement | null) => {
+    if (!element) return
+    element.style.height = "auto"
+    const nextHeight = Math.min(element.scrollHeight, INPUT_MAX_HEIGHT)
+    element.style.height = `${nextHeight}px`
+    element.style.overflowY = element.scrollHeight > INPUT_MAX_HEIGHT ? "auto" : "hidden"
+  }, [])
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  // 找当前章节的段落（作为上下文）
-  const findParagraphsInChapter = useCallback((chapterId: string | null) => {
-    if (!chapterId) return []
-    const walk = (nodes: typeof tree): typeof tree[0]["paragraphs"] => {
-      for (const n of nodes) {
-        if (n.chapter_id === chapterId) return n.paragraphs
-        const found = walk(n.children)
-        if (found.length) return found
-      }
-      return []
-    }
-    return walk(tree)
-  }, [tree])
+  useEffect(() => {
+    adjustTextareaHeight(textareaRef.current)
+  }, [input, adjustTextareaHeight])
 
   const handleSend = useCallback(async () => {
     const text = input.trim()
@@ -54,98 +83,77 @@ export default function AIChatPanel({ documentId }: AIChatPanelProps) {
     const assistantId = (Date.now() + 1).toString()
     const assistantMsg: Message = { id: assistantId, role: "assistant", content: "", streaming: true }
 
-    setMessages(prev => [...prev, userMsg, assistantMsg])
+    setMessages((prev) => [...prev, userMsg, assistantMsg])
     setInput("")
     setStreaming(true)
 
-    // 构建上下文
-    const paragraphs = findParagraphsInChapter(activeChapterId)
-    const selectedParagraphs = activeParagraphId
-      ? paragraphs.filter(p => p.paragraph_id === activeParagraphId).map(p => ({
-          paragraph_id: p.paragraph_id,
-          content: p.content,
-          para_type: p.para_type,
-        }))
-      : []
+    const selectedParagraphs = contextItems
+      .filter((item) => item.kind === "paragraph")
+      .map((item) => ({
+        paragraph_id: item.paragraph_id,
+        para_type: item.para_type,
+        content: item.selected_text
+          ? `用户重点选中的片段：${item.selected_text}\n\n段落全文：${item.content}`
+          : item.content,
+      }))
 
-    const selectedSummaries = summaries.slice(0, 3).map(s => ({
-      summary_id: s.summary_id,
-      title: s.title,
-      content: s.content,
-    }))
+    const selectedSummaries = contextItems
+      .filter((item) => item.kind === "summary")
+      .map((item) => ({
+        summary_id: item.summary_id,
+        title: item.title,
+        content: item.content,
+      }))
 
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
     const abort = new AbortController()
     abortRef.current = abort
 
     try {
-      const res = await fetch("/api/v1/ai/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
+      const result = await aiService.chatStream(
+        {
           message: text,
           document_id: documentId,
           current_chapter_id: activeChapterId ?? undefined,
           selected_paragraphs: selectedParagraphs.length ? selectedParagraphs : undefined,
           selected_summaries: selectedSummaries.length ? selectedSummaries : undefined,
-        }),
-        signal: abort.signal,
-      })
-
-      if (!res.ok || !res.body) throw new Error("请求失败")
-
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ""
-      let accumulated = ""
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split("\n")
-        buffer = lines.pop() ?? ""
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue
-          const raw = line.slice(6).trim()
-          if (!raw || raw === "[DONE]") continue
-          try {
-            const parsed = JSON.parse(raw)
-            if (parsed.response) {
-              accumulated += parsed.response
-              setMessages(prev => prev.map(m =>
-                m.id === assistantId ? { ...m, content: accumulated } : m
-              ))
-            }
-          } catch {
-            // 忽略解析错误
-          }
+        },
+        {
+          signal: abort.signal,
+          onChunk: (_, accumulated) => {
+            setMessages((prev) => prev.map((message) => (
+              message.id === assistantId
+                ? { ...message, content: accumulated }
+                : message
+            )))
+          },
         }
-      }
+      )
+
+      setMessages((prev) => prev.map((message) => (
+        message.id === assistantId
+          ? { ...message, content: result.response, streaming: false }
+          : message
+      )))
     } catch (err: unknown) {
       if ((err as Error)?.name === "AbortError") return
-      setMessages(prev => prev.map(m =>
-        m.id === assistantId
-          ? { ...m, content: "请求失败，请重试", streaming: false }
-          : m
-      ))
+      setMessages((prev) => prev.map((message) => (
+        message.id === assistantId
+          ? { ...message, content: err instanceof Error ? err.message : "请求失败，请重试", streaming: false }
+          : message
+      )))
     } finally {
+      abortRef.current = null
       setStreaming(false)
-      setMessages(prev => prev.map(m =>
-        m.id === assistantId ? { ...m, streaming: false } : m
-      ))
+      setMessages((prev) => prev.map((message) => (
+        message.id === assistantId ? { ...message, streaming: false } : message
+      )))
     }
-  }, [input, streaming, documentId, activeChapterId, activeParagraphId, findParagraphsInChapter, summaries])
+  }, [activeChapterId, contextItems, documentId, input, streaming])
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault()
+      void handleSend()
     }
   }
 
@@ -154,58 +162,58 @@ export default function AIChatPanel({ documentId }: AIChatPanelProps) {
     setStreaming(false)
   }
 
-  const handleClear = () => {
+  const handleClearConversation = () => {
     if (streaming) handleStop()
     setMessages([])
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* 顶部工具栏 */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 shrink-0">
+    <div className="flex h-full flex-col">
+      <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-3 py-2">
         <span className="text-xs text-gray-500">
           {activeChapterId ? "当前章节上下文已加载" : "全文档上下文"}
         </span>
         <button
-          onClick={handleClear}
-          className="text-xs text-gray-400 hover:text-gray-600 transition"
+          onClick={handleClearConversation}
+          className="text-xs text-gray-400 transition hover:text-gray-600"
         >
-          清空
+          清空对话
         </button>
       </div>
 
-      {/* 消息列表 */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-3">
+      <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-3 py-3">
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center text-gray-400 gap-2">
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-gray-400">
             <p className="text-sm">AI 助手</p>
-            <p className="text-xs">可以询问文档内容、请求修改建议、或让 AI 帮你完善章节</p>
+            <p className="text-xs">点击段落或使用“添加上下文”，再向 AI 提问</p>
           </div>
         )}
 
-        {messages.map(msg => (
+        {messages.map((message) => (
           <div
-            key={msg.id}
+            key={message.id}
             className={cn(
               "flex",
-              msg.role === "user" ? "justify-end" : "justify-start"
+              message.role === "user" ? "justify-end" : "justify-start"
             )}
           >
-            <div className={cn(
-              "max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed",
-              msg.role === "user"
-                ? "bg-blue-500 text-white rounded-br-sm"
-                : "bg-gray-100 text-gray-800 rounded-bl-sm"
-            )}>
-              {msg.content || (msg.streaming && (
+            <div
+              className={cn(
+                "max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed",
+                message.role === "user"
+                  ? "rounded-br-sm bg-blue-500 text-white"
+                  : "rounded-bl-sm bg-gray-100 text-gray-800"
+              )}
+            >
+              {message.content || (message.streaming && (
                 <span className="inline-flex gap-0.5">
-                  <span className="w-1 h-1 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <span className="w-1 h-1 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <span className="w-1 h-1 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+                  <span className="h-1 w-1 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: "0ms" }} />
+                  <span className="h-1 w-1 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: "150ms" }} />
+                  <span className="h-1 w-1 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: "300ms" }} />
                 </span>
               ))}
-              {msg.streaming && msg.content && (
-                <span className="inline-block w-0.5 h-3 bg-gray-500 ml-0.5 animate-pulse align-middle" />
+              {message.streaming && message.content && (
+                <span className="ml-0.5 inline-block h-3 w-0.5 animate-pulse align-middle bg-gray-500" />
               )}
             </div>
           </div>
@@ -213,38 +221,78 @@ export default function AIChatPanel({ documentId }: AIChatPanelProps) {
         <div ref={bottomRef} />
       </div>
 
-      {/* 输入区 */}
       <div className="shrink-0 border-t border-gray-100 px-3 py-2">
-        <div className="flex gap-2 items-end">
+        {contextItems.length > 0 && (
+          <div className="mb-2 flex items-start justify-between gap-2">
+            <div className="flex flex-wrap gap-2">
+              {contextItems.map((item) => {
+                const meta = getContextMeta(item)
+                return (
+                  <div
+                    key={item.context_id}
+                    className="flex max-w-full items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="rounded bg-amber-100 px-1 py-0.5 text-[10px] font-medium text-amber-700">
+                          {meta.tag}
+                        </span>
+                        <div className="text-[11px] font-medium text-amber-700">{meta.title}</div>
+                      </div>
+                      <div className="max-w-[180px] truncate text-[11px] text-amber-900/80">
+                        {meta.preview}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeContext(item.context_id)}
+                      className="shrink-0 text-[11px] text-amber-500 transition hover:text-amber-700"
+                      title="移除上下文"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={clearContexts}
+              className="shrink-0 pt-1 text-[11px] text-gray-400 transition hover:text-gray-600"
+            >
+              清空上下文
+            </button>
+          </div>
+        )}
+
+        <div className="relative">
           <textarea
             ref={textareaRef}
             value={input}
-            onChange={e => setInput(e.target.value)}
+            onChange={(event) => setInput(event.target.value)}
             onKeyDown={handleKeyDown}
             disabled={streaming}
             rows={1}
             placeholder="输入消息，Enter 发送，Shift+Enter 换行"
-            className="flex-1 resize-none rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs outline-none focus:border-blue-300 focus:bg-white transition leading-relaxed disabled:opacity-50"
-            style={{ maxHeight: "120px" }}
-            onInput={e => {
-              const el = e.currentTarget
-              el.style.height = "auto"
-              el.style.height = `${Math.min(el.scrollHeight, 120)}px`
-            }}
+            className="w-full resize-none rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 pr-11 text-xs leading-relaxed outline-none transition focus:border-blue-300 focus:bg-white disabled:opacity-50"
+            style={{ maxHeight: `${INPUT_MAX_HEIGHT}px`, overflowY: "hidden" }}
+            onInput={(event) => adjustTextareaHeight(event.currentTarget)}
           />
+
           {streaming ? (
             <button
               onClick={handleStop}
-              className="shrink-0 h-8 w-8 flex items-center justify-center rounded-lg bg-red-100 text-red-500 hover:bg-red-200 transition"
+              className="absolute bottom-2 right-2 flex h-7 w-7 items-center justify-center rounded-md bg-red-100 text-red-500 transition hover:bg-red-200"
               title="停止"
             >
               ■
             </button>
           ) : (
             <button
-              onClick={handleSend}
+              onClick={() => void handleSend()}
               disabled={!input.trim()}
-              className="shrink-0 h-8 w-8 flex items-center justify-center rounded-lg bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-40 transition"
+              className="absolute bottom-2 right-2 flex h-7 w-7 items-center justify-center rounded-md bg-blue-500 text-white transition hover:bg-blue-600 disabled:opacity-40"
               title="发送"
             >
               ↑

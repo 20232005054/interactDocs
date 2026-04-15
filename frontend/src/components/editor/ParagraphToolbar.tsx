@@ -2,16 +2,32 @@
 
 import { useState, useRef } from "react"
 import { useAIAssist } from "@/hooks/useAIAssist"
+import { useChatStore } from "@/store/chatStore"
 import { cn } from "@/lib/utils"
+import type { ParaType } from "@/types/api"
 
 interface ParagraphToolbarProps {
   paragraphId: string
   chapterId: string
+  chapterTitle: string
+  paragraphContent: string
+  paraType: ParaType
   hasContent: boolean
 }
 
-export default function ParagraphToolbar({ paragraphId, chapterId, hasContent }: ParagraphToolbarProps) {
+export default function ParagraphToolbar({
+  paragraphId,
+  chapterId,
+  chapterTitle,
+  paragraphContent,
+  paraType,
+  hasContent,
+}: ParagraphToolbarProps) {
   const { aiAssistingParagraphId, aiAssistPreview, startAssist, applyAssist, discardAssist } = useAIAssist()
+  const upsertManualParagraphContext = useChatStore((state) => state.upsertManualParagraphContext)
+  const hasContext = useChatStore((state) => state.contextItems.some((item) => (
+    item.kind === "paragraph" && item.source === "manual" && item.paragraph_id === paragraphId
+  )))
 
   const [evaluating, setEvaluating] = useState(false)
   const [evalResult, setEvalResult] = useState<{ evaluation: string; suggestions: string[] } | null>(null)
@@ -21,6 +37,16 @@ export default function ParagraphToolbar({ paragraphId, chapterId, hasContent }:
 
   const isAssisting = aiAssistingParagraphId === paragraphId
   const hasPreview = isAssisting && aiAssistPreview.length > 0
+
+  const handleAddContext = () => {
+    upsertManualParagraphContext({
+      paragraph_id: paragraphId,
+      chapter_id: chapterId,
+      chapter_title: chapterTitle,
+      content: paragraphContent,
+      para_type: paraType,
+    })
+  }
 
   // AI 评估
   const handleEvaluate = async () => {
@@ -121,6 +147,19 @@ export default function ParagraphToolbar({ paragraphId, chapterId, hasContent }:
             )}
           </div>
         )}
+
+        <button
+          type="button"
+          onClick={handleAddContext}
+          className={cn(
+            "h-6 px-2 rounded text-xs transition font-medium",
+            hasContext
+              ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
+              : "bg-amber-50 text-amber-600 hover:bg-amber-100"
+          )}
+        >
+          {hasContext ? "已加上下文" : "添加上下文"}
+        </button>
 
         <button
           type="button"
