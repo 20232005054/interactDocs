@@ -2,11 +2,25 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { useAuthStore } from "@/store/authStore"
+import { cn } from "@/lib/utils"
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+interface AdminLayoutProps {
+  children: React.ReactNode
+}
+
+const NAV_ITEMS = [
+  { href: "/admin", label: "总览", exact: true },
+  { href: "/admin/users", label: "用户管理" },
+  { href: "/admin/documents", label: "文档管理" },
+  { href: "/admin/templates", label: "模板管理" },
+]
+
+export default function AdminLayout({ children }: AdminLayoutProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const { user, clearAuth } = useAuthStore()
   const [initialized, setInitialized] = useState(false)
 
@@ -23,7 +37,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         localStorage.removeItem("user")
       }
     }
-    setInitialized(true)
+    const frameId = window.requestAnimationFrame(() => {
+      setInitialized(true)
+    })
+
+    return () => {
+      window.cancelAnimationFrame(frameId)
+    }
   }, [])
 
   useEffect(() => {
@@ -53,18 +73,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <header className="h-14 bg-card border-b border-border flex items-center px-6 gap-6">
         <span className="font-semibold text-foreground">InteractiveDocs 管理后台</span>
         <nav className="flex gap-4 ml-4">
-          <Link href="/admin" className="text-sm text-muted-foreground hover:text-foreground transition">
-            总览
-          </Link>
-          <Link href="/admin/users" className="text-sm text-muted-foreground hover:text-foreground transition">
-            用户管理
-          </Link>
-          <Link href="/admin/documents" className="text-sm text-muted-foreground hover:text-foreground transition">
-            文档管理
-          </Link>
-          <Link href="/admin/templates" className="text-sm text-muted-foreground hover:text-foreground transition">
-            模板管理
-          </Link>
+          {NAV_ITEMS.map((item) => {
+            const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href)
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "text-sm transition",
+                  isActive ? "font-medium text-foreground" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {item.label}
+              </Link>
+            )
+          })}
         </nav>
         <div className="ml-auto flex items-center gap-3">
           <span className="text-sm text-muted-foreground">{user.name}</span>
