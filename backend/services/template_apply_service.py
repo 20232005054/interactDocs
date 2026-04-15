@@ -217,6 +217,33 @@ class TemplateApplyService:
                     content = SummaryTemplateService.generate_content_copy_mode(
                         template.content_template, template.sources, source_data_map
                     )
+            elif generation_mode == 2:
+                # 直接使用：content_template 原文，不做任何替换
+                content = template.content_template or ""
+            elif generation_mode == 3:
+                # AI修改：以 content_template 为草稿，AI 润色
+                try:
+                    content = await SummaryTemplateService.render_ai_content(
+                        db=db,
+                        document=document,
+                        summary_template=template,
+                        generated_summary_map=existing_summaries_map,
+                        source_data_map=source_data_map,
+                        draft=template.content_template,
+                    )
+                except Exception as exc:
+                    error_code, duration_ms = TemplateApplyService._extract_ai_error_fields(exc)
+                    generation_error = TemplateApplyService._build_generation_error(
+                        template_id=str(template.summary_template_id),
+                        field_key=template.field_key,
+                        generation_mode=generation_mode,
+                        error_type=type(exc).__name__,
+                        error_message=str(exc),
+                        error_code=error_code,
+                        duration_ms=duration_ms,
+                    )
+                if not content:
+                    content = template.content_template or ""
             else:
                 generation_error = TemplateApplyService._build_generation_error(
                     template_id=str(template.summary_template_id),
@@ -346,7 +373,7 @@ class TemplateApplyService:
             paragraph = None
             paragraph_content = ""
 
-            if generation_mode in (0, 1):
+            if generation_mode in (0, 1, 3):
                 if generation_mode == 0:
                     source_data_map = {}
                     try:
@@ -359,9 +386,26 @@ class TemplateApplyService:
                         template.content_template, template.sources, source_data_map
                     )
                 else:
-                    paragraph_content = ""  # AI 模式先留空
+                    paragraph_content = ""  # AI 模式（1/3）先留空
 
-                if paragraph_content or generation_mode == 1:
+                if paragraph_content or generation_mode in (1, 3):
+                    paragraph = Paragraph(
+                        chapter_id=chapter.chapter_id,
+                        content=paragraph_content,
+                        para_type="paragraph",
+                        order_index=0,
+                        ai_eval=None,
+                        ai_suggestion=None,
+                        ai_generate=None,
+                        ischange=0,
+                    )
+                    db.add(paragraph)
+                    await db.flush()
+                    paragraph_id_map[template.structure_template_id] = paragraph.paragraph_id
+            elif generation_mode == 2:
+                # 直接使用：content_template 原文，不替换变量
+                paragraph_content = template.content_template or ""
+                if paragraph_content:
                     paragraph = Paragraph(
                         chapter_id=chapter.chapter_id,
                         content=paragraph_content,
@@ -397,7 +441,7 @@ class TemplateApplyService:
         # ----------------------------------------------------------------
         ai_tasks = [
             item for item in created_chapters
-            if item["generation_mode"] == 1
+            if item["generation_mode"] in (1, 3)
             and item["template"].structure_template_id in paragraph_id_map
         ]
 
@@ -433,6 +477,7 @@ class TemplateApplyService:
                                 document=document,
                                 structure_template=template,
                                 source_data_map=source_data_map,
+                                draft=template.content_template if item["generation_mode"] == 3 else None,
                             )
                         except Exception as exc:
                             error_code, duration_ms = TemplateApplyService._extract_ai_error_fields(exc)
@@ -461,7 +506,6 @@ class TemplateApplyService:
                         )
 
                     return item, content, generation_error
-
             results = await asyncio.gather(*[run_ai(item) for item in ai_tasks], return_exceptions=True)
 
             # 批量更新段落内容

@@ -133,8 +133,9 @@ class TemplateRenderService:
         template_id: str = None,
         generated_summary_map: Dict[str, str] = None,
         source_data_map: Dict[str, str] = None,
+        draft: str = None,
     ) -> str:
-        if not prompt:
+        if not prompt and not draft:
             return ""
 
         print(f"\n========== 开始生成 AI 内容: [{title}] ==========")
@@ -173,8 +174,13 @@ class TemplateRenderService:
             if not has_data:
                 sources_text = ""
 
-        base_prompt = TemplateRenderService.render_template_variables(prompt, variable_map)
+        base_prompt = TemplateRenderService.render_template_variables(prompt or "", variable_map)
         title_context = f"当前需要生成的摘要/内容模块名称为：【{title}】\n"
+
+        # mode 3：草稿润色，把草稿拼入 prompt
+        draft_context = ""
+        if draft and draft.strip():
+            draft_context = f"\n\n【当前草稿内容】\n{draft.strip()}\n请在以上草稿基础上进行修改完善，使其更专业、更符合临床研究规范。\n"
 
         core_info_background = ""
         try:
@@ -184,7 +190,7 @@ class TemplateRenderService:
         except Exception:
             pass
 
-        final_prompt = f"{title_context}{base_prompt}{core_info_background}{sources_text}"
+        final_prompt = f"{title_context}{base_prompt}{draft_context}{core_info_background}{sources_text}"
         print(f"-> 最终构建的 AI 提示词 (final_prompt):\n{final_prompt}")
 
         content = await TemplateRenderService._call_ai_renderer(
