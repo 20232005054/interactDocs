@@ -1,12 +1,14 @@
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, update as sa_update
 from db.mappers.paragraph_mapper import ParagraphMapper
 from db.mappers.dependency_edge_mapper import DependencyEdgeMapper
 from db.mappers.summary_mapper import SummaryMapper
-from db.models import Paragraph
+from db.models import Paragraph, Chapter, Document, StructureTemplate
 from schemas.schemas import ParagraphCreate, ParagraphUpdate
 from uuid import UUID
 from fastapi import HTTPException
 from core.constants import EdgeSourceType, EdgeTargetType
+from services.ai_client import call_qwen_once
 
 class ParagraphService:
     @staticmethod
@@ -114,27 +116,104 @@ class ParagraphService:
     @staticmethod
     async def apply_ai_assist_result(db: AsyncSession, paragraph_id: UUID):
         """
-        应用AI帮填结果，将ai_generate字段的内容填充到content字段
+        应用AI帮填结果，将ai_generate字段的内容填充到content字段。
+        反哺用的 instruction 从数据库的 ai_instruction 字段取，与 ai_generate 严格配对。
         """
-        # 获取段落信息
         paragraph = await ParagraphMapper.get_paragraph_by_id(db, paragraph_id)
         if not paragraph:
             raise HTTPException(status_code=404, detail="段落不存在")
-        
+
+        print(f"[apply] ai_instruction={paragraph.ai_instruction!r}")
+
         if not paragraph.ai_generate:
             raise HTTPException(status_code=400, detail="AI帮填结果不存在")
-        
-        # 构建更新数据：将ai_generate内容填充到content，ischange置0
+
+        # 先保存 instruction，update 后对象状态可能被刷新
+        saved_instruction = paragraph.ai_instruction
+
         update_data = {
             "content": paragraph.ai_generate,
-            "ischange": 0  # 重置为无变更状态
+            "ischange": 0,
+            "ai_instruction": None,
         }
-        
-        # 更新段落
+
         await ParagraphMapper.update_paragraph(db, paragraph_id, update_data)
-        
-        # 返回更新后的段落
+
+        # 反哺模板（有 ai_instruction 时触发，与 ai_generate 严格配对）
+        if saved_instruction and saved_instruction.strip():
+            print(f"[反哺] 触发反哺，instruction={saved_instruction!r}")
+            try:
+                await ParagraphService._feedback_to_template(db, paragraph_id, saved_instruction.strip())
+            except Exception as e:
+                import traceback
+                print(f"[反哺] 异常: {e}")
+                traceback.print_exc()
+        else:
+            print(f"[反哺] ai_instruction 为空，跳过。值={saved_instruction!r}")
+
         return await ParagraphMapper.get_paragraph_by_id(db, paragraph_id)
+
+    @staticmethod
+    async def _feedback_to_template(db: AsyncSession, paragraph_id: UUID, instruction: str):
+        paragraph = await ParagraphMapper.get_paragraph_by_id(db, paragraph_id)
+        if not paragraph:
+            print(f"[反哺] 段落不存在: {paragraph_id}")
+            return
+
+        chapter_result = await db.execute(
+            select(Chapter).where(Chapter.chapter_id == paragraph.chapter_id)
+        )
+        chapter = chapter_result.scalar_one_or_none()
+        if not chapter or not chapter.field_key:
+            print(f"[反哺] 章节无 field_key，跳过。chapter_id={paragraph.chapter_id}, field_key={getattr(chapter, 'field_key', None)}")
+            return
+
+        print(f"[反哺] 章节 field_key={chapter.field_key}, instruction={instruction}")
+
+        doc_result = await db.execute(
+            select(Document).where(Document.document_id == chapter.document_id)
+        )
+        document = doc_result.scalar_one_or_none()
+        if not document or not document.template_id:
+            print(f"[反哺] 文档无 template_id，跳过。document_id={chapter.document_id}")
+            return
+
+        struct_result = await db.execute(
+            select(StructureTemplate)
+            .where(
+                StructureTemplate.template_id == document.template_id,
+                StructureTemplate.field_key == chapter.field_key,
+            )
+        )
+        struct_template = struct_result.scalar_one_or_none()
+        if not struct_template:
+            print(f"[反哺] 未找到对应 StructureTemplate，template_id={document.template_id}, field_key={chapter.field_key}")
+            return
+
+        current_prompt = struct_template.custom_prompt or struct_template.default_prompt or ""
+        print(f"[反哺] 当前 custom_prompt={current_prompt!r}")
+
+        optimize_prompt = (
+            f"现有提示词：\n{current_prompt}\n\n"
+            f"用户对生成结果的反馈：{instruction}\n\n"
+            "请根据以上反馈，对提示词进行优化改写，使其能更好地指导 AI 生成符合用户期望的内容。"
+            "直接输出优化后的提示词，不要解释。"
+        )
+
+        try:
+            result = await call_qwen_once("你是一位专业的 prompt 工程师。", [], optimize_prompt)
+            new_prompt = result.get("content", "").strip()
+            print(f"[反哺] AI 优化后 prompt={new_prompt!r}")
+            if new_prompt:
+                await db.execute(
+                    sa_update(StructureTemplate)
+                    .where(StructureTemplate.structure_template_id == struct_template.structure_template_id)
+                    .values(custom_prompt=new_prompt)
+                )
+                await db.commit()
+                print(f"[反哺] custom_prompt 已更新，structure_template_id={struct_template.structure_template_id}")
+        except Exception as e:
+            print(f"[反哺] AI 优化 prompt 失败: {e}")
     
     @staticmethod
     async def get_paragraph_related_summaries(db: AsyncSession, paragraph_id: UUID):

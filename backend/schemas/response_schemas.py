@@ -126,6 +126,7 @@ class ParagraphResponse(BaseModel):
     ai_eval: Optional[str] = None
     ai_suggestion: Optional[str] = None
     ai_generate: Optional[str] = None
+    ai_instruction: Optional[str] = None
     ischange: int
 
 
