@@ -241,8 +241,7 @@ class CoreInfo(CoreInfoBase):
 
 # --- AI帮填请求相关 ---
 class AIAssistRequest(BaseModel):
-    summary_sections: Optional[List[str]] = Field(None, description="选择的摘要部分ID列表，不指定则使用所有摘要")
-    keywords: Optional[List[str]] = Field(None, description="选择的关键词ID列表，不指定则使用所有关键词")
+    instruction: Optional[str] = Field(None, description="用户修改意见，有值时 AI 按意见修改段落")
 
 
 # --- 核心信息模板相关 (CoreInfoTemplate) ---

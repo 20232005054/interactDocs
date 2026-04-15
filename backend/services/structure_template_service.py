@@ -206,6 +206,7 @@ class StructureTemplateService:
         structure_template: StructureTemplate,
         generated_summary_map: Dict[str, str] = None,
         source_data_map: Dict[str, str] = None,
+        draft: str = None,
     ) -> str:
         return await TemplateRenderService.render_ai_content(
             db=db,
@@ -217,4 +218,5 @@ class StructureTemplateService:
             template_id=str(structure_template.structure_template_id),
             generated_summary_map=generated_summary_map,
             source_data_map=source_data_map,
+            draft=draft,
         )

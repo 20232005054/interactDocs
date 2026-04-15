@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS paragraphs (
     ai_eval TEXT,
     ai_suggestion TEXT,
     ai_generate TEXT,
+    ai_instruction TEXT,
     ischange INTEGER NOT NULL DEFAULT 0
 );
 

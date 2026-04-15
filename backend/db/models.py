@@ -63,6 +63,7 @@ class Paragraph(Base):
     ai_eval = Column(Text, nullable=True)
     ai_suggestion = Column(Text, nullable=True)
     ai_generate = Column(Text, nullable=True)
+    ai_instruction = Column(Text, nullable=True)  # 与 ai_generate 配套的用户修改意见
     ischange = Column(Integer, nullable=False, default=0)
 
     # 关系

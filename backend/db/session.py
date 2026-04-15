@@ -4,7 +4,14 @@ from sqlalchemy.orm import sessionmaker
 # 格式: postgresql+asyncpg://用户名:密码@地址:端口/数据库名
 DATABASE_URL = "postgresql+asyncpg://postgres:nrryyn8426@127.0.0.1:5432/inter"
 
-engine = create_async_engine(DATABASE_URL, echo=True)
+engine = create_async_engine(
+    DATABASE_URL,
+    echo=True,
+    pool_size=20,
+    max_overflow=10,
+    pool_timeout=30,
+    pool_recycle=1800,
+)
 AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 async def get_db():

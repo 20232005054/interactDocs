@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
+from typing import Optional
+from pydantic import BaseModel
 
 from core.response import success_response, ResponseModel
 from db.session import get_db
@@ -23,6 +25,7 @@ def _para_response(p) -> ParagraphResponse:
         ai_eval=p.ai_eval,
         ai_suggestion=p.ai_suggestion,
         ai_generate=p.ai_generate,
+        ai_instruction=p.ai_instruction,
         ischange=p.ischange
     )
 
@@ -78,7 +81,7 @@ async def ai_assist_paragraph(paragraph_id: UUID, assist_request: AIAssistReques
         raise HTTPException(status_code=400, detail="只有正文类型的段落才能使用AI帮填功能")
     try:
         return StreamingResponse(
-            ai_service.ai_assist_paragraph(db, paragraph_id, assist_request),
+            ai_service.ai_assist_paragraph(paragraph_id, assist_request, instruction=assist_request.instruction),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
         )
@@ -92,7 +95,7 @@ async def ai_evaluate_paragraph(paragraph_id: UUID, db: AsyncSession = Depends(g
         evaluate_and_save_func = ai_service.ai_evaluate_paragraph(paragraph_id)
 
         async def generate_evaluation():
-            async for chunk in evaluate_and_save_func(db):
+            async for chunk in evaluate_and_save_func():
                 yield chunk
 
         return StreamingResponse(
@@ -105,7 +108,10 @@ async def ai_evaluate_paragraph(paragraph_id: UUID, db: AsyncSession = Depends(g
 
 
 @router.post("/paragraphs/{paragraph_id}/ai/apply", summary="应用AI帮填结果", response_model=ResponseModel[ParagraphResponse])
-async def apply_ai_assist_result(paragraph_id: UUID, db: AsyncSession = Depends(get_db)):
+async def apply_ai_assist_result(
+    paragraph_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
     try:
         updated = await ParagraphService.apply_ai_assist_result(db, paragraph_id)
         return success_response(data=_para_response(updated))

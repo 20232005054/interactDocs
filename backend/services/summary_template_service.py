@@ -136,6 +136,7 @@ class SummaryTemplateService:
         summary_template: SummaryTemplate,
         generated_summary_map: Dict[str, str] = None,
         source_data_map: Dict[str, str] = None,
+        draft: str = None,
     ) -> str:
         template_id = getattr(
             summary_template, "summary_template_id",
@@ -151,6 +152,7 @@ class SummaryTemplateService:
             template_id=str(template_id) if template_id else None,
             generated_summary_map=generated_summary_map,
             source_data_map=source_data_map,
+            draft=draft,
         )
 
     @staticmethod
