@@ -384,3 +384,191 @@ class TemplateService:
                 for st in structures
             ],
         }
+
+    # ----------------------------------------------------------------
+    # 模板导出 / 导入
+    # ----------------------------------------------------------------
+
+    @staticmethod
+    async def export_template_json(db: AsyncSession, template_id: UUID) -> dict:
+        """
+        将模板主表 + 三类子表序列化为可移植的 dict。
+        - 不导出主键（template_id / core_template_id 等）
+        - 保留 field_key（sources 引用依赖它）
+        - CoreInfoTemplate / StructureTemplate 以嵌套 children 表示树形结构
+        """
+        from fastapi import HTTPException
+        from datetime import datetime, timezone
+
+        template = await TemplateMapper.get_template(db, template_id)
+        if not template:
+            raise HTTPException(status_code=404, detail="模板不存在")
+
+        core_infos = await CoreInfoTemplateMapper.get_by_template_id(db, template_id)
+        summaries = await SummaryTemplateMapper.get_by_template_id(db, template_id)
+        structures = await StructureTemplateMapper.get_by_template_id(db, template_id)
+
+        # 构建 CoreInfoTemplate 嵌套树
+        def _ci_node(ci) -> dict:
+            return {
+                "field_name": ci.field_name,
+                "field_key": ci.field_key,
+                "field_type": ci.field_type,
+                "default_value": ci.default_value,
+                "options": ci.options,
+                "is_required": ci.is_required,
+                "order_index": ci.order_index,
+                "children": sorted(
+                    [_ci_node(c) for c in core_infos if c.parent_id == ci.core_template_id],
+                    key=lambda x: x["order_index"],
+                ),
+            }
+
+        ci_tree = sorted(
+            [_ci_node(ci) for ci in core_infos if ci.parent_id is None],
+            key=lambda x: x["order_index"],
+        )
+
+        # 构建 StructureTemplate 嵌套树
+        def _st_node(st) -> dict:
+            return {
+                "title": st.title,
+                "field_key": st.field_key,
+                "level": st.level,
+                "generation_mode": st.generation_mode,
+                "content_template": st.content_template,
+                "sources": st.sources,
+                "default_prompt": st.default_prompt,
+                "custom_prompt": st.custom_prompt,
+                "order_index": st.order_index,
+                "children": sorted(
+                    [_st_node(c) for c in structures if c.parent_id == st.structure_template_id],
+                    key=lambda x: x["order_index"],
+                ),
+            }
+
+        st_tree = sorted(
+            [_st_node(st) for st in structures if st.parent_id is None],
+            key=lambda x: x["order_index"],
+        )
+
+        return {
+            "version": "1.0",
+            "exported_at": datetime.now(timezone.utc).isoformat(),
+            "template": {
+                "group_id": str(template.group_id),
+                "purpose": template.purpose,
+                "display_name": template.display_name,
+                "content": template.content,
+                "template_type": template.template_type,
+            },
+            "core_info_templates": ci_tree,
+            "summary_templates": [
+                {
+                    "title": s.title,
+                    "field_key": s.field_key,
+                    "generation_mode": s.generation_mode,
+                    "content_template": s.content_template,
+                    "sources": s.sources,
+                    "default_prompt": s.default_prompt,
+                    "custom_prompt": s.custom_prompt,
+                    "order_index": s.order_index,
+                }
+                for s in sorted(summaries, key=lambda x: x.order_index)
+            ],
+            "structure_templates": st_tree,
+        }
+
+    @staticmethod
+    async def import_template_json(db: AsyncSession, data: dict, user_id: UUID) -> Template:
+        """
+        从导出的 JSON dict 创建新模板。
+        - 重新生成所有主键
+        - group_id 重新生成（不复用，避免与系统模板形成 group 关联）
+        - template_type 固定为 USER_REUSABLE
+        - field_key 原样保留（sources 引用依赖它）
+        """
+        from fastapi import HTTPException
+
+        # 基本校验
+        tpl_data = data.get("template", {})
+        if not tpl_data.get("purpose") or not tpl_data.get("display_name"):
+            raise HTTPException(status_code=400, detail="JSON 格式错误：缺少 template.purpose 或 template.display_name")
+
+        # 1. 创建主表
+        new_template = Template(
+            group_id=uuid4(),
+            purpose=tpl_data["purpose"],
+            display_name=tpl_data["display_name"],
+            content=tpl_data.get("content") or {},
+            version=1,
+            template_type=TemplateType.USER_REUSABLE,
+            user_id=user_id,
+            document_id=None,
+            is_active=True,
+        )
+        await TemplateMapper.create_template(db, new_template)
+
+        # 2. 递归写入 CoreInfoTemplate（DFS，父先于子）
+        async def _flush_and_recurse(nodes: list, parent_id=None):
+            for node in sorted(nodes, key=lambda x: x.get("order_index", 0)):
+                ci = CoreInfoTemplate(
+                    template_id=new_template.template_id,
+                    parent_id=parent_id,
+                    field_name=node.get("field_name", ""),
+                    field_key=node.get("field_key", "core_" + uuid4().hex[:8]),
+                    field_type=node.get("field_type", "text"),
+                    default_value=node.get("default_value"),
+                    options=node.get("options"),
+                    is_required=node.get("is_required", True),
+                    order_index=node.get("order_index", 0),
+                )
+                db.add(ci)
+                await db.flush()
+                children = node.get("children") or []
+                if children:
+                    await _flush_and_recurse(children, parent_id=ci.core_template_id)
+
+        await _flush_and_recurse(data.get("core_info_templates") or [])
+
+        # 3. 平铺写入 SummaryTemplate
+        for s in sorted(data.get("summary_templates") or [], key=lambda x: x.get("order_index", 0)):
+            db.add(SummaryTemplate(
+                template_id=new_template.template_id,
+                title=s.get("title", ""),
+                field_key=s.get("field_key", "summary_" + uuid4().hex[:8]),
+                generation_mode=s.get("generation_mode", 0),
+                content_template=s.get("content_template"),
+                sources=s.get("sources"),
+                default_prompt=s.get("default_prompt"),
+                custom_prompt=s.get("custom_prompt"),
+                order_index=s.get("order_index", 0),
+            ))
+
+        # 4. 递归写入 StructureTemplate（DFS，父先于子）
+        async def _flush_and_recurse_st(nodes: list, parent_id=None):
+            for node in sorted(nodes, key=lambda x: x.get("order_index", 0)):
+                st = StructureTemplate(
+                    template_id=new_template.template_id,
+                    parent_id=parent_id,
+                    title=node.get("title", ""),
+                    field_key=node.get("field_key", "struct_" + uuid4().hex[:8]),
+                    level=node.get("level", 1),
+                    generation_mode=node.get("generation_mode", 0),
+                    content_template=node.get("content_template"),
+                    sources=node.get("sources"),
+                    default_prompt=node.get("default_prompt"),
+                    custom_prompt=node.get("custom_prompt"),
+                    order_index=node.get("order_index", 0),
+                )
+                db.add(st)
+                await db.flush()
+                children = node.get("children") or []
+                if children:
+                    await _flush_and_recurse_st(children, parent_id=st.structure_template_id)
+
+        await _flush_and_recurse_st(data.get("structure_templates") or [])
+
+        await db.commit()
+        await db.refresh(new_template)
+        return new_template

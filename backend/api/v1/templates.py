@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi.responses import Response
 from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
+import json
 
 from core.response import success_response, ResponseModel
 from db.session import get_db
@@ -33,6 +35,51 @@ def _template_response(t) -> TemplateResponse:
 async def get_template_dependencies(template_id: UUID, db: AsyncSession = Depends(get_db)):
     result = await TemplateService.get_template_dependencies(db, template_id)
     return success_response(data=result)
+
+
+@router.get("/{template_id}/export", summary="导出模板为 JSON 文件")
+async def export_template_json(template_id: UUID, db: AsyncSession = Depends(get_db)):
+    """将模板主表及三类子表导出为 JSON 文件，可用于备份或跨环境迁移。"""
+    data = await TemplateService.export_template_json(db, template_id)
+    from urllib.parse import quote
+    raw_name = data["template"]["display_name"].replace("/", "_").replace("\\", "_")
+    # HTTP 头只支持 latin-1，中文文件名用 RFC 5987 编码
+    encoded_name = quote(raw_name + ".json", safe="")
+    return Response(
+        content=json.dumps(data, ensure_ascii=False, indent=2),
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_name}"
+        },
+    )
+
+
+@router.post("/import", summary="从 JSON 文件导入模板", response_model=ResponseModel[TemplateDetailResponse])
+async def import_template_json(
+    file: UploadFile = File(...),
+    current_user=Depends(get_editor_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """上传由 /export 导出的 JSON 文件，创建为当前用户的可复用模板（type=2）。"""
+    if file.size and file.size > 1 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="文件大小不能超过 1MB")
+    try:
+        content = await file.read()
+        raw = content.decode("utf-8")
+        # 修复 AI 生成 JSON 时常见的非法转义序列（如 \* \_ \[ \l \g 等）
+        import re
+        raw = re.sub(r'\\([*_\[\]()!#+\-.>`lgLG])', r'\1', raw)
+        data = json.loads(raw)
+    except Exception:
+        raise HTTPException(status_code=400, detail="文件格式错误，请上传有效的 JSON 文件")
+
+    t = await TemplateService.import_template_json(db, data, user_id=current_user.user_id)
+    return success_response(data=TemplateDetailResponse(
+        template_id=t.template_id, group_id=t.group_id, document_id=t.document_id,
+        purpose=t.purpose, display_name=t.display_name, content=t.content,
+        version=t.version, template_type=t.template_type, user_id=t.user_id,
+        is_active=t.is_active, created_at=t.created_at, updated_at=t.updated_at,
+    ))
 
 
 @router.post("", summary="创建模板", response_model=ResponseModel[TemplateDetailResponse])
