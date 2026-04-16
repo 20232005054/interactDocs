@@ -1,0 +1,666 @@
+{
+  "version": "1.0",
+  "template": {
+    "purpose": "临床试验方案",
+    "display_name": "随机对照临床试验方案模板",
+    "content": {
+      "description": "适用于药物或医疗器械的随机对照临床试验，包含完整的研究背景、设计、受试者选择、评估、统计及伦理等标准章节，符合ICH E6(R2) GCP及CFDA指导原则。"
+    }
+  },
+  "core_info_templates": [
+    {
+      "field_name": "试验基本信息",
+      "field_key": "core_basic_group",
+      "field_type": "group",
+      "default_value": null,
+      "options": null,
+      "is_required": true,
+      "order_index": 0,
+      "children": [
+        {
+          "field_name": "试验名称",
+          "field_key": "core_trial_name",
+          "field_type": "text",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 0,
+          "children": []
+        },
+        {
+          "field_name": "研究阶段",
+          "field_key": "core_phase",
+          "field_type": "select",
+          "default_value": null,
+          "options": ["I期", "II期", "III期", "IV期", "器械临床试验"],
+          "is_required": true,
+          "order_index": 1,
+          "children": []
+        },
+        {
+          "field_name": "申办方",
+          "field_key": "core_sponsor",
+          "field_type": "text",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 2,
+          "children": []
+        },
+        {
+          "field_name": "方案编号",
+          "field_key": "core_protocol_number",
+          "field_type": "text",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 3,
+          "children": []
+        },
+        {
+          "field_name": "版本号与日期",
+          "field_key": "core_version_date",
+          "field_type": "text",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 4,
+          "children": []
+        }
+      ]
+    },
+    {
+      "field_name": "研究设计参数",
+      "field_key": "core_design_group",
+      "field_type": "group",
+      "default_value": null,
+      "options": null,
+      "is_required": true,
+      "order_index": 1,
+      "children": [
+        {
+          "field_name": "研究类型",
+          "field_key": "core_study_type",
+          "field_type": "select",
+          "default_value": null,
+          "options": ["干预性研究", "观察性研究", "诊断性研究"],
+          "is_required": true,
+          "order_index": 0,
+          "children": []
+        },
+        {
+          "field_name": "设计类型",
+          "field_key": "core_design_type",
+          "field_type": "select",
+          "default_value": null,
+          "options": ["平行分组", "交叉设计", "单臂", "析因设计", "适应性设计"],
+          "is_required": true,
+          "order_index": 1,
+          "children": []
+        },
+        {
+          "field_name": "盲法",
+          "field_key": "core_blinding",
+          "field_type": "select",
+          "default_value": null,
+          "options": ["开放标签", "单盲", "双盲", "三盲"],
+          "is_required": true,
+          "order_index": 2,
+          "children": []
+        },
+        {
+          "field_name": "随机化方法",
+          "field_key": "core_randomization",
+          "field_type": "select",
+          "default_value": null,
+          "options": ["中央随机化", "区组随机化", "分层随机化", "动态随机化", "未随机"],
+          "is_required": true,
+          "order_index": 3,
+          "children": []
+        },
+        {
+          "field_name": "中心类型",
+          "field_key": "core_center_type",
+          "field_type": "select",
+          "default_value": null,
+          "options": ["单中心", "多中心"],
+          "is_required": true,
+          "order_index": 4,
+          "children": []
+        },
+        {
+          "field_name": "对照类型",
+          "field_key": "core_control_type",
+          "field_type": "select",
+          "default_value": null,
+          "options": ["安慰剂对照", "阳性对照", "空白对照", "剂量对照", "自身对照"],
+          "is_required": true,
+          "order_index": 5,
+          "children": []
+        }
+      ]
+    },
+    {
+      "field_name": "受试者信息",
+      "field_key": "core_subject_group",
+      "field_type": "group",
+      "default_value": null,
+      "options": null,
+      "is_required": true,
+      "order_index": 2,
+      "children": [
+        {
+          "field_name": "适应症",
+          "field_key": "core_indication",
+          "field_type": "text",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 0,
+          "children": []
+        },
+        {
+          "field_name": "计划样本量",
+          "field_key": "core_sample_size",
+          "field_type": "text",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 1,
+          "children": []
+        },
+        {
+          "field_name": "年龄范围",
+          "field_key": "core_age_range",
+          "field_type": "text",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 2,
+          "children": []
+        },
+        {
+          "field_name": "性别要求",
+          "field_key": "core_gender",
+          "field_type": "select",
+          "default_value": null,
+          "options": ["不限", "仅男性", "仅女性"],
+          "is_required": true,
+          "order_index": 3,
+          "children": []
+        },
+        {
+          "field_name": "主要入选标准简述",
+          "field_key": "core_key_inclusion",
+          "field_type": "text",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 4,
+          "children": []
+        }
+      ]
+    },
+    {
+      "field_name": "给药方案",
+      "field_key": "core_dosing_group",
+      "field_type": "group",
+      "default_value": null,
+      "options": null,
+      "is_required": true,
+      "order_index": 3,
+      "children": [
+        {
+          "field_name": "试验药物名称",
+          "field_key": "core_drug_name",
+          "field_type": "text",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 0,
+          "children": []
+        },
+        {
+          "field_name": "给药途径",
+          "field_key": "core_route",
+          "field_type": "select",
+          "default_value": null,
+          "options": ["口服", "静脉注射", "皮下注射", "肌肉注射", "外用", "吸入"],
+          "is_required": true,
+          "order_index": 1,
+          "children": []
+        },
+        {
+          "field_name": "给药频率",
+          "field_key": "core_frequency",
+          "field_type": "text",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 2,
+          "children": []
+        },
+        {
+          "field_name": "治疗周期",
+          "field_key": "core_treatment_duration",
+          "field_type": "text",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 3,
+          "children": []
+        },
+        {
+          "field_name": "对照组干预",
+          "field_key": "core_control_intervention",
+          "field_type": "text",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 4,
+          "children": []
+        }
+      ]
+    }
+  ],
+  "summary_templates": [
+    {
+      "title": "研究概述",
+      "field_key": "summary_overview",
+      "generation_mode": 1,
+      "content_template": null,
+      "sources": [
+        {
+          "source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"},
+          "match_type": "关键信息匹配",
+          "match_keys": [
+            {"value": "core_trial_name", "label": "试验名称"},
+            {"value": "core_phase", "label": "研究阶段"},
+            {"value": "core_indication", "label": "适应症"},
+            {"value": "core_design_type", "label": "设计类型"},
+            {"value": "core_sample_size", "label": "计划样本量"}
+          ],
+          "target_field": "trial_info"
+        }
+      ],
+      "default_prompt": "请根据提供的试验名称、研究阶段、适应症、设计类型和计划样本量，撰写一段专业简洁的研究概述（150-200字）。概述应涵盖试验目的、设计方法、受试人群和主要终点，语言符合ICH GCP要求。",
+      "custom_prompt": null,
+      "order_index": 0
+    },
+    {
+      "title": "试验药物与对照",
+      "field_key": "summary_drug_control",
+      "generation_mode": 0,
+      "content_template": "本研究试验药物为 **{{drug_name}}**（{{route}}），给药频率为 **{{frequency}}**，治疗周期为 **{{treatment_duration}}**。对照组干预措施为 **{{control_intervention}}**。",
+      "sources": [
+        {
+          "source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"},
+          "match_type": "关键信息匹配",
+          "match_keys": [{"value": "core_drug_name", "label": "试验药物名称"}],
+          "target_field": "drug_name"
+        },
+        {
+          "source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"},
+          "match_type": "关键信息匹配",
+          "match_keys": [{"value": "core_route", "label": "给药途径"}],
+          "target_field": "route"
+        },
+        {
+          "source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"},
+          "match_type": "关键信息匹配",
+          "match_keys": [{"value": "core_frequency", "label": "给药频率"}],
+          "target_field": "frequency"
+        },
+        {
+          "source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"},
+          "match_type": "关键信息匹配",
+          "match_keys": [{"value": "core_treatment_duration", "label": "治疗周期"}],
+          "target_field": "treatment_duration"
+        },
+        {
+          "source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"},
+          "match_type": "关键信息匹配",
+          "match_keys": [{"value": "core_control_intervention", "label": "对照组干预"}],
+          "target_field": "control_intervention"
+        }
+      ],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 1
+    },
+    {
+      "title": "研究设计摘要",
+      "field_key": "summary_design",
+      "generation_mode": 0,
+      "content_template": "本研究为一项 **{{phase}}**、**{{center_type}}**、**{{blinding}}**、**{{design_type}}** 临床试验，采用 **{{control_type}}**。计划纳入 **{{sample_size}}** 例 **{{indication}}** 受试者，按 **{{randomization}}** 方法分配至试验组或对照组。",
+      "sources": [
+        {
+          "source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"},
+          "match_type": "关键信息匹配",
+          "match_keys": [{"value": "core_phase", "label": "研究阶段"}],
+          "target_field": "phase"
+        },
+        {
+          "source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"},
+          "match_type": "关键信息匹配",
+          "match_keys": [{"value": "core_center_type", "label": "中心类型"}],
+          "target_field": "center_type"
+        },
+        {
+          "source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"},
+          "match_type": "关键信息匹配",
+          "match_keys": [{"value": "core_blinding", "label": "盲法"}],
+          "target_field": "blinding"
+        },
+        {
+          "source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"},
+          "match_type": "关键信息匹配",
+          "match_keys": [{"value": "core_design_type", "label": "设计类型"}],
+          "target_field": "design_type"
+        },
+        {
+          "source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"},
+          "match_type": "关键信息匹配",
+          "match_keys": [{"value": "core_control_type", "label": "对照类型"}],
+          "target_field": "control_type"
+        },
+        {
+          "source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"},
+          "match_type": "关键信息匹配",
+          "match_keys": [{"value": "core_sample_size", "label": "计划样本量"}],
+          "target_field": "sample_size"
+        },
+        {
+          "source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"},
+          "match_type": "关键信息匹配",
+          "match_keys": [{"value": "core_indication", "label": "适应症"}],
+          "target_field": "indication"
+        },
+        {
+          "source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"},
+          "match_type": "关键信息匹配",
+          "match_keys": [{"value": "core_randomization", "label": "随机化方法"}],
+          "target_field": "randomization"
+        }
+      ],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 2
+    },
+    {
+      "title": "受试者人群",
+      "field_key": "summary_population",
+      "generation_mode": 0,
+      "content_template": "受试者需符合 **{{indication}}** 诊断标准，年龄 **{{age_range}}**，性别要求 **{{gender}}**。关键入选标准：{{key_inclusion}}。",
+      "sources": [
+        {
+          "source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"},
+          "match_type": "关键信息匹配",
+          "match_keys": [{"value": "core_indication", "label": "适应症"}],
+          "target_field": "indication"
+        },
+        {
+          "source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"},
+          "match_type": "关键信息匹配",
+          "match_keys": [{"value": "core_age_range", "label": "年龄范围"}],
+          "target_field": "age_range"
+        },
+        {
+          "source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"},
+          "match_type": "关键信息匹配",
+          "match_keys": [{"value": "core_gender", "label": "性别要求"}],
+          "target_field": "gender"
+        },
+        {
+          "source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"},
+          "match_type": "关键信息匹配",
+          "match_keys": [{"value": "core_key_inclusion", "label": "主要入选标准简述"}],
+          "target_field": "key_inclusion"
+        }
+      ],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 3
+    },
+    {
+      "title": "主要疗效终点",
+      "field_key": "summary_endpoints",
+      "generation_mode": 2,
+      "content_template": "**主要疗效终点**：第24周时主要疗效指标较基线的变化值。\\n**关键次要终点**：达到临床应答标准的受试者比例、患者报告结局变化、生活质量评分改善。",
+      "sources": [],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 4
+    },
+    {
+      "title": "安全性评价",
+      "field_key": "summary_safety",
+      "generation_mode": 2,
+      "content_template": "安全性评价包括不良事件（AE）、严重不良事件（SAE）、生命体征、体格检查、实验室检查（血常规、血生化、尿常规）及心电图。不良事件分级依据 **CTCAE 5.0** 版。",
+      "sources": [],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 5
+    },
+    {
+      "title": "访视计划概述",
+      "field_key": "summary_visits",
+      "generation_mode": 0,
+      "content_template": "研究包括筛选期（-14至-1天）、治疗期（第1天至第{{treatment_duration}}）及安全性随访期（末次给药后28±3天）。主要评估时间点为基线及治疗期定期访视。",
+      "sources": [
+        {
+          "source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"},
+          "match_type": "关键信息匹配",
+          "match_keys": [{"value": "core_treatment_duration", "label": "治疗周期"}],
+          "target_field": "treatment_duration"
+        }
+      ],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 6
+    }
+  ],
+  "structure_templates": [
+    {
+      "title": "研究背景",
+      "field_key": "struct_background",
+      "level": 1,
+      "generation_mode": 1,
+      "content_template": null,
+      "sources": [
+        {
+          "source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"},
+          "match_type": "关键信息匹配",
+          "match_keys": [
+            {"value": "core_indication", "label": "适应症"},
+            {"value": "core_drug_name", "label": "试验药物名称"}
+          ],
+          "target_field": "disease_drug"
+        }
+      ],
+      "default_prompt": "请撰写研究背景章节，内容需包含以下部分：\n## 疾病流行病学与治疗现状\n描述适应症的发病率、疾病负担、现有治疗手段的局限性。\n## 研究药物/器械的研发背景\n介绍试验药物的作用机制、非临床研究数据、前期临床研究结果及本研究的合理性。\n## 立题依据\n阐明开展本研究的科学依据和临床必要性。\n内容需专业详实，不少于800字，不超过1000字，符合ICH GCP对背景部分的撰写要求。",
+      "custom_prompt": null,
+      "order_index": 0,
+      "children": []
+    },
+    {
+      "title": "研究目的",
+      "field_key": "struct_objectives",
+      "level": 1,
+      "generation_mode": 2,
+      "content_template": "## 主要目的\n\n- 评价 **试验药物/器械** 在 **目标适应症** 患者中的 **疗效**（例如：第24周时主要疗效指标的变化）。\n\n## 次要目的\n\n- 评价 **试验药物/器械** 在 **目标适应症** 患者中的 **安全性** 和 **耐受性**。\n- 评价 **试验药物/器械** 对 **次要疗效指标** 的影响。\n- 评价 **试验药物/器械** 的 **群体药代动力学特征**（如适用）。\n\n## 探索性目的\n\n- 探索 **生物标志物** 与疗效及安全性的相关性。\n- 评价患者报告的结局（PRO）变化。\n\n## 研究假设\n\n本研究的无效假设（H0）为：试验组与对照组在主要疗效终点上的差异无统计学意义。备择假设（H1）为：试验组与对照组在主要疗效终点上的差异具有统计学意义。\n\n主要分析将采用双侧检验，显著性水平设为 α=0.05。",
+      "sources": [],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 1,
+      "children": []
+    },
+    {
+      "title": "研究设计",
+      "field_key": "struct_design",
+      "level": 1,
+      "generation_mode": 2,
+      "content_template": "## 总体设计\n\n本研究为一项 **多中心、随机、双盲、平行分组、安慰剂对照** 的 **III期** 临床试验。研究分为三个时期：\n\n- **筛选期**：最长14天，评估受试者入选资格。\n- **治疗期**：随机化后，受试者将接受试验药物或安慰剂治疗，持续24周。\n- **安全性随访期**：末次给药后28天进行安全性随访。\n\n## 随机化与盲法\n\n### 随机化\n采用 **中央随机化系统（IWRS）** 进行随机分组。随机化方案由独立统计师采用区组随机化方法生成，区组长度不公开。随机分层因素包括：\n- 研究中心\n- 基线疾病严重程度（轻/中度 vs. 重度）\n\n符合所有入选标准且无排除标准的受试者，将在基线访视时由研究者通过IWRS系统获取随机号及相应的治疗分配。\n\n### 盲法\n本研究为 **双盲** 设计。受试者、研究者（包括研究护士、研究协调员）、申办方研究团队成员、以及参与数据管理和统计分析的人员（直至数据库锁定且揭盲程序完成前）均对治疗分组保持盲态。\n\n试验药物与安慰剂在外观、包装、标签、气味及给药方式上完全一致。每个受试者的研究药物包装盒上贴有带有随机号的标签。\n\n### 紧急揭盲\n仅在受试者发生紧急医疗事件，且知晓治疗分组将直接影响其后续治疗决策时，研究者可通过IWRS系统进行紧急揭盲。紧急揭盲需详细记录原因、时间及揭盲人员。一旦揭盲，该受试者通常应终止研究治疗，但仍需完成研究规定的随访评估。\n\n## 研究流程图\n\n| 访视阶段 | 筛选期 | 基线/随机 | 治疗期 | 治疗期 | 治疗期 | 治疗结束 | 安全性随访 |\n| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n| **访视编号** | **V1** | **V2** | **V3** | **V4** | **V5** | **V6** | **V7** |\n| **研究日** | Day -14 ~ -1 | Day 1 | Day 29±3 | Day 85±7 | Day 169±7 | Day 197±7 | Day 225±7 |\n| 知情同意 | ✓ | | | | | | |\n| 人口学资料 | ✓ | | | | | | |\n| 病史与疾病史 | ✓ | | | | | | |\n| 入选/排除标准 | ✓ | ✓ | | | | | |\n| 体格检查 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |\n| 生命体征 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |\n| 心电图 | ✓ | ✓ | | | ✓ | ✓ | ✓ |\n| 实验室检查 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |\n| 随机分组 | | ✓ | | | | | |\n| 研究药物发放 | | ✓ | ✓ | ✓ | ✓ | | |\n| 疗效评估 | | ✓ | ✓ | ✓ | ✓ | ✓ | |\n| 不良事件评估 | | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |\n| 合并用药记录 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |\n\n注：治疗期访视时间窗需严格遵循，超出时间窗应记录方案偏离。",
+      "sources": [],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 2,
+      "children": []
+    },
+    {
+      "title": "受试者选择",
+      "field_key": "struct_subject_selection",
+      "level": 1,
+      "generation_mode": 2,
+      "content_template": "## 入选标准\n\n受试者必须满足以下所有标准方可入选本研究：\n\n1. 年龄在18至75周岁（含两端值）的男性或女性。\n2. 符合 **目标适应症** 的诊断标准（依据 **相关诊疗指南**），诊断至少持续3个月。\n3. 在筛选期，**主要疗效指标** 的基线评分符合方案规定的范围（例如：疼痛VAS评分不低于40 mm）。\n4. 育龄期女性受试者必须同意在研究期间及末次给药后至少3个月内采取高效的避孕措施；男性受试者必须同意在此期间使用避孕套。\n5. 能够理解并自愿签署书面知情同意书，并遵守研究方案的要求。\n\n## 排除标准\n\n符合以下任一标准的受试者不得入选本研究：\n\n1. 已知对试验药物或其任何辅料成分过敏。\n2. 筛选前3个月内参加过其他药物或器械临床试验。\n3. 妊娠期或哺乳期女性。\n4. 合并有未受控制的高血压（经治疗后收缩压不低于160 mmHg或舒张压不低于100 mmHg）、严重心脏病（NYHA心功能分级III-IV级）、严重肝肾功能不全（ALT/AST不低于3倍正常值上限，或血肌酐不低于1.5倍正常值上限）。\n5. 筛选前5年内有其他恶性肿瘤病史（已治愈的皮肤基底细胞癌或宫颈原位癌除外）。\n6. 有精神疾病史或认知功能障碍，可能影响知情同意或研究依从性。\n7. 研究者认为因其他原因不适合参加本研究的受试者。\n\n## 剔除标准\n\n已入组的受试者若出现以下情况，应停止研究治疗，但应尽可能完成随访评估：\n\n- 发生严重不良事件或研究者判断继续参与研究将对受试者造成不可接受的风险。\n- 受试者撤回知情同意。\n- 妊娠。\n- 使用方案禁止的合并用药。\n- 研究者判断受试者依从性差，或出现其他需要终止研究的情况。",
+      "sources": [],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 3,
+      "children": []
+    },
+    {
+      "title": "给药方案",
+      "field_key": "struct_dosing",
+      "level": 1,
+      "generation_mode": 2,
+      "content_template": "## 试验药物组\n\n- **药物名称**：试验药物 XXX 片/注射液\n- **剂型与规格**：片剂，规格为 XXX mg/片。\n- **给药途径**：口服。\n- **给药方案**：每日一次，每次一片，晨起空腹服用。\n- **治疗周期**：连续给药24周。\n\n## 对照组\n\n- **干预措施**：外观、包装、标签与试验药物完全一致的安慰剂片。\n- **给药方案**：同试验药物组。\n\n## 给药记录与依从性管理\n\n### 研究药物发放与回收\n研究药物由各研究中心指定的药品管理员管理。每次访视时，发放下一阶段所需的研究药物，并回收上一阶段剩余药物及空包装。研究者或授权人员需在《研究药物发放与回收记录表》上详细记录发放数量、日期、批号、回收数量等信息。\n\n### 依从性计算与评价\n用药依从性 = （实际服药片数 / 应服药片数） × 100%。\n\n- 依从性在 80% - 120% 范围内视为依从性良好。\n- 低于80%或高于120%视为依从性不佳，需记录原因并加强受试者教育。\n\n### 合并用药\n在研究期间，应尽可能避免使用可能影响疗效评价或增加安全性风险的药物。必须使用的合并用药（包括处方药、非处方药、中草药）应详细记录于电子病例报告表（eCRF）中，包括药物通用名、剂量、起止日期、使用原因。\n\n**禁止使用的合并用药**：\n- 与研究药物同类的其他药物。\n- 强效CYP3A4诱导剂或抑制剂（根据具体药物调整）。\n\n## 剂量调整与暂停标准\n\n### 剂量暂停\n若受试者出现可能与研究药物相关的 **3级及以上不良事件** 或研究者认为需暂停用药的临床状况，应暂停给药，直至不良事件恢复至不高于1级或基线水平。暂停给药时间不应超过连续2周。\n\n### 剂量下调\n允许因不良事件将剂量下调一个等级（例如：每日一次调整为隔日一次）。首次下调后若仍不耐受，则需永久停药。剂量下调需详细记录。\n\n### 永久停药\n出现以下情况，受试者应永久停止研究治疗：\n- 发生 **严重不良事件（SAE）** 且与试验药物相关。\n- 出现剂量暂停后超过2周仍未恢复至可继续给药的水平。\n- 剂量下调后再次出现需要剂量调整的不良事件。\n- 妊娠。\n- 受试者要求退出。",
+      "sources": [],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 4,
+      "children": []
+    },
+    {
+      "title": "有效性评估",
+      "field_key": "struct_efficacy",
+      "level": 1,
+      "generation_mode": 2,
+      "content_template": "## 评估指标\n\n### 主要疗效终点\n\n主要疗效终点为 **第24周时，主要疗效指标（例如：疾病活动评分 DAS28）较基线的变化值**。\n\n### 次要疗效终点\n\n1. 第12周、第24周时达到 **ACR20/ACR50/ACR70 改善标准** 的受试者比例。\n2. 第24周时 **患者对疾病整体评估（PGA）评分** 较基线的变化。\n3. 第24周时 **健康评估问卷（HAQ-DI）评分** 较基线的变化。\n4. 至首次达到 **低疾病活动度（LDA）** 的时间。\n\n### 探索性疗效终点\n\n1. 第12周、第24周时 **影像学进展评分** 的变化。\n2. 第24周时 **生物标志物水平** 较基线的变化。\n\n## 评估工具与标准\n\n### 主要疗效指标评估方法\n详细描述评估工具的操作规范，例如：\n- **DAS28-ESR**：基于28个关节的压痛计数（TJC28）、肿胀计数（SJC28）、红细胞沉降率（ESR）及患者总体评估（PGA-VAS）计算得出。评分越高表示疾病活动性越高。\n\n### 评估时间点\n所有疗效评估将在以下访视点进行：筛选期、基线（第1天）、第4周、第12周、第24周。为确保评估的一致性，主要疗效指标应由经过统一培训且对治疗分组保持盲态的 **独立评估者** 完成。\n\n## 疗效分析的统计考虑\n主要疗效终点将采用 **协方差分析（ANCOVA）模型** 进行分析，模型中以治疗组和随机分层因素为固定效应，基线值为协变量。将报告最小二乘均值（LS Mean）及其标准误、治疗组间差异的95%置信区间和p值。详细内容参见“统计分析”章节。",
+      "sources": [],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 5,
+      "children": []
+    },
+    {
+      "title": "安全性评估",
+      "field_key": "struct_safety",
+      "level": 1,
+      "generation_mode": 2,
+      "content_template": "## 不良事件（AE）\n\n### 定义\n不良事件（Adverse Event， AE）指受试者在签署知情同意书后至末次访视期间，发生的任何不利的医学事件，无论是否与研究药物有关。该事件可以表现为症状、体征、疾病或实验室检查异常。\n\n### 不良事件严重程度分级\n不良事件的严重程度将依据 **美国国立癌症研究所通用不良事件术语标准（CTCAE）5.0版** 进行分级：\n\n| 分级 | 描述 |\n| :--- | :--- |\n| 1级 | 轻度；无症状或轻微症状；仅临床或诊断可发现；无需治疗。 |\n| 2级 | 中度；需要较小、局部或非侵入性治疗；与年龄相当的工具性日常生活活动受限。 |\n| 3级 | 严重或有重要医学意义但不会立即危及生命；导致住院或延长住院时间；致残；自理性日常生活活动受限。 |\n| 4级 | 危及生命；需要紧急干预。 |\n| 5级 | 与不良事件相关的死亡。 |\n\n### 不良事件与研究药物关系判定\n研究者需判断每个不良事件与研究药物的因果关系，分为：\n- **肯定有关**\n- **很可能有关**\n- **可能有关**\n- **可能无关**\n- **无关**\n\n前三种情况将被计为 **治疗期间出现的不良事件（TEAE）** 并用于药物不良反应（ADR）的分析。\n\n## 严重不良事件（SAE）\n\n### SAE定义\n符合以下一条或多条标准的不良事件即构成严重不良事件（Serious Adverse Event， SAE）：\n1. 导致死亡。\n2. 危及生命。\n3. 需要住院治疗或延长现有住院时间。\n4. 导致永久性或显著的残疾/功能丧失。\n5. 导致先天性异常或出生缺陷。\n6. 其他重要的医学事件（可能需要干预以防止上述后果）。\n\n### SAE报告程序\n- 研究者获知SAE后，必须在 **24小时** 内向申办方及其授权的CRO报告，并同时报告至伦理委员会和药品监督管理部门（如适用）。\n- 初始报告应至少包含可识别的受试者编号、SAE名称、发生日期、严重程度、与研究药物的关系初步判断。\n- 随后应尽快完成并提交详细的 **SAE报告表**，并持续追踪直至事件解决或达到稳定状态。\n\n## 其他安全性评价\n\n### 实验室检查\n包括血常规、尿常规、血生化（肝肾功能、电解质）、凝血功能等。检查将在中心实验室进行。\n\n### 生命体征与体格检查\n每次访视均需测量坐位血压、心率、体温、呼吸频率。\n\n### 心电图\n标准12导联心电图。由中心阅读实验室统一评估。\n\n## 妊娠报告\n若女性受试者在研究期间或末次给药后30天内发生妊娠，应立即报告。研究者应在24小时内通过 **妊娠报告表** 向申办方报告。需对妊娠过程及结局（包括新生儿健康状况）进行追踪随访。",
+      "sources": [],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 6,
+      "children": []
+    },
+    {
+      "title": "统计分析",
+      "field_key": "struct_statistics",
+      "level": 1,
+      "generation_mode": 2,
+      "content_template": "## 样本量计算\n\n本研究样本量基于主要疗效终点（第24周时主要指标较基线的变化值）进行估算。\n\n根据文献及既往研究数据，假设试验组与安慰剂组的主要疗效指标变化值的最小二乘均数（LS Mean）差异为 **Δ= -0.6**，共同标准差（SD）为 **1.2**。采用 **双侧独立样本t检验**，检验水准 **α=0.05**，把握度（Power）设为 **80%**。在此假设下，每组需要 **63** 例受试者。\n\n考虑到可能存在 **20%** 的脱落率，计划每组纳入 **79** 例受试者，总计 **158** 例。\n\n## 分析数据集定义\n\n- **全分析集（FAS）**：所有随机化且至少接受过一次研究药物治疗并有一次基线后疗效评估的受试者。这是主要疗效分析的主要数据集。\n- **符合方案集（PPS）**：FAS中那些没有重大方案偏离、依从性良好（服药依从性在80%-120%之间）且完成所有计划访视的受试者子集。用于敏感性分析。\n- **安全性分析集（SS）**：所有随机化且至少接受过一次研究药物治疗的受试者。用于所有安全性分析。\n\n## 一般统计原则\n\n- 连续变量将使用例数（n）、均数（Mean）、标准差（SD）、中位数（Median）、最小值（Min）和最大值（Max）进行描述。\n- 分类变量将使用频数（n）和百分比（%）进行描述。\n- 所有统计检验均为双侧检验，p < 0.05 将被视为有统计学显著性差异。\n\n## 疗效分析\n\n### 主要疗效终点分析\n主要疗效终点（第24周较基线的变化值）的分析将采用 **协方差分析（ANCOVA）模型**。模型中将包括：\n- 治疗组（固定效应）\n- 随机分层因素（研究中心、基线疾病严重程度）（固定效应）\n- 基线主要疗效指标值（协变量）\n\n将估计各治疗组的LS Mean、治疗组间差异（试验组-安慰剂组）及其95%置信区间和p值。\n\n**缺失数据处理**：主要分析将采用基于多重填补（Multiple Imputation）的方法作为主要分析，同时采用末次观测值结转（LOCF）和基线观测值结转（BOCF）作为敏感性分析。\n\n### 次要疗效终点分析\n- 达到特定应答标准的受试者比例（如ACR20/50/70）将采用 **Cochran-Mantel-Haenszel（CMH）χ²检验**，以研究中心和基线严重程度为分层因素。\n- 至事件发生时间（如首次达到LDA的时间）将采用 **Kaplan-Meier法** 估计中位时间及生存曲线，组间比较采用 **分层对数秩检验（Stratified Log-rank Test）**。\n\n## 安全性分析\n\n### 不良事件分析\n- 将计算SS集中各治疗组的TEAE、与研究药物相关的TEAE、SAE、导致停药的不良事件的发生率及例次。\n- 不良事件将按系统器官分类（SOC）和首选术语（PT）使用 **MedDRA词典** 进行编码，并列出详细列表。\n- 实验室数据、生命体征和心电图数据将进行描述性统计分析，并列出异常值清单。\n\n## 期中分析\n\n本研究不计划进行期中分析。\n\n## 统计软件\n\n所有统计分析将使用 **SAS 9.4** 或更高版本进行。",
+      "sources": [],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 7,
+      "children": []
+    },
+    {
+      "title": "数据管理",
+      "field_key": "struct_data_management",
+      "level": 1,
+      "generation_mode": 2,
+      "content_template": "## 病例报告表（CRF）与电子数据采集（EDC）\n\n本研究将采用 **电子数据采集（EDC）系统** 进行数据收集。研究者或其授权的CRC必须根据原始文件及时、准确、完整地填写eCRF。所有数据的录入和修改均会在EDC系统中留下完整的稽查轨迹。\n\n## 数据核查与质疑\n\n数据管理人员将对eCRF数据进行 **逻辑核查** 和 **源数据验证（SDV）**。发现的数据问题将通过EDC系统以 **质疑（Query）** 形式发送给研究中心。研究者或其授权人员需在规定的时限内（通常为5个工作日）对质疑进行回复或更正。\n\n## 数据库锁定\n\n在完成所有数据录入、数据核查、质疑关闭、医学编码（AE、SAE、合并用药）审核以及方案偏离审核后，将在数据审核会议上确认数据库锁定条件是否满足。数据库锁定由申办方、主要研究者、数据管理和统计分析负责人共同批准。锁定后的数据库将不再允许任何修改。\n\n## 数据保存与保密\n\n根据ICH GCP要求，所有研究相关文件（包括原始医疗记录、知情同意书、CRF、研究者文件夹等）应由研究者和申办方至少保存至试验终止后 **5年**，或依据当地法规要求更长的时间。\n\n受试者的身份信息（如姓名、身份证号、病历号）将严格保密，不会出现在任何公开发表的报告中。研究数据中仅以 **受试者筛选编号和随机编号** 作为唯一标识。",
+      "sources": [],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 8,
+      "children": []
+    },
+    {
+      "title": "不良事件处理与报告",
+      "field_key": "struct_ae_management",
+      "level": 1,
+      "generation_mode": 2,
+      "content_template": "## 不良事件的收集与记录\n\n从受试者签署知情同意书开始，直至安全性随访期结束，研究者应在每次访视时通过非诱导性提问（如“自上次访视以来，您是否有任何不适？”）主动收集不良事件。所有观察到或受试者主动报告的不良事件，无论是否被认为与研究药物相关，均需详细记录在eCRF的不良事件页面。记录内容包括但不限于：\n\n- 不良事件名称（使用医学专业术语）。\n- 起止日期。\n- 严重程度分级（依据CTCAE 5.0）。\n- 与研究药物的因果关系判断。\n- 针对不良事件采取的措施（无、暂停用药、剂量调整、永久停药、合并用药、非药物治疗等）。\n- 不良事件的结局（恢复/痊愈、恢复中/好转、未恢复、死亡、未知）。\n\n## 严重不良事件报告的详细流程\n\n1. **首次报告**：研究者获知SAE后，立即（最迟不超过24小时）填写 **SAE报告表** 并通过传真或安全邮件发送至申办方药物警戒（PV）部门。报告内容至少应包括：受试者编号、SAE名称、发生日期、严重程度、与药物关系、研究者签名及日期。\n2. **随访报告**：研究者需持续跟踪SAE的转归。当获得新的医学信息（如检查结果、出院小结、尸检报告）或SAE结局发生变化时，应在24小时内提交 **SAE随访报告**。\n3. **总结报告**：当SAE达到最终结局（恢复且无后遗症、恢复但有后遗症、死亡）时，研究者应提交最终的 **SAE总结报告**。\n\n## 紧急医疗事件的处理原则\n\n受试者的安全与权益高于一切。若发生紧急医疗事件，研究者应首先采取必要的医疗措施确保受试者安全，必要时立即启动紧急揭盲程序以指导后续治疗。",
+      "sources": [],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 9,
+      "children": []
+    },
+    {
+      "title": "伦理与法规依从",
+      "field_key": "struct_ethics",
+      "level": 1,
+      "generation_mode": 2,
+      "content_template": "## 伦理委员会审查\n\n本研究方案、知情同意书、提供给受试者的任何书面材料、研究者手册及招募广告等，在试验启动前必须获得 **独立的伦理委员会（EC）** 的书面批准。在研究过程中，方案的任何修正案也必须事先获得伦理委员会的批准后方可执行，除非是为了消除对受试者的即刻危害或仅为行政性变更。\n\n研究者有责任在每年规定时间内向伦理委员会提交 **研究年度进展报告**，并在研究结束时提交 **结题报告**。\n\n## 知情同意\n\n### 知情同意过程\n在开始任何研究相关程序前，研究者或其授权代表必须与潜在的受试者或其法定代理人进行一次面对面的、充分详细的知情同意谈话。谈话内容需涵盖方案要求的全部要素，包括研究目的、流程、潜在风险与获益、替代疗法、自愿参与及随时退出的权利、隐私保护等。\n\n必须给予受试者充足的时间考虑和提问，并确保受试者完全理解信息。知情同意过程应在安静、私密的环境中进行，避免任何胁迫或不正当影响。\n\n### 知情同意书签署\n只有受试者（或其法定代理人）和研究者在 **最新版、已获伦理委员会批准** 的知情同意书上亲笔签名并注明日期后，该受试者方可参加研究。知情同意书一式两份，一份交给受试者保存，一份作为原始文件保存在研究文件夹中。\n\n若研究过程中获得可能影响受试者继续参与意愿的新信息（如新的安全性发现），需修订知情同意书并再次获得伦理委员会批准，已入组受试者需重新签署新版知情同意书。\n\n## 赫尔辛基宣言与GCP\n\n本研究将严格遵循 **《赫尔辛基宣言》** 的伦理原则、**ICH E6(R2)《药物临床试验质量管理规范》** 以及所有适用的当地法律法规进行。\n\n## 保密与隐私\n\n研究者必须确保受试者的个人信息得到严格保密。研究数据将进行 **去标识化** 处理。任何直接识别受试者身份的信息（如姓名、身份证号）不得离开研究中心，也不会录入eCRF或提交给申办方。研究中心需维护一份独立的 **受试者身份识别代码表**，该表仅限研究者及其授权人员访问。",
+      "sources": [],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 10,
+      "children": []
+    },
+    {
+      "title": "研究管理",
+      "field_key": "struct_study_management",
+      "level": 1,
+      "generation_mode": 2,
+      "content_template": "## 监查\n\n申办方或其委托的合同研究组织（CRO）将指派临床研究监查员（CRA）对研究进行定期监查。监查的目的是确保研究严格遵循已批准的方案、GCP原则及适用的法规要求，并核实源数据与eCRF数据的一致性（源数据验证）。\n\nCRA将访视研究中心，检查研究文件的完整性、研究药物的管理情况，并与研究者讨论研究进展和潜在问题。监查的频率和范围将根据风险监查计划确定。\n\n## 稽查\n\n申办方的质量保证部门或独立第三方可能对研究中心进行稽查，以评估研究的实施质量、数据可靠性及对法规的依从性。稽查可能发生在研究进行期间或结束后。\n\n## 检查\n\n卫生监督管理部门（如NMPA、FDA）有权在任何时候对研究中心进行检查。研究者应及时通知申办方任何检查通知，并全力配合检查工作，提供所有必需的原始文件和记录。\n\n## 方案偏离\n\n任何对已获批准的试验方案的偏离，无论原因如何，研究者都必须记录在源文件和方案偏离记录表中。\n\n- **重要方案偏离**：指可能显著影响受试者权利、安全或福祉，或影响研究数据完整性、准确性和可靠性的偏离。重要方案偏离必须及时报告给申办方和伦理委员会。\n- **轻微方案偏离**：指对研究无显著影响的偏离，只需在研究文件中记录即可。\n\n## 研究终止或暂停\n\n若出现以下情况，申办方有权在任何时候暂停或终止研究：\n- 出现新的、无法预期的、显著的安全性风险。\n- 中期分析显示明确的有效性或无效性，继续试验已不道德或不必要。\n- 研究中心入组速度极慢或存在严重违反GCP的行为。\n\n若研究提前终止，研究者应及时通知伦理委员会和已入组的受试者，并确保对受试者进行适当的后续随访和医疗安排。",
+      "sources": [],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 11,
+      "children": []
+    },
+    {
+      "title": "讨论",
+      "field_key": "struct_discussion",
+      "level": 1,
+      "generation_mode": 1,
+      "content_template": null,
+      "sources": [
+        {
+          "source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"},
+          "match_type": "关键信息匹配",
+          "match_keys": [
+            {"value": "core_indication", "label": "适应症"},
+            {"value": "core_drug_name", "label": "试验药物名称"},
+            {"value": "core_phase", "label": "研究阶段"}
+          ],
+          "target_field": "discussion_context"
+        }
+      ],
+      "default_prompt": "请撰写方案讨论部分，内容应包括：\n- 本研究设计的优势（如随机双盲、多中心）及合理性。\n- 主要终点选择的依据及临床意义。\n- 潜在的局限性（如样本量有限、单一人群）及应对措施。\n- 对临床实践和未来研究的启示。\n内容应专业、客观，字数在300-500字。",
+      "custom_prompt": null,
+      "order_index": 12,
+      "children": []
+    },
+    {
+      "title": "参考文献",
+      "field_key": "struct_references",
+      "level": 1,
+      "generation_mode": 2,
+      "content_template": "1. [作者.] [文章标题.] [期刊名.] [年份];[卷号]:[页码].\n2. [作者.] [书名.] [版本.] [出版地]:[出版社];[年份].\n3. World Medical Association. World Medical Association Declaration of Helsinki: ethical principles for medical research involving human subjects. JAMA. 2013;310(20):2191-2194.\n4. International Council for Harmonisation of Technical Requirements for Pharmaceuticals for Human Use (ICH). ICH Harmonised Guideline: Integrated Addendum to ICH E6(R1): Guideline for Good Clinical Practice E6(R2). Current Step 4 version. 2016.\n5. 国家药品监督管理局.《药物临床试验质量管理规范》（2020年第57号）. 2020.\n6. （此处应根据试验药物和适应症添加相关临床研究文献）",
+      "sources": [],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 13,
+      "children": []
+    },
+    {
+      "title": "附录",
+      "field_key": "struct_appendix",
+      "level": 1,
+      "generation_mode": 2,
+      "content_template": "### 附录一：研究流程图\n\n（此处应插入详细的访视流程图，已在研究设计章节中呈现）\n\n### 附录二：评估量表\n\n（此处应附上主要疗效评估量表，如DAS28评分表、疼痛VAS量表、生活质量问卷SF-36等）\n\n### 附录三：实验室检查正常值范围\n\n（此处应列出中心实验室的各项检查指标的正常值参考范围及异常分级标准）\n\n### 附录四：合并用药禁止/限制列表\n\n| 类别 | 药物通用名 | 限制说明 |\n| :--- | :--- | :--- |\n| 禁止类 | 同类别其他药物 | 可能混淆疗效评价 |\n| 谨慎使用类 | NSAIDs | 仅允许稳定剂量，不可新增 |\n\n### 附录五：CTCAE 5.0 分级标准节选\n\n（列出与研究药物预期不良事件相关的主要术语的分级标准）",
+      "sources": [],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 14,
+      "children": []
+    }
+  ]
+}
