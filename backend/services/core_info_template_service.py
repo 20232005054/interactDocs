@@ -88,7 +88,9 @@ class CoreInfoTemplateService:
             is_required=is_required,
             order_index=order_index,
         )
-        return await CoreInfoTemplateMapper.create(db, core_template)
+        result = await CoreInfoTemplateMapper.create(db, core_template)
+        await db.commit()
+        return result
 
     @staticmethod
     async def insert_after(
@@ -125,14 +127,13 @@ class CoreInfoTemplateService:
             is_required=is_required,
             order_index=insert_index,
         )
-        return await CoreInfoTemplateMapper.create(db, core_template)
+        result = await CoreInfoTemplateMapper.create(db, core_template)
+        await db.commit()
+        return result
 
     @staticmethod
     async def delete(db: AsyncSession, core_template_id: UUID):
-        """
-        删除节点，并将同级后续节点 order_index -1 补位。
-        子节点由数据库 CASCADE 自动删除，无需手动处理。
-        """
+        """删除节点，并将同级后续节点 order_index -1 补位。子节点由数据库 CASCADE 自动删除。"""
         node = await CoreInfoTemplateMapper.get_by_id(db, core_template_id)
         if not node:
             return
@@ -142,11 +143,10 @@ class CoreInfoTemplateService:
         template_id = node.template_id
 
         await CoreInfoTemplateMapper.delete_by_id(db, core_template_id)
-
-        # 后续同级节点补位
         await CoreInfoTemplateMapper.shift_order_index(
             db, template_id, parent_id, deleted_index + 1, delta=-1
         )
+        await db.commit()
 
     @staticmethod
     async def reorder(
@@ -155,10 +155,6 @@ class CoreInfoTemplateService:
         parent_id: Optional[UUID],
         ordered_ids: List[UUID],
     ):
-        """
-        拖拽重排：前端传入同级节点的新顺序 ID 列表，按列表下标重写 order_index。
-        支持跨父节点移动：如果某节点原 parent_id 与传入 parent_id 不同，同时更新 parent_id。
-        """
         from sqlalchemy import update as sa_update
 
         for idx, cid in enumerate(ordered_ids):
@@ -180,8 +176,12 @@ class CoreInfoTemplateService:
         if "parent_id" in kwargs and kwargs["parent_id"] is not None:
             if str(kwargs["parent_id"]) == str(core_template_id):
                 raise ValueError("父节点不能是自己")
-        return await CoreInfoTemplateMapper.update(db, core_template_id, kwargs)
+        await CoreInfoTemplateMapper.update(db, core_template_id, kwargs)
+        await db.commit()
+        return await CoreInfoTemplateMapper.get_by_id(db, core_template_id)
 
     @staticmethod
     async def batch_create(db: AsyncSession, templates: List[CoreInfoTemplate]):
-        return await CoreInfoTemplateMapper.batch_create(db, templates)
+        result = await CoreInfoTemplateMapper.batch_create(db, templates)
+        await db.commit()
+        return result

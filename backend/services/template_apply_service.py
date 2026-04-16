@@ -14,6 +14,7 @@ from services.summary_template_service import SummaryTemplateService
 from services.structure_template_service import StructureTemplateService
 from services.ai_client import AIClientError
 from core.constants import EdgeSourceType, EdgeTargetType
+from core.config import AI_MAX_CONCURRENCY
 
 
 class TemplateApplyService:
@@ -331,8 +332,6 @@ class TemplateApplyService:
         """
         import asyncio
 
-        AI_CONCURRENCY = 10
-
         document = await DocumentMapper.get_document_by_id(db, document_id)
         if not document:
             raise HTTPException(status_code=404, detail="文档不存在")
@@ -446,7 +445,7 @@ class TemplateApplyService:
         ]
 
         if ai_tasks:
-            semaphore = asyncio.Semaphore(AI_CONCURRENCY)
+            semaphore = asyncio.Semaphore(AI_MAX_CONCURRENCY)
 
             async def run_ai(item):
                 async with semaphore:

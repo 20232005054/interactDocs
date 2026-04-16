@@ -46,11 +46,15 @@ class SummaryTemplateService:
             custom_prompt=custom_prompt,
             order_index=order_index
         )
-        return await SummaryTemplateMapper.create(db, summary_template)
+        result = await SummaryTemplateMapper.create(db, summary_template)
+        await db.commit()
+        return result
 
     @staticmethod
     async def update(db: AsyncSession, summary_template_id: UUID, **kwargs):
-        return await SummaryTemplateMapper.update(db, summary_template_id, kwargs)
+        await SummaryTemplateMapper.update(db, summary_template_id, kwargs)
+        await db.commit()
+        return await SummaryTemplateMapper.get_by_id(db, summary_template_id)
 
     @staticmethod
     async def delete(db: AsyncSession, summary_template_id: UUID):
@@ -61,6 +65,7 @@ class SummaryTemplateService:
         template_id = node.template_id
         await SummaryTemplateMapper.delete_by_id(db, summary_template_id)
         await SummaryTemplateMapper.shift_order_index(db, template_id, deleted_index + 1, delta=-1)
+        await db.commit()
 
     @staticmethod
     async def insert_after(
@@ -85,7 +90,9 @@ class SummaryTemplateService:
             default_prompt=data.get("default_prompt"),
             custom_prompt=data.get("custom_prompt"),
         )
-        return await SummaryTemplateMapper.create(db, summary_template)
+        result = await SummaryTemplateMapper.create(db, summary_template)
+        await db.commit()
+        return result
 
     @staticmethod
     async def reorder(
@@ -96,10 +103,13 @@ class SummaryTemplateService:
             for idx, sid in enumerate(ordered_ids)
         ]
         await SummaryTemplateMapper.batch_update_order(db, items)
+        await db.commit()
 
     @staticmethod
     async def batch_create(db: AsyncSession, templates: List[SummaryTemplate]):
-        return await SummaryTemplateMapper.batch_create(db, templates)
+        result = await SummaryTemplateMapper.batch_create(db, templates)
+        await db.commit()
+        return result
 
     @staticmethod
     def render_template_variables(template_text: str, variables: dict) -> str:

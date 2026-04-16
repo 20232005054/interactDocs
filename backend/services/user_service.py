@@ -49,6 +49,7 @@ class UserService:
             role=UserRole.USER,
         )
         user = await UserMapper.create(db, new_user)
+        await db.commit()
 
         # 生成 token
         token = create_access_token(user.user_id, user.role)
@@ -85,7 +86,9 @@ class UserService:
         update_data = user_in.model_dump(exclude_unset=True)
         if not update_data:
             raise HTTPException(status_code=400, detail="没有要更新的数据")
-        return await UserMapper.update(db, user_id, update_data)
+        result = await UserMapper.update(db, user_id, update_data)
+        await db.commit()
+        return result
 
     @staticmethod
     async def update_role(db: AsyncSession, user_id, new_role: UserRole) -> User:
@@ -93,7 +96,9 @@ class UserService:
         user = await UserMapper.get_by_id(db, user_id)
         if not user:
             raise HTTPException(status_code=404, detail="用户不存在")
-        return await UserMapper.update(db, user_id, {"role": new_role})
+        result = await UserMapper.update(db, user_id, {"role": new_role})
+        await db.commit()
+        return result
 
     @staticmethod
     async def delete_user(db: AsyncSession, user_id) -> None:
@@ -102,3 +107,4 @@ class UserService:
         if not user:
             raise HTTPException(status_code=404, detail="用户不存在")
         await UserMapper.delete(db, user_id)
+        await db.commit()

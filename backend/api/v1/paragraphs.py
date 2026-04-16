@@ -79,32 +79,26 @@ async def ai_assist_paragraph(paragraph_id: UUID, assist_request: AIAssistReques
         raise HTTPException(status_code=404, detail="段落不存在")
     if paragraph.para_type != "paragraph":
         raise HTTPException(status_code=400, detail="只有正文类型的段落才能使用AI帮填功能")
-    try:
-        return StreamingResponse(
-            ai_service.ai_assist_paragraph(paragraph_id, assist_request, instruction=assist_request.instruction),
-            media_type="text/event-stream",
-            headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="AI 帮填失败")
+    return StreamingResponse(
+        ai_service.ai_assist_paragraph(paragraph_id, assist_request, instruction=assist_request.instruction),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
+    )
 
 
 @router.post("/paragraphs/{paragraph_id}/ai/evaluate", summary="AI 评估段落内容")
 async def ai_evaluate_paragraph(paragraph_id: UUID, db: AsyncSession = Depends(get_db)):
-    try:
-        evaluate_and_save_func = ai_service.ai_evaluate_paragraph(paragraph_id)
+    evaluate_and_save_func = ai_service.ai_evaluate_paragraph(paragraph_id)
 
-        async def generate_evaluation():
-            async for chunk in evaluate_and_save_func():
-                yield chunk
+    async def generate_evaluation():
+        async for chunk in evaluate_and_save_func():
+            yield chunk
 
-        return StreamingResponse(
-            generate_evaluation(),
-            media_type="text/event-stream",
-            headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
-        )
-    except Exception:
-        raise HTTPException(status_code=500, detail="AI 评估失败")
+    return StreamingResponse(
+        generate_evaluation(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
+    )
 
 
 @router.post("/paragraphs/{paragraph_id}/ai/apply", summary="应用AI帮填结果", response_model=ResponseModel[ParagraphResponse])

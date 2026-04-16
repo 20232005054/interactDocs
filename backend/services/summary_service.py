@@ -49,14 +49,18 @@ class SummaryService:
             "is_change": 1 if new_content != old_summary.content else 0,
         }
         updated_summary = await SummaryMapper.update_summary(db, summary_id, update_data)
+        await db.commit()
 
         # 内容有变化时启动后台任务
         if new_content != old_summary.content:
             import asyncio
             from services.summary_change_service import handle_summary_change_async
-            asyncio.create_task(
-                handle_summary_change_async(summary_id, old_summary.content, new_content)
+            from core.utils import log_task_exception
+            task = asyncio.create_task(
+                handle_summary_change_async(summary_id, old_summary.content, new_content),
+                name=f"summary_change_{summary_id}",
             )
+            task.add_done_callback(log_task_exception)
 
         return updated_summary
 
@@ -79,7 +83,7 @@ class SummaryService:
                 .where(DocumentSummary.order_index > deleted_order_index)
                 .values(order_index=DocumentSummary.order_index - 1)
             )
-            
+            await db.commit()
             return {"message": "删除成功"}
         return {"message": "摘要不存在"}
     
@@ -107,7 +111,9 @@ class SummaryService:
             order_index=order_index
         )
         
-        return await SummaryMapper.create_summary(db, new_summary)
+        result = await SummaryMapper.create_summary(db, new_summary)
+        await db.commit()
+        return result
     
     @staticmethod
     async def insert_summary_after(db: AsyncSession, summary_id: UUID):
@@ -141,7 +147,9 @@ class SummaryService:
             order_index=target_order_index + 1
         )
         
-        return await SummaryMapper.create_summary(db, new_summary)
+        result = await SummaryMapper.create_summary(db, new_summary)
+        await db.commit()
+        return result
     
     @staticmethod
     async def apply_ai_assist_result(db: AsyncSession, summary_id: UUID):
@@ -164,6 +172,7 @@ class SummaryService:
         
         # 更新摘要
         await SummaryMapper.update_summary(db, summary_id, update_data)
+        await db.commit()
         
         # 返回更新后的摘要
         return await SummaryMapper.get_summary_by_id(db, summary_id)
@@ -172,32 +181,30 @@ class SummaryService:
 
     @staticmethod
     async def get_summary_related_paragraphs(db: AsyncSession, summary_id: UUID):
-        """
-        获取摘要关联的段落信息
-        """
-        # 获取摘要的所有关联链接（通过DependencyEdge表）
+        """获取摘要关联的段落信息（批量查询，避免 N+1）"""
         edges = await DependencyEdgeMapper.get_edges_by_target(
             db, EdgeTargetType.SUMMARY, summary_id
         )
-        
-        related_paragraphs = []
-        for edge in edges:
-            # 获取段落详情
-            from db.mappers.paragraph_mapper import ParagraphMapper
-            paragraph = await ParagraphMapper.get_paragraph_by_id(db, edge.source_id)
-            if paragraph:
-                # 直接使用纯文本内容
-                related_paragraphs.append({
-                    "paragraph_id": paragraph.paragraph_id,
-                    "chapter_id": paragraph.chapter_id,
-                    "content": paragraph.content,
-                    "para_type": paragraph.para_type,
-                    "order_index": paragraph.order_index,
-                    "ai_eval": paragraph.ai_eval,
-                    "ai_suggestion": paragraph.ai_suggestion,
-                    "summary_version": edge.target_version,
-                    "relevance_score": edge.relevance_score
-                })
-        
-        return related_paragraphs
+        if not edges:
+            return []
+
+        para_ids = [edge.source_id for edge in edges]
+        paragraphs = await ParagraphMapper.get_paragraphs_by_ids(db, para_ids)
+
+        edge_map = {edge.source_id: edge for edge in edges}
+        return [
+            {
+                "paragraph_id": p.paragraph_id,
+                "chapter_id": p.chapter_id,
+                "content": p.content,
+                "para_type": p.para_type,
+                "order_index": p.order_index,
+                "ai_eval": p.ai_eval,
+                "ai_suggestion": p.ai_suggestion,
+                "summary_version": edge_map[p.paragraph_id].target_version,
+                "relevance_score": edge_map[p.paragraph_id].relevance_score,
+            }
+            for p in paragraphs
+            if p.paragraph_id in edge_map
+        ]
 

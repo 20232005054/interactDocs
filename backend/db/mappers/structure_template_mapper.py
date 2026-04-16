@@ -44,7 +44,7 @@ class StructureTemplateMapper:
     @staticmethod
     async def create(db: AsyncSession, structure_template: StructureTemplate):
         db.add(structure_template)
-        await db.commit()
+        await db.flush()
         await db.refresh(structure_template)
         return structure_template
 
@@ -56,14 +56,12 @@ class StructureTemplateMapper:
             .where(StructureTemplate.structure_template_id == structure_template_id)
             .values(**update_data)
         )
-        await db.commit()
 
     @staticmethod
     async def delete_by_id(db: AsyncSession, structure_template_id: UUID):
         await db.execute(
             delete(StructureTemplate).where(StructureTemplate.structure_template_id == structure_template_id)
         )
-        await db.commit()
 
     @staticmethod
     async def shift_order_index(
@@ -86,10 +84,9 @@ class StructureTemplateMapper:
         await db.execute(
             delete(StructureTemplate).where(StructureTemplate.template_id == template_id)
         )
-        await db.commit()
 
     @staticmethod
     async def batch_create(db: AsyncSession, templates: list):
         db.add_all(templates)
-        await db.commit()
+        await db.flush()
         return templates

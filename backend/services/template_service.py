@@ -28,7 +28,9 @@ class TemplateService:
             user_id=user_id,
             is_active=True
         )
-        return await TemplateMapper.create_template(db, new_template)
+        result = await TemplateMapper.create_template(db, new_template)
+        await db.commit()
+        return result
     
     @staticmethod
     async def get_template(db: AsyncSession, template_id: UUID):

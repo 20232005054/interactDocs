@@ -35,7 +35,9 @@ class ParagraphService:
             ischange=0  # 默认为0
         )
         
-        return await ParagraphMapper.create_paragraph(db, new_paragraph)
+        result = await ParagraphMapper.create_paragraph(db, new_paragraph)
+        await db.commit()
+        return result
 
     @staticmethod
     async def update_paragraph(db: AsyncSession, paragraph_id: UUID, paragraph_in: ParagraphUpdate):
@@ -57,6 +59,7 @@ class ParagraphService:
             update_data["ai_suggestion"] = paragraph_in.ai_suggestion
 
         await ParagraphMapper.update_paragraph(db, paragraph_id, update_data)
+        await db.commit()
         return await ParagraphMapper.get_paragraph_by_id(db, paragraph_id)
 
     @staticmethod
@@ -217,30 +220,29 @@ class ParagraphService:
     
     @staticmethod
     async def get_paragraph_related_summaries(db: AsyncSession, paragraph_id: UUID):
-        """
-        获取段落关联的摘要信息
-        """
-        # 获取段落的所有关联链接（通过DependencyEdge表）
+        """获取段落关联的摘要信息（批量查询，避免 N+1）"""
         edges = await DependencyEdgeMapper.get_edges_by_source_and_target_type(
             db, EdgeSourceType.PARAGRAPH, paragraph_id, EdgeTargetType.SUMMARY
         )
-        
-        related_summaries = []
-        for edge in edges:
-            # 获取摘要详情
-            summary = await SummaryMapper.get_summary_by_id(db, edge.target_id)
-            if summary:
-                # 直接使用纯文本内容
-                related_summaries.append({
-                    "summary_id": summary.summary_id,
-                    "document_id": summary.document_id,
-                    "title": summary.title,
-                    "field_key": summary.field_key,
-                    "content": summary.content,
-                    "version": summary.version,
-                    "created_at": summary.created_at,
-                    "updated_at": summary.updated_at,
-                    "relevance_score": edge.relevance_score
-                })
-        
-        return related_summaries
+        if not edges:
+            return []
+
+        summary_ids = [edge.target_id for edge in edges]
+        summaries = await SummaryMapper.get_summaries_by_ids(db, summary_ids)
+
+        edge_map = {edge.target_id: edge for edge in edges}
+        return [
+            {
+                "summary_id": s.summary_id,
+                "document_id": s.document_id,
+                "title": s.title,
+                "field_key": s.field_key,
+                "content": s.content,
+                "version": s.version,
+                "created_at": s.created_at,
+                "updated_at": s.updated_at,
+                "relevance_score": edge_map[s.summary_id].relevance_score,
+            }
+            for s in summaries
+            if s.summary_id in edge_map
+        ]

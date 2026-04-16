@@ -75,7 +75,7 @@ class CoreInfoTemplateMapper:
     @staticmethod
     async def create(db: AsyncSession, core_info_template: CoreInfoTemplate):
         db.add(core_info_template)
-        await db.commit()
+        await db.flush()
         await db.refresh(core_info_template)
         return core_info_template
 
@@ -86,26 +86,23 @@ class CoreInfoTemplateMapper:
             .where(CoreInfoTemplate.core_template_id == core_template_id)
             .values(**update_data)
         )
-        await db.commit()
 
     @staticmethod
     async def delete_by_id(db: AsyncSession, core_template_id: UUID):
         await db.execute(
             delete(CoreInfoTemplate).where(CoreInfoTemplate.core_template_id == core_template_id)
         )
-        await db.commit()
 
     @staticmethod
     async def delete_by_template_id(db: AsyncSession, template_id: UUID):
         await db.execute(
             delete(CoreInfoTemplate).where(CoreInfoTemplate.template_id == template_id)
         )
-        await db.commit()
 
     @staticmethod
     async def batch_create(db: AsyncSession, templates: list):
         db.add_all(templates)
-        await db.commit()
+        await db.flush()
         return templates
 
     @staticmethod
@@ -117,4 +114,3 @@ class CoreInfoTemplateMapper:
                 .where(CoreInfoTemplate.core_template_id == item["core_template_id"])
                 .values(order_index=item["order_index"])
             )
-        await db.commit()

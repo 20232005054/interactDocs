@@ -132,7 +132,9 @@ class ChapterService:
             order_index=order_index
         )
         
-        return await ChapterMapper.create_chapter(db, new_chapter)
+        result = await ChapterMapper.create_chapter(db, new_chapter)
+        await db.commit()
+        return result
 
     @staticmethod
     async def create_sub_chapter(db: AsyncSession, document_id: UUID, parent_id: UUID):
@@ -162,7 +164,9 @@ class ChapterService:
             order_index=order_index
         )
         
-        return await ChapterMapper.create_chapter(db, new_chapter)
+        result = await ChapterMapper.create_chapter(db, new_chapter)
+        await db.commit()
+        return result
 
     @staticmethod
     async def update_chapter(db: AsyncSession, chapter_id: UUID, chapter_in: ChapterUpdate):
@@ -187,6 +191,7 @@ class ChapterService:
             update_data["parent_id"] = chapter_in.parent_id
         
         await ChapterMapper.update_chapter(db, chapter_id, update_data)
+        await db.commit()
         # 获取更新后的章节
         updated_chapter = await ChapterMapper.get_chapter_by_id(db, chapter_id)
         # 构建不包含段落的字典
@@ -209,6 +214,7 @@ class ChapterService:
             raise HTTPException(status_code=404, detail="章节不存在")
         
         await ChapterMapper.delete_chapter(db, chapter)
+        await db.commit()
         return {"message": "删除成功"}
 
     @staticmethod
@@ -235,7 +241,7 @@ class ChapterService:
         return result
 
     @staticmethod
-    async def reorder_chapters(db: AsyncSession, document_id: UUID, parent_id, ordered_ids: list):
+    async def reorder_chapters(db: AsyncSession, document_id: UUID, parent_id, ordered_ids: list):        
         """
         拖拽重排：传入同级章节的新顺序 ID 列表，按下标重写 order_index。
         支持跨父节点移动：若节点原 parent_id 与传入 parent_id 不同，同时更新 parent_id。
@@ -250,6 +256,7 @@ class ChapterService:
                 item["parent_id"] = parent_id
             items.append(item)
         await ChapterMapper.batch_update_order(db, items)
+        await db.commit()
 
     @staticmethod
     async def get_chapter_toc(db: AsyncSession, chapter_id: UUID):

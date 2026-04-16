@@ -63,16 +63,18 @@ class StructureTemplateService:
             custom_prompt=custom_prompt,
             order_index=order_index
         )
-        return await StructureTemplateMapper.create(db, structure_template)
-
+        result = await StructureTemplateMapper.create(db, structure_template)
+        await db.commit()
+        return result
 
     @staticmethod
     async def update(db: AsyncSession, structure_template_id: UUID, **kwargs):
         if "parent_id" in kwargs and kwargs["parent_id"] is not None:
-            # 防环校验
             if str(kwargs["parent_id"]) == str(structure_template_id):
                 raise ValueError("父节点不能是自己")
-        return await StructureTemplateMapper.update(db, structure_template_id, kwargs)
+        await StructureTemplateMapper.update(db, structure_template_id, kwargs)
+        await db.commit()
+        return await StructureTemplateMapper.get_by_id(db, structure_template_id)
 
     @staticmethod
     async def delete(db: AsyncSession, structure_template_id: UUID):
@@ -86,6 +88,7 @@ class StructureTemplateService:
         await StructureTemplateMapper.shift_order_index(
             db, template_id, parent_id, deleted_index + 1, delta=-1
         )
+        await db.commit()
 
     @staticmethod
     async def insert_after(
@@ -115,7 +118,9 @@ class StructureTemplateService:
             default_prompt=data.get("default_prompt"),
             custom_prompt=data.get("custom_prompt"),
         )
-        return await StructureTemplateMapper.create(db, structure_template)
+        result = await StructureTemplateMapper.create(db, structure_template)
+        await db.commit()
+        return result
 
     @staticmethod
     async def reorder(
@@ -139,7 +144,9 @@ class StructureTemplateService:
 
     @staticmethod
     async def batch_create(db: AsyncSession, templates: List[StructureTemplate]):
-        return await StructureTemplateMapper.batch_create(db, templates)
+        result = await StructureTemplateMapper.batch_create(db, templates)
+        await db.commit()
+        return result
 
     @staticmethod
     async def get_structure_tree(db: AsyncSession, template_id: UUID) -> List[dict]:

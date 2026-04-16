@@ -25,7 +25,7 @@ class SummaryTemplateMapper:
     @staticmethod
     async def create(db: AsyncSession, summary_template: SummaryTemplate):
         db.add(summary_template)
-        await db.commit()
+        await db.flush()
         await db.refresh(summary_template)
         return summary_template
 
@@ -37,26 +37,23 @@ class SummaryTemplateMapper:
             .where(SummaryTemplate.summary_template_id == summary_template_id)
             .values(**update_data)
         )
-        await db.commit()
 
     @staticmethod
     async def delete_by_id(db: AsyncSession, summary_template_id: UUID):
         await db.execute(
             delete(SummaryTemplate).where(SummaryTemplate.summary_template_id == summary_template_id)
         )
-        await db.commit()
 
     @staticmethod
     async def delete_by_template_id(db: AsyncSession, template_id: UUID):
         await db.execute(
             delete(SummaryTemplate).where(SummaryTemplate.template_id == template_id)
         )
-        await db.commit()
 
     @staticmethod
     async def batch_create(db: AsyncSession, templates: list):
         db.add_all(templates)
-        await db.commit()
+        await db.flush()
         return templates
 
     @staticmethod

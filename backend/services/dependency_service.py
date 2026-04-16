@@ -26,6 +26,7 @@ class DependencyService:
                     await DependencyEdgeMapper.update_edge(db, edge.edge_id, {
                         "target_version": target_version
                     })
+                    await db.commit()
                 return edge
         
         edge_data = {
@@ -41,7 +42,9 @@ class DependencyService:
             edge_data["target_version"] = target_version
         
         edge = DependencyEdge(**edge_data)
-        return await DependencyEdgeMapper.create_edge(db, edge)
+        result = await DependencyEdgeMapper.create_edge(db, edge)
+        await db.commit()
+        return result
     
     @staticmethod
     async def get_upstream_dependencies(

@@ -51,7 +51,9 @@ class CoreInfoService:
             is_locked=core_info_in.is_locked
         )
         
-        return await CoreInfoMapper.create_core_info(db, core_info)
+        result = await CoreInfoMapper.create_core_info(db, core_info)
+        await db.commit()
+        return result
     
     @staticmethod
     async def get_core_info_by_id(db: AsyncSession, core_info_id: uuid.UUID) -> DocumentCoreInfo:
@@ -126,32 +128,44 @@ class CoreInfoService:
             update_data["is_change"] = 1
 
         updated = await CoreInfoMapper.update_core_info(db, core_info_id, update_data)
+        await db.commit()
 
         # 启动后台任务处理下游联动
         if "content" in update_data and new_content != old_content:
             import asyncio
             from services.core_info_change_service import handle_core_info_change_async
-            asyncio.create_task(
-                handle_core_info_change_async(core_info_id, old_content, new_content)
+            from core.utils import log_task_exception
+            task = asyncio.create_task(
+                handle_core_info_change_async(core_info_id, old_content, new_content),
+                name=f"core_info_change_{core_info_id}",
             )
+            task.add_done_callback(log_task_exception)
 
         return updated
     
     @staticmethod
     async def delete_core_info(db: AsyncSession, core_info_id: uuid.UUID) -> bool:
-        return await CoreInfoMapper.delete_core_info(db, core_info_id)
+        result = await CoreInfoMapper.delete_core_info(db, core_info_id)
+        await db.commit()
+        return result
     
     @staticmethod
     async def update_order(db: AsyncSession, document_id: uuid.UUID, core_info_id: uuid.UUID, new_order: int) -> bool:
-        return await CoreInfoMapper.update_order_index(db, document_id, core_info_id, new_order)
+        result = await CoreInfoMapper.update_order_index(db, document_id, core_info_id, new_order)
+        await db.commit()
+        return result
     
     @staticmethod
     async def lock_core_info(db: AsyncSession, core_info_id: uuid.UUID) -> DocumentCoreInfo:
-        return await CoreInfoMapper.update_core_info(db, core_info_id, {"is_locked": True})
+        result = await CoreInfoMapper.update_core_info(db, core_info_id, {"is_locked": True})
+        await db.commit()
+        return result
     
     @staticmethod
     async def unlock_core_info(db: AsyncSession, core_info_id: uuid.UUID) -> DocumentCoreInfo:
-        return await CoreInfoMapper.update_core_info(db, core_info_id, {"is_locked": False})
+        result = await CoreInfoMapper.update_core_info(db, core_info_id, {"is_locked": False})
+        await db.commit()
+        return result
 
     @staticmethod
     async def reorder(db: AsyncSession, document_id: uuid.UUID, parent_id, ordered_ids: list) -> None:

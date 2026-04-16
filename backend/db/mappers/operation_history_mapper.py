@@ -35,10 +35,7 @@ class OperationHistoryMapper:
     
     @staticmethod
     async def create_operation_history(db: AsyncSession, history):
-        """
-        创建操作历史记录
-        """
         db.add(history)
-        await db.commit()
+        await db.flush()
         await db.refresh(history)
         return history

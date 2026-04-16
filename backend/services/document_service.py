@@ -200,6 +200,7 @@ class DocumentService:
             update_data["template_id"] = doc_in.template_id
 
         await DocumentMapper.update_document(db, document_id, update_data)
+        await db.commit()
         return await DocumentMapper.get_document_by_id(db, document_id)
 
     @staticmethod
@@ -209,6 +210,7 @@ class DocumentService:
             raise HTTPException(status_code=404, detail="文档不存在")
 
         await DocumentMapper.delete_document(db, document)
+        await db.commit()
         return {"message": "删除成功"}
 
     @staticmethod

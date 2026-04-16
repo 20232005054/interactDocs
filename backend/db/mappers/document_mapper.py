@@ -21,7 +21,7 @@ class DocumentMapper:
     @staticmethod
     async def create_document(db: AsyncSession, document):
         db.add(document)
-        await db.commit()
+        await db.flush()
         await db.refresh(document)
         return document
 
@@ -33,12 +33,10 @@ class DocumentMapper:
             .where(Document.document_id == document_id)
             .values(**update_data)
         )
-        await db.commit()
 
     @staticmethod
     async def delete_document(db: AsyncSession, document):
         await db.delete(document)
-        await db.commit()
     
     @staticmethod
     async def get_snapshots_by_document_id(db: AsyncSession, document_id: UUID):
@@ -61,7 +59,7 @@ class DocumentMapper:
     @staticmethod
     async def create_snapshot(db: AsyncSession, snapshot):
         db.add(snapshot)
-        await db.commit()
+        await db.flush()
         await db.refresh(snapshot)
         return snapshot
     
@@ -73,4 +71,3 @@ class DocumentMapper:
             .where(DocumentVersion.version_id == snapshot_id)
             .values(**update_data)
         )
-        await db.commit()

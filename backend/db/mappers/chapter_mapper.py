@@ -30,7 +30,7 @@ class ChapterMapper:
     @staticmethod
     async def create_chapter(db: AsyncSession, chapter):
         db.add(chapter)
-        await db.commit()
+        await db.flush()
         await db.refresh(chapter)
         return chapter
 
@@ -41,7 +41,6 @@ class ChapterMapper:
             .where(Chapter.chapter_id == chapter_id)
             .values(**update_data)
         )
-        await db.commit()
 
     @staticmethod
     async def shift_order_index(
@@ -75,7 +74,6 @@ class ChapterMapper:
                 .where(Chapter.chapter_id == item["chapter_id"])
                 .values(**values)
             )
-        await db.commit()
 
     @staticmethod
     async def delete_chapter(db: AsyncSession, chapter):
@@ -84,7 +82,7 @@ class ChapterMapper:
         deleted_order_index = chapter.order_index
 
         await db.delete(chapter)
-        await db.commit()
+        await db.flush()
 
         # 被删章节之后的同级章节补位
         query = (
@@ -97,7 +95,6 @@ class ChapterMapper:
         else:
             query = query.where(Chapter.parent_id == parent_id)
         await db.execute(query.values(order_index=Chapter.order_index - 1))
-        await db.commit()
 
     @staticmethod
     async def get_chapter_with_paragraphs(db: AsyncSession, chapter_id: UUID):

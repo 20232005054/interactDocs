@@ -34,7 +34,7 @@ class ParagraphMapper:
     @staticmethod
     async def create_paragraph(db: AsyncSession, paragraph):
         db.add(paragraph)
-        await db.commit()
+        await db.flush()
         await db.refresh(paragraph)
         return paragraph
 
@@ -45,7 +45,6 @@ class ParagraphMapper:
             .where(Paragraph.paragraph_id == paragraph_id)
             .values(**update_data)
         )
-        await db.commit()
 
     @staticmethod
     async def shift_order_index(
@@ -62,7 +61,6 @@ class ParagraphMapper:
     @staticmethod
     async def delete_paragraph(db: AsyncSession, paragraph):
         await db.delete(paragraph)
-        await db.commit()
 
     @staticmethod
     async def get_heading_paragraphs(db: AsyncSession, chapter_id: UUID):
@@ -73,5 +71,15 @@ class ParagraphMapper:
                 Paragraph.para_type.in_(['heading-1', 'heading-2', 'heading-3'])
             )
             .order_by(Paragraph.order_index)
+        )
+        return result.scalars().all()
+
+    @staticmethod
+    async def get_paragraphs_by_ids(db: AsyncSession, paragraph_ids: list) -> list:
+        """批量查询段落，避免 N+1"""
+        if not paragraph_ids:
+            return []
+        result = await db.execute(
+            select(Paragraph).where(Paragraph.paragraph_id.in_(paragraph_ids))
         )
         return result.scalars().all()

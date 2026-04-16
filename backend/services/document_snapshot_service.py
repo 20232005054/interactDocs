@@ -158,6 +158,7 @@ class DocumentSnapshotService:
             created_by=None,
         )
         new_snapshot = await DocumentMapper.create_snapshot(db, new_snapshot)
+        await db.commit()
 
         return {
             "version_id": new_snapshot.version_id,
@@ -179,6 +180,7 @@ class DocumentSnapshotService:
             raise HTTPException(status_code=404, detail="快照不存在")
 
         await DocumentMapper.update_snapshot(db, snapshot_id, {"description": description})
+        await db.commit()
 
         updated_result = await db.execute(
             select(DocumentVersion).where(DocumentVersion.version_id == snapshot_id)

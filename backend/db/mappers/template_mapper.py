@@ -20,7 +20,7 @@ class TemplateMapper:
         创建模板
         """
         db.add(template)
-        await db.commit()
+        await db.flush()
         await db.refresh(template)
         return template
     
@@ -35,7 +35,6 @@ class TemplateMapper:
             .where(Template.template_id == template_id)
             .values(**update_data)
         )
-        await db.commit()
     
     @staticmethod
     async def delete_template(db: AsyncSession, template):
@@ -43,7 +42,6 @@ class TemplateMapper:
         删除模板
         """
         await db.delete(template)
-        await db.commit()
     
     @staticmethod
     async def list_templates(

@@ -33,7 +33,7 @@ class UserMapper:
     async def create(db: AsyncSession, user: User) -> User:
         """创建新用户"""
         db.add(user)
-        await db.commit()
+        await db.flush()
         await db.refresh(user)
         return user
 
@@ -44,7 +44,6 @@ class UserMapper:
         await db.execute(
             update(User).where(User.user_id == user_id).values(**update_data)
         )
-        await db.commit()
         return await UserMapper.get_by_id(db, user_id)
 
     @staticmethod
@@ -54,7 +53,6 @@ class UserMapper:
         result = await db.execute(
             delete(User).where(User.user_id == user_id)
         )
-        await db.commit()
         return result.rowcount > 0
 
     @staticmethod

@@ -7,7 +7,7 @@ class DependencyEdgeMapper:
     @staticmethod
     async def create_edge(db: AsyncSession, edge: DependencyEdge):
         db.add(edge)
-        await db.commit()
+        await db.flush()
         await db.refresh(edge)
         return edge
 
@@ -41,8 +41,6 @@ class DependencyEdgeMapper:
             .where(DependencyEdge.edge_id == edge_id)
             .values(**update_data)
         )
-        await db.commit()
-        # 内联查询逻辑，不再依赖 get_edge_by_id 方法
         result = await db.execute(
             select(DependencyEdge).where(DependencyEdge.edge_id == edge_id)
         )
