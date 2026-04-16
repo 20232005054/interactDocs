@@ -82,9 +82,9 @@ async with AsyncSessionLocal() as db:
 ```
 
 **commit 时机：**
-- mapper 的 `create` / `update` / `delete` 方法负责 commit
-- service 在多步操作后统一 commit，不在每个 mapper 调用后单独 commit
-- `flush` 用于需要获取自增 ID 但还未提交的场景
+- mapper 的 `create` / `update` / `delete` 方法只做 `db.add` / `db.execute` / `db.flush`，**不 commit**
+- service 层统一负责 commit：单步操作在 service 方法末尾 commit，多步操作在所有步骤完成后统一 commit 一次
+- `flush` 用于需要获取数据库生成的 ID 但还未提交的场景（如 `create` 后需要用到 ID 建立关联）
 
 ---
 
@@ -162,3 +162,54 @@ CoreInfoResponse.model_rebuild()
 - Service 文件：`snake_case_service.py`（如 `document_service.py`）
 - Mapper 文件：`snake_case_mapper.py`（如 `paragraph_mapper.py`）
 - Schema 字段：`snake_case`，与数据库列名一致
+
+---
+
+## 11. 模板类型（TemplateType）
+
+`templates.template_type` 字段使用整数枚举，定义在 `core/constants.py`：
+
+| 值 | 枚举名 | 说明 |
+|---|---|---|
+| `0` | `DOCUMENT_PRIVATE` | 文档私有副本，创建文档时自动生成 |
+| `1` | `SYSTEM` | 系统模板，editor/admin 维护 |
+| `2` | `USER_REUSABLE` | 用户导出的可复用私有模板 |
+| `3` | `USER_PUBLIC` | 用户公开分享（预留，未实现） |
+
+**权限规则：**
+- type=1 的模板只有 editor/admin 可写
+- type=2 的模板只有创建者可写
+- 创建文档时可选 type=1 和 type=2（通过 `include_user=true` 参数合并返回）
+
+---
+
+## 12. 后台任务规范
+
+使用 `asyncio.create_task` 启动后台任务时，必须加 done callback 记录异常：
+
+```python
+from core.utils import log_task_exception
+
+task = asyncio.create_task(
+    some_async_func(...),
+    name="task_name_for_debugging",
+)
+task.add_done_callback(log_task_exception)
+```
+
+---
+
+## 13. AI 并发控制规范
+
+- 全局并发上限由 `core/config.AI_MAX_CONCURRENCY` 控制，`ai_client.py` 的 `_AI_SEMAPHORE` 是最终兜底
+- 在 `template_apply_service` 等批量 AI 调用场景，**必须在本层显式创建 Semaphore**，不能只依赖全局兜底：
+
+```python
+semaphore = asyncio.Semaphore(AI_MAX_CONCURRENCY)
+
+async def run_ai(item):
+    async with semaphore:
+        return await some_ai_call(...)
+
+results = await asyncio.gather(*[run_ai(item) for item in items])
+```

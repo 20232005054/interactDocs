@@ -57,9 +57,10 @@ backend/
 ├── core/                       # 核心组件
 │   ├── auth.py                 # 鉴权依赖（get_current_user / get_editor_user / get_admin_user）
 │   ├── config.py               # 全局配置（从环境变量读取）
-│   ├── constants.py            # 枚举常量（UserRole / EdgeSourceType / EdgeTargetType）
-│   ├── response.py             # 统一响应格式与异常处理
-│   └── security.py             # JWT 生成与验证、密码哈希
+│   ├── constants.py            # 枚举常量（UserRole / TemplateType / EdgeSourceType / EdgeTargetType）
+│   ├── response.py             # 统一响应格式与异常处理（含全局 logger）
+│   ├── security.py             # JWT 生成与验证、密码哈希
+│   └── utils.py                # 公共工具函数（log_task_exception 等）
 ├── db/                         # 数据层
 │   ├── models.py               # SQLAlchemy ORM 模型
 │   ├── session.py              # 数据库会话
@@ -68,7 +69,10 @@ backend/
 │   ├── schemas.py              # 请求体模型
 │   └── response_schemas.py     # 响应体模型
 ├── services/                   # 业务逻辑层
-│   ├── document_service.py     # 文档业务（含模板应用）
+│   ├── document_service.py     # 文档业务（含模板深拷贝、模板导出）
+│   ├── template_apply_service.py   # 模板应用（核心信息/摘要/结构，含 AI 并发生成与降级）
+│   ├── core_info_change_service.py # 核心信息变更后台联动处理
+│   ├── summary_change_service.py   # 摘要变更后台联动处理
 │   ├── chapter_service.py
 │   ├── paragraph_service.py
 │   ├── summary_service.py
@@ -86,9 +90,10 @@ backend/
 │   ├── export_service.py       # Word 导出
 │   ├── oss_service.py          # 阿里云 OSS 上传
 │   └── user_service.py
-├── sql/                        # SQL 脚本
-│   ├── database.sql            # 建表脚本
-│   └── migration_*.sql         # 增量迁移脚本
+│   ├── sql/
+│   │   ├── database.sql            # 建表脚本（最新版本）
+│   │   ├── migrate_template_type.sql  # 迁移：is_system → template_type
+│   │   └── insert_template_test_data.sql  # 测试数据
 ├── .env                        # 环境变量（本地开发）
 ├── main.py                     # 应用入口
 ├── requirements.txt            # 依赖清单
@@ -142,7 +147,9 @@ OSS_BASE_URL=
 psql -U postgres -d interactivedocs -f sql/database.sql
 ```
 
-如有历史数据库，按需执行 `sql/migration_*.sql` 中的增量迁移脚本。
+如有历史数据库，按需执行 `sql/migrate_*.sql` 中的增量迁移脚本。
+
+> **注意**：如果从旧版本升级，需执行 `sql/migrate_template_type.sql` 将 `templates.is_system` 字段迁移为 `template_type` 整数枚举。
 
 ### 启动服务
 
@@ -309,7 +316,18 @@ data: [DONE]
 
 ### 模板复制机制
 
-创建文档时，系统会将选定的系统模板（含核心信息模板、摘要模板、结构模板子表）完整深拷贝，生成一份用户专属模板，文档绑定到该副本而非直接引用系统模板，保证用户修改不影响原始模板。
+创建文档时，系统会将选定的模板（含核心信息模板、摘要模板、结构模板子表）完整深拷贝，生成一份文档私有副本（`template_type=0`），文档绑定到该副本而非直接引用原始模板，保证用户修改不影响原始模板。
+
+### 模板类型（template_type）
+
+| 值 | 名称 | 说明 |
+|---|---|---|
+| `0` | 文档私有副本 | 创建文档时自动生成，绑定到具体文档，不可复用 |
+| `1` | 系统模板 | 由 editor/admin 维护，所有用户可选用 |
+| `2` | 用户可复用模板 | 用户从文档导出的个人模板库，创建文档时可选用 |
+| `3` | 用户公开模板 | 预留，未实现 |
+
+用户可通过 `POST /api/v1/documents/{id}/export-template` 将文档的私有模板副本导出到个人模板库（type=2）。
 
 ### 模板生成模式
 
@@ -317,10 +335,12 @@ data: [DONE]
 |---|---|---|
 | `0` | 复制模式 | 按 `content_template` + `sources` 做变量替换，不调用 AI |
 | `1` | AI 生成模式 | 按 `sources` 装配上下文，用 `custom_prompt` 或 `default_prompt` 调用 AI |
+| `2` | 直接使用 | `content_template` 原文直接写入，不做任何替换或 AI 调用 |
+| `3` | AI 修改模式 | 以 `content_template` 为草稿，AI 润色后写入 |
 
 ### AI 降级策略
 
-mode1 在以下情况自动降级到复制模式，确保模板应用不中断：
+mode=1/3 在以下情况自动降级到复制模式（mode=0），确保模板应用不中断：
 - 来源数据装配失败
 - AI 调用超时或异常
 - AI 返回空内容

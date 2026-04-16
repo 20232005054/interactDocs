@@ -1,10 +1,12 @@
 from typing import Any, Optional, Generic, TypeVar
+import logging
 from pydantic import BaseModel
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 
 T = TypeVar("T")
+logger = logging.getLogger(__name__)
 
 
 # 统一响应结构
@@ -41,4 +43,10 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 async def generic_exception_handler(request: Request, exc: Exception):
     if isinstance(exc, ValueError):
         return _error_response(400, str(exc))
+    logger.exception(
+        "未处理的异常 [%s %s]: %s",
+        request.method,
+        request.url.path,
+        exc,
+    )
     return _error_response(500, "服务器内部错误")
