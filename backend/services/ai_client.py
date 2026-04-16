@@ -185,15 +185,49 @@ async def call_qwen_stream(
         template_id=template_id,
         field_key=field_key,
     )
-    for response in responses:
-        if response.status_code == HTTPStatus.OK:
-            yield response.output.choices[0]["message"]["content"]
-            continue
-        error_code = _extract_error_code(response)
-        logger.warning(
-            "ai_generation_stream_error template_id=%s field_key=%s error_code=%s",
-            template_id or "",
-            field_key or "",
-            error_code,
-        )
-        yield f"Error: AI调用失败({error_code}): {response.message}"
+
+    # dashscope stream=True 返回的是同步 generator，直接在事件循环里迭代会阻塞。
+    # 正确做法：在线程池里迭代，通过 asyncio.Queue 把 chunk 传回事件循环。
+    queue: asyncio.Queue = asyncio.Queue()
+    loop = asyncio.get_event_loop()
+
+    def _producer():
+        """在线程里同步迭代 generator，把每个 chunk 放入 queue，None 作为结束哨兵。"""
+        try:
+            for response in responses:
+                if response.status_code == HTTPStatus.OK:
+                    chunk = response.output.choices[0]["message"]["content"]
+                    loop.call_soon_threadsafe(queue.put_nowait, chunk)
+                else:
+                    error_code = _extract_error_code(response)
+                    logger.warning(
+                        "ai_generation_stream_error template_id=%s field_key=%s error_code=%s",
+                        template_id or "",
+                        field_key or "",
+                        error_code,
+                    )
+                    loop.call_soon_threadsafe(
+                        queue.put_nowait,
+                        f"Error: AI调用失败({error_code}): {getattr(response, 'message', '')}",
+                    )
+        except Exception as exc:
+            logger.exception(
+                "ai_generation_stream_producer_error template_id=%s field_key=%s",
+                template_id or "",
+                field_key or "",
+            )
+            loop.call_soon_threadsafe(
+                queue.put_nowait,
+                f"Error: 流式生成异常: {exc}",
+            )
+        finally:
+            # 无论正常结束还是异常，都放入哨兵，防止消费端死锁
+            loop.call_soon_threadsafe(queue.put_nowait, None)
+
+    loop.run_in_executor(None, _producer)
+
+    while True:
+        chunk = await queue.get()
+        if chunk is None:
+            break
+        yield chunk
