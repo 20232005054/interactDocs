@@ -27,7 +27,7 @@ class SummaryMapper:
         result = await db.execute(
             select(DocumentSummary)
             .where(DocumentSummary.document_id == document_id)
-            .order_by(DocumentSummary.version.desc())
+            .order_by(DocumentSummary.order_index)
         )
         return result.scalars().all()
 

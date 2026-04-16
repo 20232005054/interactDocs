@@ -117,6 +117,29 @@ class ParagraphService:
 
     
     @staticmethod
+    async def reorder_paragraphs(db: AsyncSession, document_id: UUID, items: list):
+        """
+        批量重排段落，支持跨章节移动。
+        items 每项包含 paragraph_id、chapter_id、order_index。
+        依赖边以 paragraph_id 为 source_id，chapter_id 变更不影响依赖关系。
+        """
+        from db.mappers.document_mapper import DocumentMapper
+        document = await DocumentMapper.get_document_by_id(db, document_id)
+        if not document:
+            raise HTTPException(status_code=404, detail="文档不存在")
+
+        reorder_items = [
+            {
+                "paragraph_id": item.paragraph_id,
+                "chapter_id": item.chapter_id,
+                "order_index": item.order_index,
+            }
+            for item in items
+        ]
+        await ParagraphMapper.batch_update_chapter_and_order(db, reorder_items)
+        await db.commit()
+
+    @staticmethod
     async def apply_ai_assist_result(db: AsyncSession, paragraph_id: UUID):
         """
         应用AI帮填结果，将ai_generate字段的内容填充到content字段。
@@ -141,6 +164,7 @@ class ParagraphService:
         }
 
         await ParagraphMapper.update_paragraph(db, paragraph_id, update_data)
+        await db.commit()
 
         # 反哺模板（有 ai_instruction 时触发，与 ai_generate 严格配对）
         if saved_instruction and saved_instruction.strip():

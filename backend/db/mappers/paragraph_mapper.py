@@ -63,6 +63,19 @@ class ParagraphMapper:
         await db.delete(paragraph)
 
     @staticmethod
+    async def batch_update_chapter_and_order(db: AsyncSession, items: list) -> None:
+        """批量更新段落的 chapter_id 和 order_index，支持跨章节移动"""
+        for item in items:
+            values = {"order_index": item["order_index"]}
+            if "chapter_id" in item:
+                values["chapter_id"] = item["chapter_id"]
+            await db.execute(
+                update(Paragraph)
+                .where(Paragraph.paragraph_id == item["paragraph_id"])
+                .values(**values)
+            )
+
+    @staticmethod
     async def get_heading_paragraphs(db: AsyncSession, chapter_id: UUID):
         result = await db.execute(
             select(Paragraph)

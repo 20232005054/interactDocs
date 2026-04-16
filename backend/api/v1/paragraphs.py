@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel
 
 from core.response import success_response, ResponseModel
@@ -13,6 +13,16 @@ from schemas.schemas import ParagraphCreate, ParagraphUpdate, AIAssistRequest
 from schemas.response_schemas import ParagraphResponse, ParagraphListResponse, ParagraphRelatedSummariesResponse, RelatedSummaryItem
 
 router = APIRouter(prefix="/api/v1", tags=["段落管理"])
+
+
+class ParagraphReorderItem(BaseModel):
+    paragraph_id: UUID
+    chapter_id: UUID
+    order_index: int
+
+
+class ParagraphReorderPayload(BaseModel):
+    items: List[ParagraphReorderItem]
 
 
 def _para_response(p) -> ParagraphResponse:
@@ -121,3 +131,9 @@ async def get_paragraph_summaries(paragraph_id: UUID, db: AsyncSession = Depends
     return success_response(data=ParagraphRelatedSummariesResponse(
         summaries=[RelatedSummaryItem(**s) for s in summaries]
     ))
+
+
+@router.post("/documents/{document_id}/paragraphs/reorder", summary="批量重排段落（支持跨章节移动）", response_model=ResponseModel[None])
+async def reorder_paragraphs(document_id: UUID, payload: ParagraphReorderPayload, db: AsyncSession = Depends(get_db)):
+    await ParagraphService.reorder_paragraphs(db, document_id, payload.items)
+    return success_response(message="排序更新成功")
