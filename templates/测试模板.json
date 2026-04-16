@@ -1,0 +1,639 @@
+{
+  "version": "1.0",
+  "template": {
+    "purpose": "临床试验方案",
+    "display_name": "II/III期 2型糖尿病创新药随机对照临床试验方案模板",
+    "content": {
+      "description": "本模板适用于降糖类创新药物（Chemical or Biological）的II/III期临床试验设计，涵盖了ICH E6(R2)及国内新药审评要求的核心章节，重点强化了统计分析、访视计划及安全性评估的标准化描述。"
+    }
+  },
+  "core_info_templates": [
+    {
+      "field_name": "试验基本信息",
+      "field_key": "core_basic_group",
+      "field_type": "group",
+      "default_value": null,
+      "options": null,
+      "is_required": true,
+      "order_index": 0,
+      "children": [
+        {
+          "field_name": "试验完整名称",
+          "field_key": "core_trial_name",
+          "field_type": "text",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 0,
+          "children": []
+        },
+        {
+          "field_name": "试验药物名称",
+          "field_key": "core_drug_name",
+          "field_type": "text",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 1,
+          "children": []
+        },
+        {
+          "field_name": "适应症",
+          "field_key": "core_indication",
+          "field_type": "text",
+          "default_value": "2型糖尿病",
+          "options": null,
+          "is_required": true,
+          "order_index": 2,
+          "children": []
+        },
+        {
+          "field_name": "研究阶段",
+          "field_key": "core_phase",
+          "field_type": "select",
+          "default_value": "III期",
+          "options": ["I期", "II期", "III期", "IV期"],
+          "is_required": true,
+          "order_index": 3,
+          "children": []
+        }
+      ]
+    },
+    {
+      "field_name": "研究设计参数",
+      "field_key": "core_design_group",
+      "field_type": "group",
+      "default_value": null,
+      "options": null,
+      "is_required": true,
+      "order_index": 1,
+      "children": [
+        {
+          "field_name": "对照组类型",
+          "field_key": "core_control_type",
+          "field_type": "select",
+          "default_value": "安慰剂对照",
+          "options": ["安慰剂对照", "阳性药物对照", "剂量反应研究"],
+          "is_required": true,
+          "order_index": 0,
+          "children": []
+        },
+        {
+          "field_name": "随机化比例",
+          "field_key": "core_rand_ratio",
+          "field_type": "select",
+          "default_value": "1:1",
+          "options": ["1:1", "2:1", "3:1"],
+          "is_required": true,
+          "order_index": 1,
+          "children": []
+        },
+        {
+          "field_name": "盲法设计",
+          "field_key": "core_blinding",
+          "field_type": "select",
+          "default_value": "双盲",
+          "options": ["双盲", "单盲", "开放"],
+          "is_required": true,
+          "order_index": 2,
+          "children": []
+        }
+      ]
+    },
+    {
+      "field_name": "受试者与给药",
+      "field_key": "core_subject_group",
+      "field_type": "group",
+      "default_value": null,
+      "options": null,
+      "is_required": true,
+      "order_index": 2,
+      "children": [
+        {
+          "field_name": "计划样本量",
+          "field_key": "core_sample_size",
+          "field_type": "text",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 0,
+          "children": []
+        },
+        {
+          "field_name": "给药周期(周)",
+          "field_key": "core_duration",
+          "field_type": "text",
+          "default_value": "24",
+          "options": null,
+          "is_required": true,
+          "order_index": 1,
+          "children": []
+        },
+        {
+          "field_name": "主要终点指标",
+          "field_key": "core_primary_endpoint",
+          "field_type": "text",
+          "default_value": "糖化血红蛋白(HbA1c)较基线的变化值",
+          "options": null,
+          "is_required": true,
+          "order_index": 2,
+          "children": []
+        }
+      ]
+    }
+  ],
+  "summary_templates": [
+    {
+      "title": "研究概述",
+      "field_key": "summary_overview",
+      "generation_mode": 1,
+      "content_template": null,
+      "sources": [
+        {
+          "source": { "value": "keyinfo", "label": "关键信息", "ui_type": "select" },
+          "match_type": "关键信息匹配",
+          "match_keys": [{ "value": "core_trial_name", "label": "试验名称" }],
+          "target_field": "trial_name"
+        }
+      ],
+      "default_prompt": "根据试验名称撰写研究概述，包括研究背景、目的和主要设计，200字左右。",
+      "custom_prompt": null,
+      "order_index": 0
+    },
+    {
+      "title": "研究目的摘要",
+      "field_key": "summary_objective",
+      "generation_mode": 0,
+      "content_template": "本研究的主要目的是评价 **{{drug_name}}** 在 **{{indication}}** 患者中的疗效，主要疗效指标为 **{{primary_endpoint}}**。次要目的包括评估其安全性和耐受性。",
+      "sources": [
+        {
+          "source": { "value": "keyinfo", "label": "关键信息", "ui_type": "select" },
+          "match_type": "关键信息匹配",
+          "match_keys": [{ "value": "core_drug_name", "label": "试验药物" }],
+          "target_field": "drug_name"
+        },
+        {
+          "source": { "value": "keyinfo", "label": "关键信息", "ui_type": "select" },
+          "match_type": "关键信息匹配",
+          "match_keys": [{ "value": "core_indication", "label": "适应症" }],
+          "target_field": "indication"
+        },
+        {
+          "source": { "value": "keyinfo", "label": "关键信息", "ui_type": "select" },
+          "match_type": "关键信息匹配",
+          "match_keys": [{ "value": "core_primary_endpoint", "label": "主要终点" }],
+          "target_field": "primary_endpoint"
+        }
+      ],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 1
+    },
+    {
+      "title": "试验设计摘要",
+      "field_key": "summary_design_brief",
+      "generation_mode": 0,
+      "content_template": "本研究采用 **{{blinding}}**、**{{control_type}}** 设计。受试者将按 **{{rand_ratio}}** 随机分配至试验组或对照组。预计总样本量为 **{{sample_size}}** 例，给药时长为 **{{duration}}** 周。",
+      "sources": [
+        {
+          "source": { "value": "keyinfo", "label": "关键信息", "ui_type": "select" },
+          "match_type": "关键信息匹配",
+          "match_keys": [{ "value": "core_blinding", "label": "盲法" }],
+          "target_field": "blinding"
+        },
+        {
+          "source": { "value": "keyinfo", "label": "关键信息", "ui_type": "select" },
+          "match_type": "关键信息匹配",
+          "match_keys": [{ "value": "core_control_type", "label": "对照组" }],
+          "target_field": "control_type"
+        },
+        {
+          "source": { "value": "keyinfo", "label": "关键信息", "ui_type": "select" },
+          "match_type": "关键信息匹配",
+          "match_keys": [{ "value": "core_rand_ratio", "label": "随机比例" }],
+          "target_field": "rand_ratio"
+        },
+        {
+          "source": { "value": "keyinfo", "label": "关键信息", "ui_type": "select" },
+          "match_type": "关键信息匹配",
+          "match_keys": [{ "value": "core_sample_size", "label": "样本量" }],
+          "target_field": "sample_size"
+        },
+        {
+          "source": { "value": "keyinfo", "label": "关键信息", "ui_type": "select" },
+          "match_type": "关键信息匹配",
+          "match_keys": [{ "value": "core_duration", "label": "周期" }],
+          "target_field": "duration"
+        }
+      ],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 2
+    }
+  ],
+    "structure_templates": [
+    {
+      "title": "研究背景",
+      "field_key": "struct_background",
+      "level": 1,
+      "generation_mode": 1,
+      "content_template": null,
+      "sources": [
+        {
+          "source": { "value": "keyinfo", "label": "关键信息", "ui_type": "select" },
+          "match_type": "关键信息匹配",
+          "match_keys": [
+            { "value": "core_drug_name", "label": "药物" },
+            { "value": "core_indication", "label": "适应症" }
+          ],
+          "target_field": "context"
+        }
+      ],
+      "default_prompt": "撰写糖尿病药物研究背景。包括：1.糖尿病流行病学现状；2.现有降糖药物的局限性；3.本研究药物的作用机制及其临床前或早期临床研究综述；4.开展本研究的科学依据。800字以上。",
+      "custom_prompt": null,
+      "order_index": 0,
+      "children": []
+    },
+    {
+      "title": "研究目的",
+      "field_key": "struct_objective",
+      "level": 1,
+      "generation_mode": 2,
+      "content_template": null,
+      "sources": [],
+      "order_index": 1,
+      "children": [
+        {
+          "title": "主要目的",
+          "field_key": "struct_objective_primary",
+          "level": 2,
+          "generation_mode": 2,
+          "content_template": "评价 **试验药物** 在目标受试者人群中给药后的临床疗效。主要终点为治疗至第24周时，受试者糖化血红蛋白（HbA1c）较基线的平均变化值。",
+          "sources": [],
+          "order_index": 0,
+          "children": []
+        },
+        {
+          "title": "次要目的",
+          "field_key": "struct_objective_secondary",
+          "level": 2,
+          "generation_mode": 2,
+          "content_template": "* 评估治疗至第24周时，HbA1c ≤ 7.0% 且 HbA1c ≤ 6.5% 的受试者比例。\n* 评估空腹血糖（FPG）及餐后2小时血糖（2h-PPG）较基线的变化。\n* 评估体重、体重指数（BMI）及血脂指标较基线的变化。\n* 评估试验药物在目标受试者中的安全性与耐受性。",
+          "sources": [],
+          "order_index": 1,
+          "children": []
+        },
+        {
+          "title": "探索性目的",
+          "field_key": "struct_objective_exploratory",
+          "level": 2,
+          "generation_mode": 2,
+          "content_template": "* 评估胰岛B细胞功能指标（如Homa-Beta）的改善情况。\n* 收集群体药代动力学（PopPK）样本进行后续分析。",
+          "sources": [],
+          "order_index": 2,
+          "children": []
+        }
+      ]
+    },
+    {
+      "title": "总体研究设计",
+      "field_key": "struct_design",
+      "level": 1,
+      "generation_mode": 2,
+      "content_template": null,
+      "sources": [],
+      "order_index": 2,
+      "children": [
+        {
+          "title": "试验设计概述",
+          "field_key": "struct_design_overview",
+          "level": 2,
+          "generation_mode": 2,
+          "content_template": "本研究是一项多中心、随机、双盲、安慰剂对照的临床研究。研究分为三个阶段：\n\n1. **筛选与导入期（2-4周）**：受试者签署知情同意书，进行初步筛查，并在必要时进行降糖药物洗脱或饮食管理导入。\n2. **治疗期（24周）**：通过随机化系统按比例分配，进入试验组或对照组进行药物干预。\n3. **随访期（2周）**：停止给药后，进行安全性和潜在停药反应的随访。",
+          "sources": [],
+          "order_index": 0,
+          "children": []
+        },
+        {
+          "title": "终点指标设置",
+          "field_key": "struct_design_endpoints",
+          "level": 2,
+          "generation_mode": 2,
+          "content_template": "| 类别 | 指标名称 | 定义 | 评估时间点 |\n| :--- | :--- | :--- | :--- |\n| 主要终点 | HbA1c变化 | 治疗24周后HbA1c较基线的绝对变化值 | 第24周 |\n| 次要终点 | 达标率 | HbA1c < 7.0% 的受试者比例 | 第24周 |\n| 安全终点 | 不良事件发生率 | AE、SAE及特殊关注的低血糖事件 | 全程 |",
+          "sources": [],
+          "order_index": 1,
+          "children": []
+        },
+        {
+          "title": "随机化与盲法",
+          "field_key": "struct_design_blinding",
+          "level": 2,
+          "generation_mode": 2,
+          "content_template": "采用中央随机化系统（IWRS）进行受试者编号分配。试验药物与安慰剂在外观、气味、包装上保持完全一致。除非发生需紧急揭盲的安全性事件，否则研究人员、受试者及申办方人员均处于盲态。",
+          "sources": [],
+          "order_index": 2,
+          "children": []
+        }
+      ]
+    },
+    {
+      "title": "受试者选择",
+      "field_key": "struct_subject_selection",
+      "level": 1,
+      "generation_mode": 2,
+      "content_template": null,
+      "sources": [],
+      "order_index": 3,
+      "children": [
+        {
+          "title": "纳入标准",
+          "field_key": "struct_subject_inclusion",
+          "level": 2,
+          "generation_mode": 2,
+          "content_template": "受试者必须符合以下所有标准方可入组：\n1. 年龄在18至75周岁（含边界值）的男性或女性。\n2. 明确诊断为2型糖尿病，诊断标准符合WHO（1999年）标准。\n3. 筛选时糖化血红蛋白（HbA1c）满足：7.0% ≤ HbA1c ≤ 10.5%。\n4. 筛选前至少3个月内饮食及运动控制稳定，或稳定服用基础剂量的二甲双胍。\n5. 体重指数（BMI）在18.5至35.0 kg/m²之间。\n6. 理解本研究过程，自愿参加并签署知情同意书。",
+          "sources": [],
+          "order_index": 0,
+          "children": []
+        },
+        {
+          "title": "排除标准",
+          "field_key": "struct_subject_exclusion",
+          "level": 2,
+          "generation_mode": 2,
+          "content_template": "凡具有以下任一情况者，不得入组：\n1. 1型糖尿病、妊娠期糖尿病或特殊类型糖尿病。\n2. 筛选前6个月内发生过严重急性糖尿病并发症（如酮症酸中毒、高渗性昏迷）。\n3. 筛选前3个月内发生过严重低血糖或无意识低血糖病史。\n4. 伴有严重的慢性并发症，如增殖性视网膜病变、糖尿病足、严重植物神经病变等。\n5. 肾功能受损：估算肾小球滤过率（eGFR）< 60 mL/min/1.73m²。\n6. 肝功能异常：ALT或AST > 2.5倍正常值上限（ULN）。\n7. 筛选前3个月内参加过其他临床试验。\n8. 研究者认为不适合参加本研究的其他情况（如依从性差、酗酒、药物滥用）。",
+          "sources": [],
+          "order_index": 1,
+          "children": []
+        }
+      ]
+    },
+    {
+      "title": "给药方案",
+      "field_key": "struct_medication",
+      "level": 1,
+      "generation_mode": 2,
+      "content_template": null,
+      "sources": [],
+      "order_index": 4,
+      "children": [
+        {
+          "title": "试验用药物",
+          "field_key": "struct_medication_drugs",
+          "level": 2,
+          "generation_mode": 2,
+          "content_template": "* **试验组**：药物名称、规格、用法用量（如：每日一次，随餐服用）。\n* **对照组**：安慰剂，其物理特性与试验药一致。",
+          "sources": [],
+          "order_index": 0,
+          "children": []
+        },
+        {
+          "title": "包装与标记",
+          "field_key": "struct_medication_packaging",
+          "level": 2,
+          "generation_mode": 2,
+          "content_template": "所有试验药物包装上必须粘贴包含\"仅供临床试验使用\"字样的标签。标签应包含药物编号、有效期、储藏条件和申办方信息。",
+          "sources": [],
+          "order_index": 1,
+          "children": []
+        },
+        {
+          "title": "药物合并使用限制",
+          "field_key": "struct_medication_concomitant",
+          "level": 2,
+          "generation_mode": 2,
+          "content_template": "1. **禁用药物**：禁止使用本研究规定之外的其他降糖药物（如胰岛素、GLP-1受体激动剂等），除非作为紧急营救用药。\n2. **允许药物**：用于治疗原发病以外的其他稳定期慢性疾病药物（如降压药、降脂药）在剂量保持不变的前提下允许使用。",
+          "sources": [],
+          "order_index": 2,
+          "children": []
+        }
+      ]
+    },
+    {
+      "title": "访视计划与评估",
+      "field_key": "struct_visit_plan",
+      "level": 1,
+      "generation_mode": 2,
+      "content_template": "受试者需按照以下时间表进行访视。研究窗口期为±2天（治疗期）或±3天（随访期）。",
+      "sources": [],
+      "order_index": 5,
+      "children": [
+        {
+          "title": "评估时间表",
+          "field_key": "struct_visit_schedule",
+          "level": 2,
+          "generation_mode": 2,
+          "content_template": "| 访视阶段 | 访视点 | 时间窗口(天) | 知情/随机 | 有效性评估 | 安全性评估 | 给药/收回 |\n| :--- | :--- | :--- | :---: | :---: | :---: | :---: |\n| 筛选期 | Visit 1 | Day -14 to -1 | 知情 | FPG, HbA1c | 体检, 心电图 | 无 |\n| 基线期 | Visit 2 | Day 1 | 随机 | 基线采样 | 安全性基线 | 发药 |\n| 治疗期 | Visit 3 | Week 4 ± 2 | - | FPG | AE询问 | 发/回药 |\n| 治疗期 | Visit 4 | Week 12 ± 2 | - | HbA1c, FPG | 实验室检查 | 发/回药 |\n| 治疗期 | Visit 5 | Week 24 ± 2 | - | HbA1c(主要) | 全面评估 | 回药 |\n| 随访期 | Visit 6 | Week 26 ± 3 | - | - | AE, 伴随用药 | 无 |\n\n**有效性指标**：包括糖化血红蛋白、空腹血糖、餐后血糖曲线下面积等。\n**安全性指标**：包括生命体征、实验室检查（血尿常规、肝肾功、脂质）、心电图、低血糖记录等。",
+          "sources": [],
+          "order_index": 0,
+          "children": []
+        }
+      ]
+    },
+    {
+      "title": "安全性评估与报告",
+      "field_key": "struct_safety",
+      "level": 1,
+      "generation_mode": 2,
+      "content_template": null,
+      "sources": [],
+      "order_index": 6,
+      "children": [
+        {
+          "title": "不良事件（AE）定义",
+          "field_key": "struct_safety_ae_def",
+          "level": 2,
+          "generation_mode": 2,
+          "content_template": "不良事件是指受试者在接受临床试验用药品后出现的任何不良医学事件，但不一定与治疗有因果关系。包括症状、体征或实验室异常。",
+          "sources": [],
+          "order_index": 0,
+          "children": []
+        },
+        {
+          "title": "严重不良事件（SAE）",
+          "field_key": "struct_safety_sae",
+          "level": 2,
+          "generation_mode": 2,
+          "content_template": "符合以下任一标准即定义为SAE：\n1. 导致死亡；\n2. 危及生命；\n3. 导致永久或严重的伤残/影响工作能力；\n4. 需住院治疗或延长住院时间；\n5. 先天性异常或出生缺陷。",
+          "sources": [],
+          "order_index": 1,
+          "children": []
+        },
+        {
+          "title": "SAE报告流程",
+          "field_key": "struct_safety_sae_report",
+          "level": 2,
+          "generation_mode": 2,
+          "content_template": "研究者在获知SAE后，必须在 **24小时内** 向申办方、伦理委员会和监管部门（如国家药监局）提交书面报告。报告应尽可能详细，并在后续获得更多信息时进行补充。",
+          "sources": [],
+          "order_index": 2,
+          "children": []
+        },
+        {
+          "title": "特殊关注事件：低血糖",
+          "field_key": "struct_safety_hypoglycemia",
+          "level": 2,
+          "generation_mode": 2,
+          "content_template": "由于是降糖药物研究，低血糖被列为特殊关注的不良事件。根据ADA标准分为：\n* **1级（低血糖警戒值）**：血糖 < 3.9 mmol/L 且 ≥ 3.0 mmol/L。\n* **2级（临床显著低血糖）**：血糖 < 3.0 mmol/L。\n* **3级（严重低血糖）**：伴有意识改变或需他人协助处理，无论血糖值。",
+          "sources": [],
+          "order_index": 3,
+          "children": []
+        }
+      ]
+    },
+    {
+      "title": "统计分析计划",
+      "field_key": "struct_stats",
+      "level": 1,
+      "generation_mode": 2,
+      "content_template": null,
+      "sources": [],
+      "order_index": 7,
+      "children": [
+        {
+          "title": "样本量计算依据",
+          "field_key": "struct_stats_sample",
+          "level": 2,
+          "generation_mode": 2,
+          "content_template": "样本量计算基于主要终点指标：第24周HbA1c较基线变化值的组间差异。假设试验组较对照组（安慰剂）在24周时HbA1c多下降0.5%，标准差(SD)预计为1.1%。在双侧Alpha=0.05，把握度(Power)=90%的前提下，计算得到每组需有效病例约105例。考虑到约20%的脱落率，计划共纳入264例受试者（每组132例）。",
+          "sources": [],
+          "order_index": 0,
+          "children": []
+        },
+        {
+          "title": "分析集定义",
+          "field_key": "struct_stats_sets",
+          "level": 2,
+          "generation_mode": 2,
+          "content_template": "* **全分析集 (FAS)**：尽可能接近意向性治疗原则。包含随机化后至少接受一次给药且至少有一次基线后有效性评估数据的受试者。\n* **符合方案集 (PPS)**：FAS中不违反方案、依从性良好且完成主要终点评估的受试者子集。\n* **安全性分析集 (SS)**：至少接受过一次给药且具有基线后安全性评估数据的受试者。",
+          "sources": [],
+          "order_index": 1,
+          "children": []
+        },
+        {
+          "title": "主要终点分析",
+          "field_key": "struct_stats_primary",
+          "level": 2,
+          "generation_mode": 2,
+          "content_template": "主要分析将在FAS集上进行。采用混合效应模型（MMRM）或协方差分析（ANCOVA）模型比较两组HbA1c变化的最小二乘均数。模型中将包含治疗组别、中心、基线HbA1c水平作为固定效应或协变量。缺失数据处理将采用多重填补（MI）法进行敏感性分析。",
+          "sources": [],
+          "order_index": 2,
+          "children": []
+        },
+        {
+          "title": "安全性分析",
+          "field_key": "struct_stats_safety",
+          "level": 2,
+          "generation_mode": 2,
+          "content_template": "对所有安全性指标进行描述性统计。计算各组AE、SAE及导致停药的AE发生率，并采用Fisher精确检验进行组间比较。实验室检查结果将通过偏移表呈现基线到访视点的变化方向。",
+          "sources": [],
+          "order_index": 3,
+          "children": []
+        }
+      ]
+    },
+    {
+      "title": "数据管理",
+      "field_key": "struct_data_management",
+      "level": 1,
+      "generation_mode": 2,
+      "content_template": null,
+      "sources": [],
+      "order_index": 8,
+      "children": [
+        {
+          "title": "数据采集",
+          "field_key": "struct_data_collection",
+          "level": 2,
+          "generation_mode": 2,
+          "content_template": "本研究采用电子数据采集系统（EDC）。研究者或授权人员应及时将受试者的原始数据输入电子个案报告表（eCRF）。",
+          "sources": [],
+          "order_index": 0,
+          "children": []
+        },
+        {
+          "title": "数据质疑与清理",
+          "field_key": "struct_data_query",
+          "level": 2,
+          "generation_mode": 2,
+          "content_template": "数据管理人员通过逻辑检查程序发现异常数据，并发布质疑（Query）。研究者应针对质疑进行核实并在EDC系统中在线回复。所有修改必须保留审计追踪。",
+          "sources": [],
+          "order_index": 1,
+          "children": []
+        },
+        {
+          "title": "医学编码",
+          "field_key": "struct_data_coding",
+          "level": 2,
+          "generation_mode": 2,
+          "content_template": "不良事件（AE）采用 **MedDRA** 词典进行编码。合并用药采用 **WHO Drug** 词典进行编码。",
+          "sources": [],
+          "order_index": 2,
+          "children": []
+        }
+      ]
+    },
+    {
+      "title": "伦理声明与质量保证",
+      "field_key": "struct_ethics",
+      "level": 1,
+      "generation_mode": 2,
+      "content_template": null,
+      "sources": [],
+      "order_index": 9,
+      "children": [
+        {
+          "title": "遵循的规范",
+          "field_key": "struct_ethics_regulations",
+          "level": 2,
+          "generation_mode": 2,
+          "content_template": "本研究将严格按照《世界医学大会赫尔辛基宣言》、中国《药物临床试验质量管理规范》（GCP）及相关法律法规执行。",
+          "sources": [],
+          "order_index": 0,
+          "children": []
+        },
+        {
+          "title": "知情同意流程",
+          "field_key": "struct_ethics_consent",
+          "level": 2,
+          "generation_mode": 2,
+          "content_template": "在进行任何研究相关操作前，研究者必须向受试者详细解释研究的目的、过程、潜在风险和获益，并获取受试者签署并注明日期的书面知情同意书。",
+          "sources": [],
+          "order_index": 1,
+          "children": []
+        },
+        {
+          "title": "质量监查",
+          "field_key": "struct_ethics_monitoring",
+          "level": 2,
+          "generation_mode": 2,
+          "content_template": "申办方将委派监查员（CRA）定期对研究中心进行现场监查，以确保研究过程符合方案要求，确保原始数据的真实性、准确性和完整性。",
+          "sources": [],
+          "order_index": 2,
+          "children": []
+        }
+      ]
+    },
+    {
+      "title": "讨论",
+      "field_key": "struct_discussion",
+      "level": 1,
+      "generation_mode": 1,
+      "content_template": null,
+      "sources": [
+        {
+          "source": { "value": "keyinfo", "label": "关键信息", "ui_type": "select" },
+          "match_type": "关键信息匹配",
+          "match_keys": [
+            { "value": "core_drug_name", "label": "药物" },
+            { "value": "core_control_type", "label": "对照组" }
+          ],
+          "target_field": "context"
+        }
+      ],
+      "default_prompt": "基于上述试验设计撰写讨论章节。分析：1.主要终点选择HbA1c的合理性；2.对照组设置及样本量的科学性；3.潜在的风险管理策略；4.该研究结果对2型糖尿病治疗的临床价值预估。800字左右。",
+      "custom_prompt": null,
+      "order_index": 10,
+      "children": []
+    }
+  ]
+}
