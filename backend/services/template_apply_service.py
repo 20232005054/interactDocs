@@ -99,7 +99,7 @@ class TemplateApplyService:
     async def apply_summary_template(db: AsyncSession, document_id: UUID):
         """
         应用摘要模板：根据模板创建文档的摘要
-        AI 总结模式并发执行，减少等待时间
+        AI 生成模式（mode=1/3）并发执行，Semaphore 控制并发数，减少等待时间
         """
         import asyncio
 
@@ -116,7 +116,9 @@ class TemplateApplyService:
         summary_id_map = {item.title: item.summary_id for item in existing_summaries}
         existing_summaries_map = {item.title: item.content for item in existing_summaries}
 
-        # 第一步：并发构建所有 source_data_map
+        semaphore = asyncio.Semaphore(AI_MAX_CONCURRENCY)
+
+        # 第一步：并发构建所有 source_data_map（纯数据库读，无需 Semaphore）
         async def build_source_map(template, current_summaries_map):
             try:
                 return await SummaryTemplateService.build_sources_data_map(
@@ -128,26 +130,29 @@ class TemplateApplyService:
             except Exception as exc:
                 return exc
 
-        # 第二步：并发执行所有 AI 生成（mode=1 的摘要）
+        # 第二步：并发执行所有 AI 生成（mode=1 和 mode=3），Semaphore 控制并发数
         async def render_ai(template, current_summaries_map, source_data_map):
-            try:
-                return await SummaryTemplateService.render_ai_content(
-                    db=db,
-                    document=document,
-                    summary_template=template,
-                    generated_summary_map=current_summaries_map,
-                    source_data_map=source_data_map,
-                )
-            except Exception as exc:
-                return exc
+            async with semaphore:
+                try:
+                    draft = template.content_template if template.generation_mode == 3 else None
+                    return await SummaryTemplateService.render_ai_content(
+                        db=db,
+                        document=document,
+                        summary_template=template,
+                        generated_summary_map=current_summaries_map,
+                        source_data_map=source_data_map,
+                        draft=draft,
+                    )
+                except Exception as exc:
+                    return exc
 
         # 并发构建所有 source_data_map
         source_map_results = await asyncio.gather(*[
             build_source_map(t, existing_summaries_map) for t in summary_templates
         ])
 
-        # 实际只对 mode=1 的并发，其他直接 None
-        ai_indices = [i for i, t in enumerate(summary_templates) if t.generation_mode == 1]
+        # 对 mode=1 和 mode=3 并发执行 AI 生成
+        ai_indices = [i for i, t in enumerate(summary_templates) if t.generation_mode in (1, 3)]
         ai_coros = [
             render_ai(
                 summary_templates[i],
@@ -189,7 +194,7 @@ class TemplateApplyService:
                 content = SummaryTemplateService.generate_content_copy_mode(
                     template.content_template, template.sources, source_data_map
                 )
-            elif generation_mode == 1:
+            elif generation_mode in (1, 3):
                 ai_result = ai_results.get(idx)
                 if isinstance(ai_result, Exception):
                     error_code, duration_ms = TemplateApplyService._extract_ai_error_fields(ai_result)
@@ -221,30 +226,6 @@ class TemplateApplyService:
             elif generation_mode == 2:
                 # 直接使用：content_template 原文，不做任何替换
                 content = template.content_template or ""
-            elif generation_mode == 3:
-                # AI修改：以 content_template 为草稿，AI 润色
-                try:
-                    content = await SummaryTemplateService.render_ai_content(
-                        db=db,
-                        document=document,
-                        summary_template=template,
-                        generated_summary_map=existing_summaries_map,
-                        source_data_map=source_data_map,
-                        draft=template.content_template,
-                    )
-                except Exception as exc:
-                    error_code, duration_ms = TemplateApplyService._extract_ai_error_fields(exc)
-                    generation_error = TemplateApplyService._build_generation_error(
-                        template_id=str(template.summary_template_id),
-                        field_key=template.field_key,
-                        generation_mode=generation_mode,
-                        error_type=type(exc).__name__,
-                        error_message=str(exc),
-                        error_code=error_code,
-                        duration_ms=duration_ms,
-                    )
-                if not content:
-                    content = template.content_template or ""
             else:
                 generation_error = TemplateApplyService._build_generation_error(
                     template_id=str(template.summary_template_id),
@@ -266,7 +247,7 @@ class TemplateApplyService:
                 "content": content,
                 "version": 1,
                 "is_change": 0,
-                "ai_generate": content if generation_mode == 1 and not degraded else None,
+                "ai_generate": content if generation_mode in (1, 3) and not degraded else None,
                 "order_index": idx
             }
             summary = DocumentSummary(**summary_data)

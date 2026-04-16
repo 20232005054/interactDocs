@@ -246,6 +246,12 @@ class ChapterService:
         拖拽重排：传入同级章节的新顺序 ID 列表，按下标重写 order_index。
         支持跨父节点移动：若节点原 parent_id 与传入 parent_id 不同，同时更新 parent_id。
         """
+        # 前置验证 parent_id 存在性
+        if parent_id is not None:
+            parent_chapter = await ChapterMapper.get_chapter_by_id(db, parent_id)
+            if not parent_chapter or parent_chapter.document_id != document_id:
+                raise HTTPException(status_code=404, detail="父章节不存在或不属于当前文档")
+
         items = []
         for idx, cid in enumerate(ordered_ids):
             chapter = await ChapterMapper.get_chapter_by_id(db, cid)

@@ -164,62 +164,72 @@ class AIChatService:
 
     @staticmethod
     async def chat_stream(
-        db: AsyncSession,
         document_id: UUID,
         message: str,
         current_chapter_id: Optional[UUID] = None,
         selected_paragraphs: List[Dict] = None,
         selected_summaries: List[Dict] = None,
     ) -> AsyncGenerator[str, None]:
-        # 1. 获取文档
-        doc = await AIChatService.get_document_context(db, document_id)
-        if not doc:
-            yield f"data: {json.dumps({'error': '文档不存在'})}\n\n"
+        """
+        AI 聊天流式接口（三阶段 session 分离）。不接收 db 参数，自行管理 session 生命周期。
+        """
+        from db.session import AsyncSessionLocal
+
+        # ── 阶段1：准备数据，用完立即释放连接 ──
+        ctx = None
+        try:
+            async with AsyncSessionLocal() as db:
+                doc = await AIChatService.get_document_context(db, document_id)
+                if not doc:
+                    yield f"data: {json.dumps({'error': '文档不存在'})}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+
+                chapter, chapter_text, chapter_title = await AIChatService.get_chapter_info(
+                    db, current_chapter_id
+                )
+                history_msgs = await AIChatService.get_chat_history(db, document_id)
+                context_prompt = await AIChatService.build_context_prompt(
+                    db=db,
+                    doc=doc,
+                    chapter_title=chapter_title,
+                    chapter_text=chapter_text,
+                    selected_paragraphs=selected_paragraphs or [],
+                    selected_summaries=selected_summaries or [],
+                )
+                ctx = {
+                    "full_user_message": f"{context_prompt}\n\n用户问题：{message}",
+                    "history_msgs": history_msgs,
+                    "chapter_id": current_chapter_id,
+                }
+        except Exception as e:
+            yield f"data: {json.dumps({'error': f'准备阶段失败: {str(e)}'})}\n\n"
             yield "data: [DONE]\n\n"
             return
 
-        # 2. 获取章节信息
-        chapter, chapter_text, chapter_title = await AIChatService.get_chapter_info(
-            db, current_chapter_id
-        )
-
-        # 3. 获取历史对话
-        history_msgs = await AIChatService.get_chat_history(db, document_id)
-
-        # 4. 构建上下文 prompt（作为第一条 user 消息注入）
-        context_prompt = await AIChatService.build_context_prompt(
-            db=db,
-            doc=doc,
-            chapter_title=chapter_title,
-            chapter_text=chapter_text,
-            selected_paragraphs=selected_paragraphs or [],
-            selected_summaries=selected_summaries or [],
-        )
-
-        # 把上下文拼到用户消息前面
-        full_user_message = f"{context_prompt}\n\n用户问题：{message}"
-
-        # 5. 调用 AI 流式接口
+        # ── 阶段2：流式输出，不持有任何 db 连接 ──
         full_response = ""
-        async for chunk in call_qwen_stream(SYSTEM_PROMPT, history_msgs, full_user_message):
+        async for chunk in call_qwen_stream(SYSTEM_PROMPT, ctx["history_msgs"], ctx["full_user_message"]):
             full_response += chunk
             yield f"data: {json.dumps({'response': chunk})}\n\n"
 
-        # 6. 解析响应和 action
         response_text, actions = AIChatService.parse_ai_response(full_response)
-
-        # 7. 发送解析后的结果
         if actions:
             yield f"data: {json.dumps({'response': response_text, 'actions': actions})}\n\n"
 
-        # 8. 保存聊天记录
-        await AIChatService.save_chat_record(
-            db=db,
-            document_id=document_id,
-            chapter_id=current_chapter_id,
-            message=message,
-            response=full_response,
-            role="user",
-        )
+        # ── 阶段3：保存聊天记录，独立 session ──
+        try:
+            async with AsyncSessionLocal() as db:
+                await AIChatService.save_chat_record(
+                    db=db,
+                    document_id=document_id,
+                    chapter_id=ctx["chapter_id"],
+                    message=message,
+                    response=full_response,
+                    role="user",
+                )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error("保存聊天记录失败: %s", e)
 
         yield "data: [DONE]\n\n"

@@ -174,6 +174,13 @@ class CoreInfoService:
         支持跨父节点移动：若节点原 parent_id 与传入 parent_id 不同，同时更新 parent_id。
         """
         from sqlalchemy import update as sa_update
+
+        # 前置验证 parent_id 存在性
+        if parent_id is not None:
+            parent_node = await CoreInfoMapper.get_core_info_by_id(db, parent_id)
+            if not parent_node or parent_node.document_id != document_id:
+                raise ValueError(f"父节点 {parent_id} 不存在或不属于当前文档")
+
         for idx, cid in enumerate(ordered_ids):
             node = await CoreInfoMapper.get_core_info_by_id(db, cid)
             if not node:

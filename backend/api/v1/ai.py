@@ -1,8 +1,6 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.session import get_db
 from schemas.schemas import AIChatRequest
 from services.ai_chat_service import AIChatService
 
@@ -31,7 +29,7 @@ router = APIRouter(prefix="/api/v1/ai")
         }
     },
 )
-async def ai_chat_stream(request: AIChatRequest, db: AsyncSession = Depends(get_db)):
+async def ai_chat_stream(request: AIChatRequest):
     """
     AI 聊天流式接口（Server-Sent Events）
 
@@ -42,7 +40,6 @@ async def ai_chat_stream(request: AIChatRequest, db: AsyncSession = Depends(get_
     """
     async def chat_generator():
         async for chunk in AIChatService.chat_stream(
-            db=db,
             document_id=request.document_id,
             message=request.message,
             current_chapter_id=request.current_chapter_id,
