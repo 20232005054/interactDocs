@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import TemplateStepper, { type StepKey, type Step } from "@/components/template/TemplateStepper"
 import BasicInfoStep from "@/components/template/BasicInfoStep"
 import CoreInfoTemplateStep from "@/components/template/CoreInfoTemplateStep"
@@ -16,7 +16,9 @@ interface TemplateEditorContainerProps {
 
 export default function TemplateEditorContainer({ templateId }: TemplateEditorContainerProps) {
   const router = useRouter()
-  const [activeStep, setActiveStep] = useState<StepKey>("basic")
+  const searchParams = useSearchParams()
+  const initialStep = (searchParams.get("step") as StepKey) ?? "basic"
+  const [activeStep, setActiveStep] = useState<StepKey>(initialStep)
   const [template, setTemplate] = useState<TemplateDetail | null>(null)
   const [loading, setLoading] = useState(!!templateId)
   const [error, setError] = useState<string | null>(null)
@@ -78,11 +80,12 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
   // 基础信息保存后回调
   const handleBasicSaved = (saved: TemplateDetail) => {
     setTemplate(saved)
-    // 新建成功后跳转到编辑路由，并切换到下一步
+    // 新建成功后跳转到编辑路由，带上初始步骤参数
     if (!templateId) {
-      router.replace(`/admin/templates/${saved.template_id}`)
+      router.replace(`/admin/templates/${saved.template_id}?step=core-info`)
+    } else {
+      setActiveStep("core-info")
     }
-    setActiveStep("core-info")
   }
 
   if (loading) {

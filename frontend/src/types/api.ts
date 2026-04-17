@@ -95,7 +95,6 @@ export interface AdminUserListResponse {
 // ============================================================
 export interface TemplateContent {
   description?: string
-  default_prompt?: string
 }
 
 export interface Template {

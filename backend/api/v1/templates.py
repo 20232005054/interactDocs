@@ -9,6 +9,7 @@ from core.response import success_response, ResponseModel
 from db.session import get_db
 from services.template_service import TemplateService
 from schemas.response_schemas import TemplateResponse, TemplateDetailResponse, TemplateListResponse, TemplateSimpleListResponse, PurposeListResponse, TemplateDependenciesResponse
+from schemas.schemas import ExportTemplatePayload, TemplateContent, TemplateCreatePayload, TemplateUpdatePayload
 from core.auth import get_editor_user, get_admin_user, get_current_user
 from core.constants import TemplateType
 
@@ -84,12 +85,12 @@ async def import_template_json(
 
 @router.post("", summary="创建模板", response_model=ResponseModel[TemplateDetailResponse])
 async def create_template(
-    purpose: str, display_name: str, content: dict,
-    template_type: int = TemplateType.SYSTEM, user_id: Optional[UUID] = None,
+    data: TemplateCreatePayload,
     editor=Depends(get_editor_user),
     db: AsyncSession = Depends(get_db)
 ):
-    t = await TemplateService.create_template(db, purpose, display_name, content, template_type, user_id)
+    content_dict = data.content.model_dump(exclude_none=True) if data.content else {}
+    t = await TemplateService.create_template(db, data.purpose, data.display_name, content_dict, data.template_type, data.user_id)
     return success_response(data=TemplateDetailResponse(
         template_id=t.template_id, group_id=t.group_id, document_id=t.document_id,
         purpose=t.purpose, display_name=t.display_name, content=t.content,
@@ -142,17 +143,24 @@ async def list_templates(
     ))
 
 
+class TemplateUpdatePayload(BaseModel):
+    purpose: Optional[str] = None
+    display_name: Optional[str] = None
+    content: Optional[TemplateContent] = None
+    template_type: Optional[int] = None
+    is_active: Optional[bool] = None
+
+
 @router.put("/{template_id}", summary="管理员更新模板", response_model=ResponseModel[TemplateResponse])
 async def update_template(
     template_id: UUID,
-    purpose: Optional[str] = None, display_name: Optional[str] = None,
-    content: Optional[dict] = None, template_type: Optional[int] = None,
-    is_active: Optional[bool] = None, editor=Depends(get_editor_user), db: AsyncSession = Depends(get_db)
+    data: TemplateUpdatePayload,
+    editor=Depends(get_editor_user),
+    db: AsyncSession = Depends(get_db)
 ):
-    update_data = {k: v for k, v in {
-        "purpose": purpose, "display_name": display_name, "content": content,
-        "template_type": template_type, "is_active": is_active
-    }.items() if v is not None}
+    update_data = data.model_dump(exclude_none=True)
+    if "content" in update_data:
+        update_data["content"] = data.content.model_dump(exclude_none=True)
     t = await TemplateService.update_template(db, template_id, **update_data)
     if not t:
         raise HTTPException(status_code=404, detail="模板不存在")

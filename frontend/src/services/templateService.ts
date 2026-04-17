@@ -33,15 +33,15 @@ export const templateService = {
     request.get(`/api/v1/templates/${templateId}`),
 
   create: (payload: CreateTemplatePayload): Promise<TemplateDetail> =>
-    request.post("/api/v1/templates", null, { params: {
+    request.post("/api/v1/templates", {
       purpose: payload.purpose,
       display_name: payload.display_name,
-      content: payload.content,
+      content: payload.content ?? {},
       template_type: payload.template_type ?? 1,
-    }}),
+    }),
 
   update: (templateId: string, payload: UpdateTemplatePayload): Promise<Template> =>
-    request.put(`/api/v1/templates/${templateId}`, null, { params: payload }),
+    request.put(`/api/v1/templates/${templateId}`, payload),
 
   delete: (templateId: string): Promise<void> =>
     request.delete(`/api/v1/templates/${templateId}`),

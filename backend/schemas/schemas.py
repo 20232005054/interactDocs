@@ -352,3 +352,25 @@ class ExportTemplatePayload(BaseModel):
     display_name: Optional[str] = Field(None, description="自定义模板名称，不传则沿用原名")
 
 
+# --- 模板主表 content 字段结构 ---
+class TemplateContent(BaseModel):
+    description: Optional[str] = Field(None, description="模板说明文字")
+
+
+# --- 模板主表 创建/更新 ---
+class TemplateCreatePayload(BaseModel):
+    purpose: str = Field(..., description="模板用途")
+    display_name: str = Field(..., description="模板显示名称")
+    content: Optional[TemplateContent] = Field(None, description="模板内容配置")
+    template_type: int = Field(default=1, description="模板类型：0=文档私有副本 1=系统模板 2=用户可复用私有模板")
+    user_id: Optional[UUID] = Field(None, description="所属用户ID")
+
+
+class TemplateUpdatePayload(BaseModel):
+    purpose: Optional[str] = Field(None, description="模板用途")
+    display_name: Optional[str] = Field(None, description="模板显示名称")
+    content: Optional[TemplateContent] = Field(None, description="模板内容配置")
+    template_type: Optional[int] = Field(None, description="模板类型")
+    is_active: Optional[bool] = Field(None, description="是否启用")
+
+

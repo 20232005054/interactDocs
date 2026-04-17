@@ -173,8 +173,7 @@ class Template(Base):
     """
     content字段结构：
     {
-        "description": "模板描述",
-        "default_prompt": "默认章节生成提示词模板"
+        "description": "模板说明文字"
     }
     """
     version = Column(Integer, nullable=False, default=1)

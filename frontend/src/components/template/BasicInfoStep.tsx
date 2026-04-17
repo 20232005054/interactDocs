@@ -27,6 +27,7 @@ const selectCls = "h-9 rounded border border-gray-300 bg-white px-2 text-sm outl
 export default function BasicInfoStep({ templateId, initialData, onSaved }: BasicInfoStepProps) {
   const [displayName, setDisplayName] = useState(initialData?.display_name ?? "")
   const [purpose, setPurpose] = useState(initialData?.purpose ?? "")
+  const [description, setDescription] = useState(initialData?.content?.description ?? "")
   const [templateType, setTemplateType] = useState(initialData?.template_type ?? 1)
   const [isActive, setIsActive] = useState(initialData?.is_active ?? true)
 
@@ -47,6 +48,7 @@ export default function BasicInfoStep({ templateId, initialData, onSaved }: Basi
         result = await templateService.update(templateId, {
           display_name: displayName.trim(),
           purpose: purpose.trim(),
+          content: { description: description.trim() || undefined },
           template_type: templateType,
           is_active: isActive,
         }) as unknown as TemplateDetail
@@ -55,7 +57,7 @@ export default function BasicInfoStep({ templateId, initialData, onSaved }: Basi
         result = await templateService.create({
           display_name: displayName.trim(),
           purpose: purpose.trim(),
-          content: {},
+          content: { description: description.trim() || undefined },
           template_type: templateType,
         })
       }
@@ -98,6 +100,16 @@ export default function BasicInfoStep({ templateId, initialData, onSaved }: Basi
           />
         </FormRow>
       </div>
+
+      <FormRow label="模板说明">
+        <textarea
+          value={description}
+          onChange={e => setDescription(e.target.value)}
+          placeholder="简要描述模板的适用场景和特点..."
+          rows={3}
+          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-green-400 focus:ring-1 focus:ring-green-200 transition resize-none"
+        />
+      </FormRow>
 
       <div className="flex items-center gap-8">
         <FormRow label="模板类型">
