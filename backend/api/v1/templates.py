@@ -143,14 +143,6 @@ async def list_templates(
     ))
 
 
-class TemplateUpdatePayload(BaseModel):
-    purpose: Optional[str] = None
-    display_name: Optional[str] = None
-    content: Optional[TemplateContent] = None
-    template_type: Optional[int] = None
-    is_active: Optional[bool] = None
-
-
 @router.put("/{template_id}", summary="管理员更新模板", response_model=ResponseModel[TemplateResponse])
 async def update_template(
     template_id: UUID,

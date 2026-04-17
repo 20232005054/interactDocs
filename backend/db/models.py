@@ -224,20 +224,17 @@ class SummaryTemplate(Base):
         {
             "source": {
                 "value": "keyinfo", 
-                "label": "关键信息",
-                "ui_type": "select"
+                "label": "关键信息"
             },
             "match_type": "关键信息匹配", 
             "match_keys": [
                 {"value": "trial_name", "label": "试验名称"}
-            ],
-            "target_field": "trial_name"
+            ]
         }
     ]
-    - source: 来源类型对象，包含 value (keyinfo/summary/chapter), label (显示名), ui_type (组件类型)
+    - source: 来源类型对象，包含 value (keyinfo/summary/chapter), label (显示名)
     - match_type: 匹配方式描述
     - match_keys: 匹配标识列表（多选），每项包含 value 和 label
-    - target_field: 目标字段名，对应content_template中的{{变量名}}
     """
     default_prompt = Column(Text, nullable=True)
     custom_prompt = Column(Text, nullable=True)
@@ -265,20 +262,17 @@ class StructureTemplate(Base):
         {
             "source": {
                 "value": "keyinfo", 
-                "label": "关键信息",
-                "ui_type": "select"
+                "label": "关键信息"
             },
             "match_type": "关键信息匹配", 
             "match_keys": [
                 {"value": "trial_name", "label": "试验名称"}
-            ],
-            "target_field": "trial_name"
+            ]
         }
     ]
-    - source: 来源类型对象，包含 value (keyinfo/summary/chapter), label (显示名), ui_type (组件类型)
+    - source: 来源类型对象，包含 value (keyinfo/summary/chapter), label (显示名)
     - match_type: 匹配方式描述
     - match_keys: 匹配标识列表（多选），每项包含 value 和 label
-    - target_field: 目标字段名，对应content_template中的{{变量名}}
     """
     default_prompt = Column(Text, nullable=True)
     custom_prompt = Column(Text, nullable=True)

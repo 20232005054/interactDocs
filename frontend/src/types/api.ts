@@ -207,14 +207,12 @@ export type GenerationMode = 0 | 1  // 0=复制模式, 1=AI生成
 export interface SourceMatchKey {
   value: string
   label: string
-  ui_type?: string
 }
 
 export interface SourceInfo {
   source: SourceMatchKey
   match_type: string
   match_keys: SourceMatchKey[]
-  target_field: string
 }
 
 export interface SummaryTemplate {

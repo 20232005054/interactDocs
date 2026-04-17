@@ -222,7 +222,6 @@ function EditPanel({ node, coreInfoOptions, summaryOptions, structureOptions, va
       source: { value: "keyinfo", label: "核心信息" },
       match_type: "keyinfo_match",
       match_keys: [],
-      target_field: "",
     }]
     setSources(next)
     save({ sources: next })

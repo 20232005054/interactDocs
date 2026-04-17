@@ -45,18 +45,7 @@ class TemplateRenderService:
     def generate_content_copy_mode(content_template: str, sources: list, data_map: dict) -> str:
         if not content_template:
             return ""
-        if not sources:
-            return TemplateRenderService.render_template_variables(content_template, data_map)
-
-        variable_map = {}
-        for source in sources:
-            target_field = source.get("target_field")
-            match_key = source.get("match_key")
-            if not target_field:
-                continue
-            variable_map[target_field] = data_map.get(target_field, data_map.get(match_key, ""))
-        merged_map = {**data_map, **variable_map}
-        return TemplateRenderService.render_template_variables(content_template, merged_map)
+        return TemplateRenderService.render_template_variables(content_template, data_map)
 
     # ------------------------------------------------------------------
     # 数据来源映射构建
@@ -84,11 +73,6 @@ class TemplateRenderService:
             source_type = source_obj.get("value") if isinstance(source_obj, dict) else None
             match_keys = source.get("match_keys") or []
 
-            target_field = source.get("target_field")
-            if not target_field:
-                continue
-
-            values = []
             for mk in match_keys:
                 match_key = mk.get("value") if isinstance(mk, dict) else None
                 if not match_key:
@@ -110,11 +94,7 @@ class TemplateRenderService:
                     value = chapter_map.get(match_key, "")
 
                 if value:
-                    values.append(str(value))
-                    if match_key not in data_map:
-                        data_map[match_key] = value
-
-            data_map[target_field] = "\n".join(values)
+                    data_map[match_key] = value
 
         return data_map
 

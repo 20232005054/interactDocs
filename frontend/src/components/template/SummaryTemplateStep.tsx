@@ -243,7 +243,6 @@ function SummaryCard({
       source: { value: "keyinfo", label: "核心信息" },
       match_type: "keyinfo_match",
       match_keys: [],
-      target_field: "",
     }]
     handleSourcesChange(newSources)
   }
