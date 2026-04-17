@@ -29,6 +29,8 @@ class TemplateApplyService:
         error_code: str = None,
         duration_ms: int = None,
     ) -> dict:
+        from services.ai_client import _ERROR_HINTS
+        user_hint = _ERROR_HINTS.get(error_code or "", _ERROR_HINTS.get("AI_REQUEST_ERROR", ""))
         return {
             "trace_id": str(uuid4()),
             "template_id": template_id,
@@ -38,6 +40,7 @@ class TemplateApplyService:
             "error_message": error_message,
             "error_code": error_code,
             "duration_ms": duration_ms,
+            "user_hint": user_hint,
         }
 
     @staticmethod

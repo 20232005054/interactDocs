@@ -14,6 +14,8 @@ DATABASE_URL: str = os.getenv(
     "DATABASE_URL",
     "postgresql+asyncpg://postgres:123456@192.168.104.52:5432/agent02"
 )
+# DB_ECHO=true 时输出所有 SQL 语句（调试用），默认关闭
+DB_ECHO: bool = os.getenv("DB_ECHO", "false").lower() == "true"
 
 # ============================================================
 # Redis

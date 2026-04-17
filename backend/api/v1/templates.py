@@ -58,10 +58,19 @@ async def export_template_json(template_id: UUID, db: AsyncSession = Depends(get
 @router.post("/import", summary="从 JSON 文件导入模板", response_model=ResponseModel[TemplateDetailResponse])
 async def import_template_json(
     file: UploadFile = File(...),
-    current_user=Depends(get_editor_user),
+    as_system: bool = False,
+    current_user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """上传由 /export 导出的 JSON 文件，创建为当前用户的可复用模板（type=2）。"""
+    """
+    上传由 /export 导出的 JSON 文件导入模板。
+    - as_system=false（默认）：创建为当前用户的可复用模板（type=2），需要 editor 权限
+    - as_system=true：创建为系统模板（type=1），需要 admin 权限
+    """
+    from core.constants import UserRole
+    if current_user.role not in (UserRole.EDITOR, UserRole.ADMIN):
+        raise HTTPException(status_code=403, detail="导入模板需要编辑权限")
+
     if file.size and file.size > 1 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="文件大小不能超过 1MB")
     try:
@@ -74,7 +83,11 @@ async def import_template_json(
     except Exception:
         raise HTTPException(status_code=400, detail="文件格式错误，请上传有效的 JSON 文件")
 
-    t = await TemplateService.import_template_json(db, data, user_id=current_user.user_id)
+    t = await TemplateService.import_template_json(
+        db, data,
+        user_id=None if as_system else current_user.user_id,
+        template_type=TemplateType.SYSTEM if as_system else TemplateType.USER_REUSABLE,
+    )
     return success_response(data=TemplateDetailResponse(
         template_id=t.template_id, group_id=t.group_id, document_id=t.document_id,
         purpose=t.purpose, display_name=t.display_name, content=t.content,

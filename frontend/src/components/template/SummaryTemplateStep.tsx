@@ -295,37 +295,47 @@ function SummaryCard({
           className="h-8 rounded border border-gray-300 bg-white px-2 text-sm outline-none focus:border-green-400 transition w-28"
         >
           <option value={0}>复制</option>
-          <option value={1}>AI总结</option>
+          <option value={1}>AI生成</option>
+          <option value={2}>直接使用</option>
+          <option value={3}>AI修改</option>
         </select>
+        <span className="text-xs text-gray-400">
+          {generationMode === 0 && "变量替换模板内容"}
+          {generationMode === 1 && "AI 根据来源数据生成"}
+          {generationMode === 2 && "固定内容，不受变更影响"}
+          {generationMode === 3 && "AI 润色模板草稿"}
+        </span>
       </div>
 
-      {/* 来源方式 */}
-      <div className="flex flex-col gap-2">
-        <label className="text-sm text-gray-600">来源方式：</label>
-        <div className="flex flex-col gap-2 pl-2">
-          {sources.map((src, i) => (
-            <SourceRow
-              key={i}
-              source={src}
-              coreInfoOptions={coreInfoOptions}
-              summaryOptions={summaryOptions}
-              structureOptions={structureOptions}
-              onChange={updated => {
-                const next = sources.map((s, idx) => idx === i ? updated : s)
-                handleSourcesChange(next)
-              }}
-              onRemove={() => handleSourcesChange(sources.filter((_, idx) => idx !== i))}
-            />
-          ))}
-          <button
-            type="button"
-            onClick={addSource}
-            className="self-start text-sm text-green-600 hover:text-green-700 font-medium"
-          >
-            + 添加来源
-          </button>
+      {/* 来源方式（mode=2 不需要） */}
+      {generationMode !== 2 && (
+        <div className="flex flex-col gap-2">
+          <label className="text-sm text-gray-600">来源方式：</label>
+          <div className="flex flex-col gap-2 pl-2">
+            {sources.map((src, i) => (
+              <SourceRow
+                key={i}
+                source={src}
+                coreInfoOptions={coreInfoOptions}
+                summaryOptions={summaryOptions}
+                structureOptions={structureOptions}
+                onChange={updated => {
+                  const next = sources.map((s, idx) => idx === i ? updated : s)
+                  handleSourcesChange(next)
+                }}
+                onRemove={() => handleSourcesChange(sources.filter((_, idx) => idx !== i))}
+              />
+            ))}
+            <button
+              type="button"
+              onClick={addSource}
+              className="self-start text-sm text-green-600 hover:text-green-700 font-medium"
+            >
+              + 添加来源
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 内容模板（富文本） */}
       <div className="relative">
@@ -333,13 +343,19 @@ function SummaryCard({
           value={contentTemplate}
           onChange={handleContentChange}
           variables={variables}
-          placeholder="这里是一大段模板文字，可插入 {{变量}} 占位符..."
+          placeholder={
+            generationMode === 2
+              ? "直接使用模式：输入固定内容，不插入变量..."
+              : generationMode === 3
+              ? "AI修改模式：输入草稿内容，AI 将基于此润色..."
+              : "这里是一大段模板文字，可插入 {{变量}} 占位符..."
+          }
           minHeight="120px"
         />
       </div>
 
-      {/* AI 模式：提示词双栏 */}
-      {generationMode === 1 && (
+      {/* AI 模式：提示词双栏（mode=1 和 mode=3） */}
+      {(generationMode === 1 || generationMode === 3) && (
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <span>AI提示词：</span>

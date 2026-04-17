@@ -43,6 +43,9 @@ export default function TemplateListContainer() {
 
   // 删除确认
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  // 导入状态
+  const [importing, setImporting] = useState(false)
+  const [importError, setImportError] = useState<string | null>(null)
 
   const debouncedKeyword = useDebounce(keyword)
 
@@ -85,6 +88,22 @@ export default function TemplateListContainer() {
     }
   }
 
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ""
+    setImporting(true)
+    setImportError(null)
+    try {
+      await templateService.import(file, isSystem)
+      load()
+    } catch (err: unknown) {
+      setImportError(err instanceof Error ? err.message : "导入失败")
+    } finally {
+      setImporting(false)
+    }
+  }
+
   const totalPages = Math.ceil(total / pageSize)
 
   return (
@@ -121,7 +140,26 @@ export default function TemplateListContainer() {
           </button>
         </div>
 
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          {/* 隐藏的文件选择器 */}
+          <input
+            id="import-template-input"
+            type="file"
+            accept=".json"
+            className="hidden"
+            onChange={handleImport}
+          />
+          <label
+            htmlFor="import-template-input"
+            className={cn(
+              "h-9 px-4 rounded-md border border-input text-sm font-medium cursor-pointer transition flex items-center",
+              importing
+                ? "opacity-50 pointer-events-none bg-muted text-muted-foreground"
+                : "bg-background text-foreground hover:bg-muted"
+            )}
+          >
+            {importing ? "导入中..." : `导入${isSystem ? "系统" : ""}模板`}
+          </label>
           <button
             onClick={() => router.push("/admin/templates/new")}
             className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition"
@@ -133,6 +171,7 @@ export default function TemplateListContainer() {
 
       {/* 错误提示 */}
       {error && <p className="text-sm text-destructive">{error}</p>}
+      {importError && <p className="text-sm text-destructive">导入失败：{importError}</p>}
 
       {/* 表格 */}
       <div className="border border-border rounded-lg overflow-hidden">

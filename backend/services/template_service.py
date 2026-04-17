@@ -480,15 +480,23 @@ class TemplateService:
         }
 
     @staticmethod
-    async def import_template_json(db: AsyncSession, data: dict, user_id: UUID) -> Template:
+    async def import_template_json(
+        db: AsyncSession,
+        data: dict,
+        user_id: UUID,
+        template_type: int = None,
+    ) -> Template:
         """
         从导出的 JSON dict 创建新模板。
         - 重新生成所有主键
         - group_id 重新生成（不复用，避免与系统模板形成 group 关联）
-        - template_type 固定为 USER_REUSABLE
+        - template_type：不传则默认 USER_REUSABLE（type=2）；传 SYSTEM（type=1）时 user_id 应为 None
         - field_key 原样保留（sources 引用依赖它）
         """
         from fastapi import HTTPException
+
+        if template_type is None:
+            template_type = TemplateType.USER_REUSABLE
 
         # 基本校验
         tpl_data = data.get("template", {})
@@ -502,7 +510,7 @@ class TemplateService:
             display_name=tpl_data["display_name"],
             content=tpl_data.get("content") or {},
             version=1,
-            template_type=TemplateType.USER_REUSABLE,
+            template_type=template_type,
             user_id=user_id,
             document_id=None,
             is_active=True,

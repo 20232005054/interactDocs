@@ -202,7 +202,11 @@ export interface CoreInfoTemplateReorderPayload {
 // ============================================================
 // 摘要模板
 // ============================================================
-export type GenerationMode = 0 | 1  // 0=复制模式, 1=AI生成
+export type GenerationMode = 0 | 1 | 2 | 3
+// 0=复制（变量替换 content_template）
+// 1=AI生成（调 AI，失败降级到复制）
+// 2=直接使用（content_template 原文，不替换变量）
+// 3=AI修改（以 content_template 为草稿，AI 润色）
 
 export interface SourceMatchKey {
   value: string

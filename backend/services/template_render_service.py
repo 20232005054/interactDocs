@@ -138,19 +138,16 @@ class TemplateRenderService:
             sources_text = "\n\n请严格结合以下参考数据进行总结和生成：\n"
             has_data = False
             for source in sources:
-                target_field = source.get("target_field")
-                if not target_field:
-                    continue
-                label = target_field
-                match_keys = source.get("match_keys")
-                if match_keys and isinstance(match_keys, list) and len(match_keys) > 0:
-                    first_mk = match_keys[0]
-                    if isinstance(first_mk, dict) and first_mk.get("label"):
-                        label = first_mk.get("label")
-                value = variable_map.get(target_field)
-                if value and str(value).strip():
-                    sources_text += f"【{label}】:\n{value}\n\n"
-                    has_data = True
+                match_keys = source.get("match_keys") or []
+                for mk in match_keys:
+                    mk_value = mk.get("value") if isinstance(mk, dict) else None
+                    mk_label = (mk.get("label") if isinstance(mk, dict) else None) or mk_value
+                    if not mk_value:
+                        continue
+                    value = variable_map.get(mk_value)
+                    if value and str(value).strip():
+                        sources_text += f"【{mk_label}】:\n{value}\n\n"
+                        has_data = True
             if not has_data:
                 sources_text = ""
 

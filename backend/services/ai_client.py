@@ -12,6 +12,41 @@ logger = logging.getLogger(__name__)
 
 _AI_SEMAPHORE = asyncio.Semaphore(AI_MAX_CONCURRENCY)
 
+# 人类可读的错误提示
+_ERROR_HINTS: dict[str, str] = {
+    "AI_SSL_ERROR": (
+        "AI 调用失败（SSL 连接错误）：可能是代理或防火墙拦截了 HTTPS 流量，"
+        "请将 dashscope.aliyuncs.com 加入代理直连白名单，或关闭 SSL 检查后重试。"
+    ),
+    "AI_AUTH_ERROR": (
+        "AI 调用失败（认证错误）：请检查 DASHSCOPE_API_KEY 是否正确配置，"
+        "并确认 API Key 未过期或被禁用。"
+    ),
+    "AI_NETWORK_ERROR": (
+        "AI 调用失败（网络连接错误）：无法连接到 dashscope.aliyuncs.com，"
+        "请检查服务器网络环境或防火墙设置。"
+    ),
+    "AI_TIMEOUT": (
+        "AI 调用超时：请求超过了设定的超时时间，可适当增大 AI_TIMEOUT_SECONDS 配置，"
+        "或检查网络延迟。"
+    ),
+    "AI_REQUEST_ERROR": (
+        "AI 调用失败（未知错误）：请查看详细日志中的 exc= 字段获取原始异常信息。"
+    ),
+}
+
+
+def _classify_exception(exc: Exception) -> str:
+    """根据异常类型和消息细化 error_code，便于快速定位问题。"""
+    msg = str(exc).lower()
+    if "ssl" in msg or "eof" in msg or "certificate" in msg:
+        return "AI_SSL_ERROR"
+    if "authentication" in msg or "api key" in msg or "unauthorized" in msg or "invalid key" in msg:
+        return "AI_AUTH_ERROR"
+    if "connection" in msg or "network" in msg or "refused" in msg or "unreachable" in msg:
+        return "AI_NETWORK_ERROR"
+    return "AI_REQUEST_ERROR"
+
 
 class AIClientError(Exception):
     def __init__(self, message: str, error_code: str, duration_ms: Optional[int] = None):
@@ -81,23 +116,34 @@ async def _call_generation_with_retry(
             continue
         except Exception as exc:
             duration_ms = int((time.perf_counter() - start) * 1000)
+            error_code = _classify_exception(exc)
             last_error = AIClientError(
                 str(exc),
-                error_code="AI_REQUEST_ERROR",
+                error_code=error_code,
                 duration_ms=duration_ms,
             )
             logger.warning(
-                "ai_generation_request_retry template_id=%s field_key=%s duration_ms=%s error_code=%s retry_attempt=%s",
+                "ai_generation_request_retry template_id=%s field_key=%s duration_ms=%s error_code=%s retry_attempt=%s exc=%s",
                 template_id or "",
                 field_key or "",
                 duration_ms,
-                "AI_REQUEST_ERROR",
+                error_code,
                 attempt - 1,
+                repr(exc),
             )
             if attempt < attempts:
                 await asyncio.sleep(AI_RETRY_BACKOFF_SECONDS * attempt)
             continue
     if isinstance(last_error, AIClientError):
+        # 所有重试耗尽，打印人类可读提示
+        hint = _ERROR_HINTS.get(last_error.error_code, _ERROR_HINTS["AI_REQUEST_ERROR"])
+        logger.error(
+            "ai_generation_failed template_id=%s field_key=%s error_code=%s hint=%s",
+            template_id or "",
+            field_key or "",
+            last_error.error_code,
+            hint,
+        )
         raise last_error
     raise AIClientError("AI请求失败", error_code="AI_REQUEST_ERROR")
 

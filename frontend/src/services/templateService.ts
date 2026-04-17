@@ -51,6 +51,14 @@ export const templateService = {
 
   getPurposes: (templateType = 1): Promise<{ purposes: string[] }> =>
     request.get("/api/v1/templates/purposes/list", { params: { template_type: templateType } }),
+
+  import: (file: File, asSystem = false): Promise<TemplateDetail> => {
+    const form = new FormData()
+    form.append("file", file)
+    return request.post(`/api/v1/templates/import?as_system=${asSystem}`, form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
+  },
 }
 
 // ============================================================
