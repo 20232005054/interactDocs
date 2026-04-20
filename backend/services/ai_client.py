@@ -257,14 +257,18 @@ async def call_qwen_stream(
                         f"Error: AI调用失败({error_code}): {getattr(response, 'message', '')}",
                     )
         except Exception as exc:
+            error_code = _classify_exception(exc)
+            hint = _ERROR_HINTS.get(error_code, _ERROR_HINTS["AI_REQUEST_ERROR"])
             logger.exception(
-                "ai_generation_stream_producer_error template_id=%s field_key=%s",
+                "ai_generation_stream_producer_error template_id=%s field_key=%s error_code=%s exc=%s",
                 template_id or "",
                 field_key or "",
+                error_code,
+                repr(exc),
             )
             loop.call_soon_threadsafe(
                 queue.put_nowait,
-                f"Error: 流式生成异常: {exc}",
+                f"Error: {hint}",
             )
         finally:
             # 无论正常结束还是异常，都放入哨兵，防止消费端死锁
