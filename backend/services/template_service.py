@@ -270,12 +270,8 @@ class TemplateService:
                     parent_id=new_parent_id,
                     title=old_struct.title,
                     level=old_struct.level,
-                    generation_mode=old_struct.generation_mode,
-                    content_template=old_struct.content_template,
-                    sources=old_struct.sources,
-                    default_prompt=old_struct.default_prompt,
-                    custom_prompt=old_struct.custom_prompt,
-                    order_index=old_struct.order_index
+                    order_index=old_struct.order_index,
+                    paragraphs=old_struct.paragraphs,
                 )
                 new_structures.append(new_struct)
             
@@ -346,7 +342,11 @@ class TemplateService:
                     )
 
         for st in structures:
-            for ref in extract_refs(st.sources or []):
+            # 从 paragraphs 里聚合所有 sources
+            all_sources = []
+            for para_def in (st.paragraphs or []):
+                all_sources.extend(para_def.get("sources") or [])
+            for ref in extract_refs(all_sources):
                 if ref["type"] == "keyinfo" and ref["field_key"] in ci_referenced_by:
                     ci_referenced_by[ref["field_key"]].append(
                         {"type": "structure", "field_key": st.field_key, "label": st.title}
@@ -379,7 +379,9 @@ class TemplateService:
                 {
                     "field_key": st.field_key,
                     "title": st.title,
-                    "references": extract_refs(st.sources or []),
+                    "references": extract_refs(
+                        [src for para_def in (st.paragraphs or []) for src in (para_def.get("sources") or [])]
+                    ),
                 }
                 for st in structures
             ],
@@ -435,12 +437,8 @@ class TemplateService:
                 "title": st.title,
                 "field_key": st.field_key,
                 "level": st.level,
-                "generation_mode": st.generation_mode,
-                "content_template": st.content_template,
-                "sources": st.sources,
-                "default_prompt": st.default_prompt,
-                "custom_prompt": st.custom_prompt,
                 "order_index": st.order_index,
+                "paragraphs": st.paragraphs or [],
                 "children": sorted(
                     [_st_node(c) for c in structures if c.parent_id == st.structure_template_id],
                     key=lambda x: x["order_index"],
@@ -562,12 +560,8 @@ class TemplateService:
                     title=node.get("title", ""),
                     field_key=node.get("field_key", "struct_" + uuid4().hex[:8]),
                     level=node.get("level", 1),
-                    generation_mode=node.get("generation_mode", 0),
-                    content_template=node.get("content_template"),
-                    sources=node.get("sources"),
-                    default_prompt=node.get("default_prompt"),
-                    custom_prompt=node.get("custom_prompt"),
                     order_index=node.get("order_index", 0),
+                    paragraphs=node.get("paragraphs") or [],
                 )
                 db.add(st)
                 await db.flush()

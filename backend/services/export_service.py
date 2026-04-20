@@ -183,12 +183,18 @@ async def export_docx(db: AsyncSession, document_id: UUID) -> bytes:
             _set_run_font(run)
 
         for para in chapter["paragraphs"]:
-            if para["para_type"] != "paragraph":
-                continue
             content = para["content"] or ""
-            text = parse_content(content)
+            para_type = para.get("para_type", "paragraph")
 
-            # 处理图片
+            if para_type in ("heading1", "heading2", "heading3"):
+                h_level = int(para_type[-1])
+                h = doc.add_heading(content, level=h_level)
+                for run in h.runs:
+                    _set_run_font(run)
+                continue
+
+            # paragraph 类型
+            text = parse_content(content)
             img_urls = extract_image_urls(content)
             if img_urls:
                 for url in img_urls:
@@ -198,7 +204,6 @@ async def export_docx(db: AsyncSession, document_id: UUID) -> bytes:
                             doc.add_picture(io.BytesIO(resp.content), width=Inches(5))
                     except Exception:
                         pass
-                # 去掉图片标记后的纯文本
                 if text.strip():
                     p = doc.add_paragraph()
                     _set_run_font(p.add_run(text))
@@ -234,9 +239,12 @@ async def export_pdf(db: AsyncSession, document_id: UUID) -> bytes:
         level = min(chapter["level"] + 1, 6)
         html = f"<h{level}>{chapter['title']}</h{level}>\n"
         for para in chapter["paragraphs"]:
-            if para["para_type"] == "paragraph":
-                content = para["content"] or ""
-                # 如果是纯文本，包一层 <p>；如果已经是 HTML 则直接输出
+            content = para["content"] or ""
+            para_type = para.get("para_type", "paragraph")
+            if para_type in ("heading1", "heading2", "heading3"):
+                h_level = int(para_type[-1])
+                html += f"<h{h_level}>{content}</h{h_level}>\n"
+            else:
                 html += f"<p>{content}</p>\n"
         for child in chapter.get("children", []):
             html += chapter_to_html(child)
@@ -297,9 +305,12 @@ async def export_markdown(db: AsyncSession, document_id: UUID) -> str:
         prefix = "#" * min(chapter["level"] + 1, 6)
         result = [f"{prefix} {chapter['title']}\n"]
         for para in chapter["paragraphs"]:
-            if para["para_type"] == "paragraph":
-                content = para["content"] or ""
-                # 先提取图片，转为 Markdown 图片语法
+            content = para["content"] or ""
+            para_type = para.get("para_type", "paragraph")
+            if para_type in ("heading1", "heading2", "heading3"):
+                h_level = int(para_type[-1])
+                result.append(f"{'#' * h_level} {content}\n")
+            else:
                 img_urls = extract_image_urls(content)
                 for url in img_urls:
                     result.append(f"![image]({url})\n")

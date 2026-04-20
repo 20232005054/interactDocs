@@ -5,6 +5,10 @@ import StarterKit from "@tiptap/starter-kit"
 import Underline from "@tiptap/extension-underline"
 import TextAlign from "@tiptap/extension-text-align"
 import Placeholder from "@tiptap/extension-placeholder"
+import { Table } from "@tiptap/extension-table"
+import { TableRow } from "@tiptap/extension-table-row"
+import { TableCell } from "@tiptap/extension-table-cell"
+import { TableHeader } from "@tiptap/extension-table-header"
 import { Markdown } from "tiptap-markdown"
 import { VariablePlaceholderExtension } from "./VariablePlaceholderExtension"
 import { cn } from "@/lib/utils"
@@ -90,10 +94,14 @@ export default function RichTextEditor({
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       Placeholder.configure({ placeholder }),
       Markdown.configure({
-        html: true,           // 允许 HTML 节点（用于 chip 的 parseHTML）
+        html: true,
         transformPastedText: true,
         transformCopiedText: false,
       }),
+      Table.configure({ resizable: false }),
+      TableRow,
+      TableHeader,
+      TableCell,
       VariablePlaceholderExtension,
     ],
     // 初始内容：先预处理 {{}} 为 span，再让 Markdown 扩展解析

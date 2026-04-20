@@ -2,7 +2,11 @@
 
 import { useEffect, useState, useCallback, useRef } from "react"
 import { structureTemplateService, coreInfoTemplateService, summaryTemplateService } from "@/services/templateService"
-import type { StructureTemplate, CoreInfoTemplate, SummaryTemplate, SourceInfo, GenerationMode } from "@/types/api"
+import type {
+  StructureTemplate, StructureTemplateParagraphDef,
+  CoreInfoTemplate, SummaryTemplate,
+  SourceInfo, GenerationMode, ParaType,
+} from "@/types/api"
 import RichTextEditor from "@/components/editor/RichTextEditor"
 import { cn } from "@/lib/utils"
 
@@ -26,6 +30,20 @@ const MATCH_TYPE_OPTIONS = [
   { value: "keyinfo_match", label: "核心信息匹配" },
   { value: "summary_match", label: "摘要匹配" },
   { value: "chapter_match", label: "章节匹配" },
+]
+
+const PARA_TYPE_OPTIONS: { value: ParaType; label: string }[] = [
+  { value: "paragraph", label: "正文" },
+  { value: "heading1", label: "一级标题" },
+  { value: "heading2", label: "二级标题" },
+  { value: "heading3", label: "三级标题" },
+]
+
+const GENERATION_MODE_OPTIONS = [
+  { value: 0, label: "复制", hint: "变量替换模板内容" },
+  { value: 1, label: "AI生成", hint: "AI 根据来源数据生成" },
+  { value: 2, label: "直接使用", hint: "固定内容，不受变更影响" },
+  { value: 3, label: "AI修改", hint: "AI 润色模板草稿" },
 ]
 
 function flattenCoreInfo(nodes: CoreInfoTemplate[]): VariableOption[] {
@@ -54,6 +72,17 @@ function flattenStructure(nodes: StructureTemplate[]): VariableOption[] {
 
 function countTree(nodes: StructureTemplate[]): number {
   return nodes.reduce((acc, n) => acc + 1 + countTree(n.children ?? []), 0)
+}
+
+function makeEmptyParaDef(): StructureTemplateParagraphDef {
+  return {
+    para_type: "paragraph",
+    content_template: "",
+    generation_mode: 2,
+    sources: null,
+    default_prompt: null,
+    custom_prompt: null,
+  }
 }
 
 // ----------------------------------------------------------------
@@ -163,7 +192,141 @@ function SourceRow({ source, coreInfoOptions, summaryOptions, structureOptions, 
 }
 
 // ----------------------------------------------------------------
-// 右侧编辑面板（实时保存）
+// 单个段落定义行
+// ----------------------------------------------------------------
+interface ParaDefRowProps {
+  paraDef: StructureTemplateParagraphDef
+  index: number
+  coreInfoOptions: VariableOption[]
+  summaryOptions: VariableOption[]
+  structureOptions: VariableOption[]
+  variables: VariableOption[]
+  onChange: (updated: StructureTemplateParagraphDef) => void
+  onRemove: () => void
+  onMoveUp: () => void
+  onMoveDown: () => void
+  isFirst: boolean
+  isLast: boolean
+}
+
+function ParaDefRow({
+  paraDef, index,
+  coreInfoOptions, summaryOptions, structureOptions, variables,
+  onChange, onRemove, onMoveUp, onMoveDown, isFirst, isLast,
+}: ParaDefRowProps) {
+  const mode = paraDef.generation_mode
+  const sources = paraDef.sources ?? []
+
+  const updateSources = (next: SourceInfo[]) => onChange({ ...paraDef, sources: next.length ? next : null })
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-4 flex flex-col gap-3 bg-white">
+      {/* 行头：序号 + 类型 + 生成方式 + 排序 + 删除 */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs text-gray-400 w-5 shrink-0">#{index + 1}</span>
+
+        {/* 段落类型 */}
+        <select
+          value={paraDef.para_type}
+          onChange={e => onChange({ ...paraDef, para_type: e.target.value as ParaType })}
+          className="h-7 rounded border border-gray-300 bg-white px-2 text-xs outline-none focus:border-green-400 transition w-24"
+        >
+          {PARA_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+
+        {/* 生成方式 */}
+        <select
+          value={mode}
+          onChange={e => onChange({ ...paraDef, generation_mode: Number(e.target.value) as GenerationMode })}
+          className="h-7 rounded border border-gray-300 bg-white px-2 text-xs outline-none focus:border-green-400 transition w-24"
+        >
+          {GENERATION_MODE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+
+        <span className="text-xs text-gray-400 flex-1">
+          {GENERATION_MODE_OPTIONS.find(o => o.value === mode)?.hint}
+        </span>
+
+        {/* 排序按钮 */}
+        <button type="button" onClick={onMoveUp} disabled={isFirst}
+          className="text-gray-300 hover:text-gray-500 disabled:opacity-30 text-sm px-1">↑</button>
+        <button type="button" onClick={onMoveDown} disabled={isLast}
+          className="text-gray-300 hover:text-gray-500 disabled:opacity-30 text-sm px-1">↓</button>
+
+        {/* 删除 */}
+        <button type="button" onClick={onRemove}
+          className="text-gray-300 hover:text-red-400 text-sm px-1">×</button>
+      </div>
+
+      {/* 来源配置（mode≠2 时显示） */}
+      {mode !== 2 && (
+        <div className="flex flex-col gap-2 pl-5">
+          <span className="text-xs text-gray-500">来源：</span>
+          {sources.map((src, i) => (
+            <SourceRow
+              key={i}
+              source={src}
+              coreInfoOptions={coreInfoOptions}
+              summaryOptions={summaryOptions}
+              structureOptions={structureOptions}
+              onChange={updated => updateSources(sources.map((s, idx) => idx === i ? updated : s))}
+              onRemove={() => updateSources(sources.filter((_, idx) => idx !== i))}
+            />
+          ))}
+          <button type="button"
+            onClick={() => updateSources([...sources, { source: { value: "keyinfo", label: "核心信息" }, match_type: "keyinfo_match", match_keys: [] }])}
+            className="self-start text-xs text-green-600 hover:text-green-700 font-medium">
+            + 添加来源
+          </button>
+        </div>
+      )}
+
+      {/* 内容模板（mode≠1 时显示） */}
+      {mode !== 1 && (
+        <div className="pl-5">
+          <RichTextEditor
+            value={paraDef.content_template ?? ""}
+            onChange={v => onChange({ ...paraDef, content_template: v })}
+            variables={mode === 0 ? variables : []}
+            placeholder={
+              mode === 2 ? "直接使用：输入固定内容..." :
+              mode === 3 ? "AI修改草稿：输入初始内容，AI 将润色..." :
+              "复制模式：可插入 {{变量}} 占位符..."
+            }
+            minHeight="80px"
+          />
+        </div>
+      )}
+
+      {/* 提示词（mode=1/3 时显示） */}
+      {(mode === 1 || mode === 3) && (
+        <div className="pl-5 grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-gray-500">默认提示词：</span>
+            <textarea
+              value={paraDef.default_prompt ?? ""}
+              onChange={e => onChange({ ...paraDef, default_prompt: e.target.value || null })}
+              rows={4}
+              className="rounded border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs outline-none focus:border-green-400 resize-none"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-gray-500">自定义提示词：</span>
+            <textarea
+              value={paraDef.custom_prompt ?? ""}
+              onChange={e => onChange({ ...paraDef, custom_prompt: e.target.value || null })}
+              rows={4}
+              className="rounded border border-gray-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-green-400 resize-none"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ----------------------------------------------------------------
+// 右侧编辑面板（章节标题 + 段落定义列表）
 // ----------------------------------------------------------------
 interface EditPanelProps {
   node: StructureTemplate
@@ -176,22 +339,14 @@ interface EditPanelProps {
 
 function EditPanel({ node, coreInfoOptions, summaryOptions, structureOptions, variables, onDeleted }: EditPanelProps) {
   const [title, setTitle] = useState(node.title)
-  const [generationMode, setGenerationMode] = useState<GenerationMode>(node.generation_mode)
-  const [sources, setSources] = useState<SourceInfo[]>(node.sources ?? [])
-  const [contentTemplate, setContentTemplate] = useState(node.content_template ?? "")
-  const [defaultPrompt, setDefaultPrompt] = useState(node.default_prompt ?? "")
-  const [customPrompt, setCustomPrompt] = useState(node.custom_prompt ?? "")
+  const [paraDefs, setParaDefs] = useState<StructureTemplateParagraphDef[]>(node.paragraphs ?? [])
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
-  // 切换节点时重置状态
+  // 切换节点时重置
   useEffect(() => {
     setTitle(node.title)
-    setGenerationMode(node.generation_mode)
-    setSources(node.sources ?? [])
-    setContentTemplate(node.content_template ?? "")
-    setDefaultPrompt(node.default_prompt ?? "")
-    setCustomPrompt(node.custom_prompt ?? "")
+    setParaDefs(node.paragraphs ?? [])
   }, [node.structure_template_id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -208,6 +363,11 @@ function EditPanel({ node, coreInfoOptions, summaryOptions, structureOptions, va
     }, 600)
   }, [node.structure_template_id])
 
+  const handleParaDefsChange = (next: StructureTemplateParagraphDef[]) => {
+    setParaDefs(next)
+    save({ paragraphs: next })
+  }
+
   const handleDelete = async () => {
     try {
       await structureTemplateService.delete(node.structure_template_id)
@@ -217,24 +377,11 @@ function EditPanel({ node, coreInfoOptions, summaryOptions, structureOptions, va
     }
   }
 
-  const addSource = () => {
-    const next: SourceInfo[] = [...sources, {
-      source: { value: "keyinfo", label: "核心信息" },
-      match_type: "keyinfo_match",
-      match_keys: [],
-    }]
-    setSources(next)
-    save({ sources: next })
-  }
-
-  // 面包屑标题
-  const breadcrumb = `${node.title}`
-
   return (
     <div className="flex flex-col gap-4 p-5">
-      {/* 面包屑 + 删除 */}
+      {/* 标题行 + 删除 */}
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-gray-700">{breadcrumb}</span>
+        <span className="text-sm font-medium text-gray-700">{node.title}</span>
         <div className="flex items-center gap-2">
           {saving && <span className="text-xs text-gray-400">保存中...</span>}
           {deleting ? (
@@ -260,103 +407,53 @@ function EditPanel({ node, coreInfoOptions, summaryOptions, structureOptions, va
         />
       </div>
 
-      {/* 生成方式 */}
-      <div className="flex items-center gap-3">
-        <label className="w-20 text-sm text-gray-600 shrink-0">生成方式</label>
-        <select
-          value={generationMode}
-          onChange={e => { const v = Number(e.target.value) as GenerationMode; setGenerationMode(v); save({ generation_mode: v }) }}
-          className="h-8 rounded border border-gray-300 bg-white px-2 text-sm outline-none focus:border-green-400 transition w-28"
+      {/* 段落定义列表 */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <label className="text-sm text-gray-600">段落定义：</label>
+          <span className="text-xs text-gray-400">{paraDefs.length} 个段落</span>
+        </div>
+
+        {paraDefs.length === 0 && (
+          <p className="text-xs text-gray-400 py-2 pl-1">暂无段落定义，点击下方添加</p>
+        )}
+
+        {paraDefs.map((paraDef, idx) => (
+          <ParaDefRow
+            key={idx}
+            paraDef={paraDef}
+            index={idx}
+            coreInfoOptions={coreInfoOptions}
+            summaryOptions={summaryOptions}
+            structureOptions={structureOptions}
+            variables={variables}
+            isFirst={idx === 0}
+            isLast={idx === paraDefs.length - 1}
+            onChange={updated => handleParaDefsChange(paraDefs.map((p, i) => i === idx ? updated : p))}
+            onRemove={() => handleParaDefsChange(paraDefs.filter((_, i) => i !== idx))}
+            onMoveUp={() => {
+              if (idx === 0) return
+              const next = [...paraDefs]
+              ;[next[idx - 1], next[idx]] = [next[idx], next[idx - 1]]
+              handleParaDefsChange(next)
+            }}
+            onMoveDown={() => {
+              if (idx === paraDefs.length - 1) return
+              const next = [...paraDefs]
+              ;[next[idx], next[idx + 1]] = [next[idx + 1], next[idx]]
+              handleParaDefsChange(next)
+            }}
+          />
+        ))}
+
+        <button
+          type="button"
+          onClick={() => handleParaDefsChange([...paraDefs, makeEmptyParaDef()])}
+          className="self-start h-7 px-3 rounded border border-green-400 text-green-600 text-xs font-medium hover:bg-green-50 transition"
         >
-          <option value={0}>复制</option>
-          <option value={1}>AI生成</option>
-          <option value={2}>直接使用</option>
-          <option value={3}>AI修改</option>
-        </select>
-        <span className="text-xs text-gray-400">
-          {generationMode === 0 && "变量替换模板内容"}
-          {generationMode === 1 && "AI 根据来源数据生成"}
-          {generationMode === 2 && "固定内容，不受变更影响"}
-          {generationMode === 3 && "AI 润色模板草稿"}
-        </span>
+          + 添加段落定义
+        </button>
       </div>
-
-      {/* 来源方式（mode=2 不需要） */}
-      {generationMode !== 2 && (
-        <div className="flex flex-col gap-2">
-          <label className="text-sm text-gray-600">来源方式：</label>
-          <div className="flex flex-col gap-2 pl-2">
-            {sources.map((src, i) => (
-              <SourceRow
-                key={i}
-                source={src}
-                coreInfoOptions={coreInfoOptions}
-                summaryOptions={summaryOptions}
-                structureOptions={structureOptions}
-                onChange={updated => {
-                  const next = sources.map((s, idx) => idx === i ? updated : s)
-                  setSources(next)
-                  save({ sources: next })
-                }}
-                onRemove={() => {
-                  const next = sources.filter((_, idx) => idx !== i)
-                  setSources(next)
-                  save({ sources: next })
-                }}
-              />
-            ))}
-            <button type="button" onClick={addSource}
-              className="self-start text-sm text-green-600 hover:text-green-700 font-medium">
-              + 添加来源
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* 内容模板 */}
-      <RichTextEditor
-        value={contentTemplate}
-        onChange={v => { setContentTemplate(v); save({ content_template: v }) }}
-        variables={variables}
-        placeholder={
-          generationMode === 2
-            ? "直接使用模式：输入固定内容，不插入变量..."
-            : generationMode === 3
-            ? "AI修改模式：输入草稿内容，AI 将基于此润色..."
-            : "这里是一大段模板文字，可插入 {{变量}} 占位符..."
-        }
-        minHeight="120px"
-      />
-
-      {/* AI 模式：提示词双栏（mode=1 和 mode=3） */}
-      {(generationMode === 1 || generationMode === 3) && (
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <span>AI提示词：</span>
-            <button type="button" className="text-green-600 hover:underline text-sm">引用样例库</button>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1">
-              <span className="text-xs text-gray-500">默认提示词：</span>
-              <textarea
-                value={defaultPrompt}
-                onChange={e => { setDefaultPrompt(e.target.value); save({ default_prompt: e.target.value }) }}
-                rows={6}
-                className="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-green-400 resize-none"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-xs text-gray-500">自定义提示词：</span>
-              <textarea
-                value={customPrompt}
-                onChange={e => { setCustomPrompt(e.target.value); save({ custom_prompt: e.target.value }) }}
-                rows={6}
-                className="rounded border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-green-400 resize-none"
-              />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
@@ -381,12 +478,15 @@ function TreeItem({ node, depth, selectedId, onSelect }: TreeItemProps) {
         style={{ paddingLeft: `${12 + depth * 16}px` }}
         className={cn(
           "w-full text-left py-2 pr-3 text-sm transition rounded-sm",
-          isSelected
-            ? "bg-green-500 text-white font-medium"
-            : "text-gray-700 hover:bg-gray-100"
+          isSelected ? "bg-green-500 text-white font-medium" : "text-gray-700 hover:bg-gray-100"
         )}
       >
-        {node.title}
+        <span>{node.title}</span>
+        {node.paragraphs && node.paragraphs.length > 0 && (
+          <span className={cn("ml-1.5 text-xs", isSelected ? "text-green-100" : "text-gray-400")}>
+            {node.paragraphs.length}段
+          </span>
+        )}
       </button>
       {node.children?.map(child => (
         <TreeItem key={child.structure_template_id} node={child} depth={depth + 1} selectedId={selectedId} onSelect={onSelect} />
@@ -418,6 +518,7 @@ function AddStructureForm({ templateId, parentId, parentLevel, onDone, onCancel 
         parent_id: parentId,
         title: title.trim(),
         level: parentLevel + 1,
+        paragraphs: [],
       })
       onDone()
     } finally {
@@ -471,10 +572,9 @@ export default function StructureTemplateStep({ templateId, onCountChange }: Str
       const newTree = structureRes.tree ?? []
       setTree(newTree)
       setCoreInfoOptions(flattenCoreInfo(coreRes.items ?? []))
-      setSummaryOptions((summaryRes.items ?? []).map(s => ({ fieldKey: s.field_key, label: s.title })))
+      setSummaryOptions((summaryRes.items ?? []).map((s: SummaryTemplate) => ({ fieldKey: s.field_key, label: s.title })))
       onCountChange?.(countTree(newTree))
 
-      // 保持选中节点同步
       if (selectedNode) {
         const findNode = (nodes: StructureTemplate[]): StructureTemplate | null => {
           for (const n of nodes) {
@@ -501,7 +601,7 @@ export default function StructureTemplateStep({ templateId, onCountChange }: Str
 
   if (loading) return (
     <div className="flex gap-4">
-      <div className="w-40 h-64 bg-gray-100 rounded animate-pulse" />
+      <div className="w-44 h-64 bg-gray-100 rounded animate-pulse" />
       <div className="flex-1 h-64 bg-gray-100 rounded animate-pulse" />
     </div>
   )

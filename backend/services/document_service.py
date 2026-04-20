@@ -114,12 +114,8 @@ class DocumentService:
                     field_key=old_struct.field_key,
                     title=old_struct.title,
                     level=old_struct.level,
-                    generation_mode=old_struct.generation_mode,
-                    content_template=old_struct.content_template,
-                    sources=old_struct.sources,
-                    default_prompt=old_struct.default_prompt,
-                    custom_prompt=old_struct.custom_prompt,
-                    order_index=old_struct.order_index
+                    order_index=old_struct.order_index,
+                    paragraphs=old_struct.paragraphs,
                 )
                 new_structures.append(new_struct)
 
@@ -407,12 +403,8 @@ class DocumentService:
                     field_key=st.field_key,
                     title=st.title,
                     level=st.level,
-                    generation_mode=st.generation_mode,
-                    content_template=st.content_template,
-                    sources=st.sources,
-                    default_prompt=st.default_prompt,
-                    custom_prompt=st.custom_prompt,
                     order_index=st.order_index,
+                    paragraphs=st.paragraphs,
                 ))
 
         await db.commit()

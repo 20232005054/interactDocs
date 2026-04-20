@@ -84,6 +84,7 @@ function RowForm({ templateId, parentId, initial, onDone, onCancel }: RowFormPro
           className="h-8 rounded border border-input bg-background px-2 text-sm outline-none focus:ring-1 focus:ring-ring"
         >
           <option value="text">文本</option>
+          <option value="number">数值</option>
           <option value="select">下拉选择</option>
           <option value="group">分组</option>
         </select>
@@ -105,6 +106,16 @@ function RowForm({ templateId, parentId, initial, onDone, onCancel }: RowFormPro
           onChange={e => setDefaultValue(e.target.value)}
           placeholder="默认值（可选）"
           className="h-8 rounded border border-input bg-background px-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+        />
+      )}
+
+      {fieldType === "number" && (
+        <input
+          type="number"
+          value={defaultValue}
+          onChange={e => setDefaultValue(e.target.value)}
+          placeholder="默认数值（可选）"
+          className="h-8 rounded border border-input bg-background px-2 text-sm outline-none focus:ring-1 focus:ring-ring w-40"
         />
       )}
 
@@ -168,6 +179,7 @@ function TreeNode({ node, templateId, depth, onRefresh }: TreeNodeProps) {
 
   const fieldTypeLabel: Record<FieldType, string> = {
     text: "文本",
+    number: "数值",
     select: "下拉",
     group: "分组",
   }

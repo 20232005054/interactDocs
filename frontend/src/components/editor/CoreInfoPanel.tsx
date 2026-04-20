@@ -118,6 +118,19 @@ function CoreInfoNode({ node, depth, onReload }: CoreInfoNodeProps) {
                 <option key={opt} value={opt}>{opt}</option>
               ))}
             </select>
+          ) : node.field_type === "number" ? (
+            <input
+              type="number"
+              value={localContent}
+              onChange={e => handleChange(e.target.value)}
+              disabled={node.is_locked}
+              className={cn(
+                "w-full h-7 rounded border border-gray-200 bg-white px-2 text-xs outline-none focus:border-blue-300 transition",
+                node.is_locked && "bg-gray-50 text-gray-400 cursor-not-allowed",
+                node.is_change === 1 && "border-orange-300 bg-orange-50/30"
+              )}
+              placeholder={node.is_locked ? "已锁定" : "请输入数值..."}
+            />
           ) : (
             <textarea
               value={localContent}

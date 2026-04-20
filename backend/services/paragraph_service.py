@@ -217,8 +217,26 @@ class ParagraphService:
             print(f"[反哺] 未找到对应 StructureTemplate，template_id={document.template_id}, field_key={chapter.field_key}")
             return
 
-        current_prompt = struct_template.custom_prompt or struct_template.default_prompt or ""
-        print(f"[反哺] 当前 custom_prompt={current_prompt!r}")
+        current_prompt = ""
+        # 用 para_def_idx 定位对应的段落定义
+        para_def_idx = paragraph.para_def_idx
+        if para_def_idx is None:
+            print(f"[反哺] 段落无 para_def_idx（用户手动创建），跳过反哺")
+            return
+
+        para_defs = struct_template.paragraphs or []
+        if para_def_idx >= len(para_defs):
+            print(f"[反哺] para_def_idx={para_def_idx} 超出 paragraphs 范围（len={len(para_defs)}），跳过")
+            return
+
+        para_def = para_defs[para_def_idx]
+        mode = para_def.get("generation_mode", 2)
+        if mode not in (1, 3):
+            print(f"[反哺] 段落定义 mode={mode}，非 AI 模式，跳过反哺")
+            return
+
+        current_prompt = para_def.get("custom_prompt") or para_def.get("default_prompt") or ""
+        print(f"[反哺] 当前 prompt={current_prompt!r}, para_def_idx={para_def_idx}")
 
         optimize_prompt = (
             f"现有提示词：\n{current_prompt}\n\n"
@@ -232,13 +250,18 @@ class ParagraphService:
             new_prompt = result.get("content", "").strip()
             print(f"[反哺] AI 优化后 prompt={new_prompt!r}")
             if new_prompt:
+                # 更新 paragraphs 数组里对应段落定义的 custom_prompt
+                new_para_defs = list(para_defs)
+                new_para_def = dict(new_para_defs[para_def_idx])
+                new_para_def["custom_prompt"] = new_prompt
+                new_para_defs[para_def_idx] = new_para_def
                 await db.execute(
                     sa_update(StructureTemplate)
                     .where(StructureTemplate.structure_template_id == struct_template.structure_template_id)
-                    .values(custom_prompt=new_prompt)
+                    .values(paragraphs=new_para_defs)
                 )
                 await db.commit()
-                print(f"[反哺] custom_prompt 已更新，structure_template_id={struct_template.structure_template_id}")
+                print(f"[反哺] paragraphs[{para_def_idx}].custom_prompt 已更新")
         except Exception as e:
             print(f"[反哺] AI 优化 prompt 失败: {e}")
     

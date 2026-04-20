@@ -310,9 +310,10 @@ class TemplateApplyService:
     async def apply_structure_template(db: AsyncSession, document_id: UUID):
         """
         应用文章结构模板：根据模板创建文档的章节结构
+        每个章节按 paragraphs 定义创建多个段落。
         两阶段执行：
-        阶段一 - 串行创建所有章节（空段落），建立 ID 映射
-        阶段二 - 并发执行所有 AI 生成，Semaphore 控制并发数
+        阶段一 - 串行创建所有章节 + 非AI段落，建立 ID 映射
+        阶段二 - 并发执行所有 AI 段落生成，Semaphore 控制并发数
         """
         import asyncio
 
@@ -333,10 +334,11 @@ class TemplateApplyService:
         sorted_templates = sorted(structure_templates, key=lambda x: (x.level, x.order_index))
 
         # ----------------------------------------------------------------
-        # 阶段一：串行创建所有章节 + 空段落，不调 AI
+        # 阶段一：串行创建所有章节 + 非AI段落
+        # paragraph_ai_tasks: [(chapter, template, para_idx, para_def, paragraph_id)]
         # ----------------------------------------------------------------
-        template_id_map = {}   # structure_template_id -> chapter_id
-        paragraph_id_map = {}  # structure_template_id -> paragraph_id
+        template_id_map = {}    # structure_template_id -> chapter_id
+        paragraph_ai_tasks = [] # 待 AI 生成的段落任务
         created_chapters = []
 
         for template in sorted_templates:
@@ -346,73 +348,55 @@ class TemplateApplyService:
                 title=template.title,
                 field_key=template.field_key,
                 status=0,
-                order_index=template.order_index
+                order_index=template.order_index,
             )
             db.add(chapter)
             await db.flush()
             template_id_map[template.structure_template_id] = chapter.chapter_id
 
-            generation_mode = template.generation_mode
-            paragraph = None
-            paragraph_content = ""
+            para_defs = template.paragraphs or []
+            chapter_paragraphs = []  # 本章节创建的段落列表
 
-            if generation_mode in (0, 1, 3):
-                if generation_mode == 0:
+            for para_idx, para_def in enumerate(para_defs):
+                mode = para_def.get("generation_mode", 2)
+                content = ""
+
+                if mode == 0:
+                    # 复制模式：变量替换
                     source_data_map = {}
                     try:
                         source_data_map = await StructureTemplateService.build_sources_data_map(
-                            db=db, document=document, sources=template.sources or []
+                            db=db, document=document, sources=para_def.get("sources") or []
                         )
                     except Exception:
                         pass
-                    paragraph_content = SummaryTemplateService.generate_content_copy_mode(
-                        template.content_template, template.sources, source_data_map
+                    content = SummaryTemplateService.generate_content_copy_mode(
+                        para_def.get("content_template"), para_def.get("sources"), source_data_map
                     )
-                else:
-                    paragraph_content = ""  # AI 模式（1/3）先留空
+                elif mode == 2:
+                    # 直接使用：原文不替换
+                    content = para_def.get("content_template") or ""
+                # mode=1/3 先留空，阶段二填充
 
-                if paragraph_content or generation_mode in (1, 3):
-                    paragraph = Paragraph(
-                        chapter_id=chapter.chapter_id,
-                        content=paragraph_content,
-                        para_type="paragraph",
-                        order_index=0,
-                        ai_eval=None,
-                        ai_suggestion=None,
-                        ai_generate=None,
-                        ischange=0,
-                    )
-                    db.add(paragraph)
-                    await db.flush()
-                    paragraph_id_map[template.structure_template_id] = paragraph.paragraph_id
-            elif generation_mode == 2:
-                # 直接使用：content_template 原文，不替换变量
-                paragraph_content = template.content_template or ""
-                if paragraph_content:
-                    paragraph = Paragraph(
-                        chapter_id=chapter.chapter_id,
-                        content=paragraph_content,
-                        para_type="paragraph",
-                        order_index=0,
-                        ai_eval=None,
-                        ai_suggestion=None,
-                        ai_generate=None,
-                        ischange=0,
-                    )
-                    db.add(paragraph)
-                    await db.flush()
-                    paragraph_id_map[template.structure_template_id] = paragraph.paragraph_id
+                paragraph = Paragraph(
+                    chapter_id=chapter.chapter_id,
+                    content=content,
+                    para_type=para_def.get("para_type", "paragraph"),
+                    order_index=para_idx,
+                    para_def_idx=para_idx,
+                    ischange=0,
+                )
+                db.add(paragraph)
+                await db.flush()
+                chapter_paragraphs.append(paragraph)
+
+                if mode in (1, 3):
+                    paragraph_ai_tasks.append((chapter, template, para_idx, para_def, paragraph.paragraph_id))
 
             created_chapters.append({
                 "chapter": chapter,
                 "template": template,
-                "paragraph": paragraph,
-                "generation_mode": generation_mode,
-                "paragraph_content": paragraph_content,
-                "sources": template.sources,
-                "content_template": template.content_template,
-                "default_prompt": template.default_prompt,
-                "custom_prompt": template.custom_prompt,
+                "paragraphs": chapter_paragraphs,
                 "degraded": False,
                 "generation_error": None,
             })
@@ -420,32 +404,27 @@ class TemplateApplyService:
         await db.commit()
 
         # ----------------------------------------------------------------
-        # 阶段二：并发执行所有 AI 生成，结果批量更新段落
+        # 阶段二：并发执行所有 AI 段落生成
         # ----------------------------------------------------------------
-        ai_tasks = [
-            item for item in created_chapters
-            if item["generation_mode"] in (1, 3)
-            and item["template"].structure_template_id in paragraph_id_map
-        ]
-
-        if ai_tasks:
+        if paragraph_ai_tasks:
             semaphore = asyncio.Semaphore(AI_MAX_CONCURRENCY)
 
-            async def run_ai(item):
+            async def run_ai_para(chapter, template, para_idx, para_def, paragraph_id):
                 async with semaphore:
-                    template = item["template"]
+                    mode = para_def.get("generation_mode", 1)
                     source_data_map = {}
                     generation_error = None
+
                     try:
                         source_data_map = await StructureTemplateService.build_sources_data_map(
-                            db=db, document=document, sources=template.sources or []
+                            db=db, document=document, sources=para_def.get("sources") or []
                         )
                     except Exception as exc:
                         error_code, duration_ms = TemplateApplyService._extract_ai_error_fields(exc)
                         generation_error = TemplateApplyService._build_generation_error(
                             template_id=str(template.structure_template_id),
-                            field_key=template.field_key,
-                            generation_mode=1,
+                            field_key=f"{template.field_key}[{para_idx}]",
+                            generation_mode=mode,
                             error_type=type(exc).__name__,
                             error_message=str(exc),
                             error_code=error_code,
@@ -455,19 +434,21 @@ class TemplateApplyService:
                     content = ""
                     if generation_error is None:
                         try:
-                            content = await StructureTemplateService.render_ai_content(
+                            content = await StructureTemplateService.render_ai_content_for_paragraph(
                                 db=db,
                                 document=document,
-                                structure_template=template,
+                                chapter_title=chapter.title,
+                                para_def=para_def,
+                                field_key=f"{template.field_key}[{para_idx}]",
+                                template_id=str(template.structure_template_id),
                                 source_data_map=source_data_map,
-                                draft=template.content_template if item["generation_mode"] == 3 else None,
                             )
                         except Exception as exc:
                             error_code, duration_ms = TemplateApplyService._extract_ai_error_fields(exc)
                             generation_error = TemplateApplyService._build_generation_error(
                                 template_id=str(template.structure_template_id),
-                                field_key=template.field_key,
-                                generation_mode=1,
+                                field_key=f"{template.field_key}[{para_idx}]",
+                                generation_mode=mode,
                                 error_type=type(exc).__name__,
                                 error_message=str(exc),
                                 error_code=error_code,
@@ -478,78 +459,88 @@ class TemplateApplyService:
                         if generation_error is None:
                             generation_error = TemplateApplyService._build_generation_error(
                                 template_id=str(template.structure_template_id),
-                                field_key=template.field_key,
-                                generation_mode=1,
+                                field_key=f"{template.field_key}[{para_idx}]",
+                                generation_mode=mode,
                                 error_type="AIEmptyResponse",
                                 error_message="AI返回为空，已降级到复制模式",
                                 error_code="AI_EMPTY_RESPONSE",
                             )
+                        # 降级：复制模式
                         content = SummaryTemplateService.generate_content_copy_mode(
-                            template.content_template, template.sources, source_data_map
+                            para_def.get("content_template"), para_def.get("sources"), source_data_map
                         )
 
-                    return item, content, generation_error
-            results = await asyncio.gather(*[run_ai(item) for item in ai_tasks], return_exceptions=True)
+                    return paragraph_id, content, generation_error
+
+            results = await asyncio.gather(
+                *[run_ai_para(*task) for task in paragraph_ai_tasks],
+                return_exceptions=True,
+            )
 
             # 批量更新段落内容
             for result in results:
                 if isinstance(result, Exception):
                     continue
-                item, content, generation_error = result
-                para_id = paragraph_id_map.get(item["template"].structure_template_id)
-                if para_id and content:
+                paragraph_id, content, generation_error = result
+                if content:
                     await db.execute(
                         sa_update(Paragraph)
-                        .where(Paragraph.paragraph_id == para_id)
+                        .where(Paragraph.paragraph_id == paragraph_id)
                         .values(
                             content=content,
                             ai_generate=content if generation_error is None else None,
                         )
                     )
-                item["paragraph_content"] = content
-                item["degraded"] = generation_error is not None
-                item["generation_error"] = generation_error
+                # 把 generation_error 写回对应章节
+                if generation_error:
+                    for item in created_chapters:
+                        if any(p.paragraph_id == paragraph_id for p in item["paragraphs"]):
+                            item["degraded"] = True
+                            item["generation_error"] = generation_error
+                            break
 
             await db.commit()
 
         # ----------------------------------------------------------------
-        # 建立依赖边
+        # 建立依赖边（按段落定义里的 sources 遍历）
         # ----------------------------------------------------------------
         for item in created_chapters:
-            paragraph = item["paragraph"]
+            chapter = item["chapter"]
             template = item["template"]
-            if not paragraph or not template.sources:
-                continue
-            for src in template.sources:
-                source_obj = src.get("source")
-                source_type = source_obj.get("value") if isinstance(source_obj, dict) else None
-                match_keys = src.get("match_keys") or []
-                for mk in match_keys:
-                    match_key = mk.get("value") if isinstance(mk, dict) else None
-                    if not match_key:
-                        continue
-                    target_id = None
-                    target_type = None
-                    if source_type == "keyinfo":
-                        target_type = EdgeTargetType.CORE_INFO
-                        target_id = core_info_id_map.get(match_key)
-                    elif source_type == "summary":
-                        target_type = EdgeTargetType.SUMMARY
-                        target_id = summary_id_map.get(match_key)
-                    elif source_type == "chapter":
-                        target_type = EdgeTargetType.CHAPTER
-                        ref_template_id = structure_field_key_to_id.get(match_key)
-                        if ref_template_id:
-                            target_id = template_id_map.get(ref_template_id)
-                    if target_type and target_id:
-                        await DependencyService.create_dependency_edge(
-                            db=db,
-                            source_type=EdgeSourceType.CHAPTER,
-                            source_id=paragraph.chapter_id,
-                            target_type=target_type,
-                            target_id=target_id,
-                            document_id=document_id
-                        )
+            para_defs = template.paragraphs or []
+
+            for para_def in para_defs:
+                sources = para_def.get("sources") or []
+                for src in sources:
+                    source_obj = src.get("source")
+                    source_type = source_obj.get("value") if isinstance(source_obj, dict) else None
+                    match_keys = src.get("match_keys") or []
+                    for mk in match_keys:
+                        match_key = mk.get("value") if isinstance(mk, dict) else None
+                        if not match_key:
+                            continue
+                        target_id = None
+                        target_type = None
+                        if source_type == "keyinfo":
+                            target_type = EdgeTargetType.CORE_INFO
+                            target_id = core_info_id_map.get(match_key)
+                        elif source_type == "summary":
+                            target_type = EdgeTargetType.SUMMARY
+                            target_id = summary_id_map.get(match_key)
+                        elif source_type == "chapter":
+                            target_type = EdgeTargetType.CHAPTER
+                            ref_template_id = structure_field_key_to_id.get(match_key)
+                            if ref_template_id:
+                                target_id = template_id_map.get(ref_template_id)
+                        if target_type and target_id:
+                            await DependencyService.create_dependency_edge(
+                                db=db,
+                                source_type=EdgeSourceType.CHAPTER,
+                                source_id=chapter.chapter_id,
+                                target_type=target_type,
+                                target_id=target_id,
+                                document_id=document_id,
+                            )
 
         await db.commit()
         return created_chapters

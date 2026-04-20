@@ -151,7 +151,7 @@ export interface UpdateTemplatePayload {
 // ============================================================
 // 核心信息模板
 // ============================================================
-export type FieldType = "text" | "select" | "group"
+export type FieldType = "text" | "number" | "select" | "group"
 
 export interface CoreInfoTemplate {
   core_template_id: string
@@ -263,6 +263,19 @@ export interface UpdateSummaryTemplatePayload {
 // ============================================================
 // 章节结构模板
 // ============================================================
+
+export type ParaType = "paragraph" | "heading1" | "heading2" | "heading3"
+
+export interface StructureTemplateParagraphDef {
+  para_type: ParaType
+  content_template: string | null
+  /** 0=复制 1=AI生成 2=直接使用 3=AI修改 */
+  generation_mode: GenerationMode
+  sources: SourceInfo[] | null
+  default_prompt: string | null
+  custom_prompt: string | null
+}
+
 export interface StructureTemplate {
   structure_template_id: string
   template_id: string
@@ -270,12 +283,8 @@ export interface StructureTemplate {
   title: string
   field_key: string
   level: number
-  generation_mode: GenerationMode
-  content_template: string | null
-  sources: SourceInfo[] | null
-  default_prompt: string | null
-  custom_prompt: string | null
   order_index: number
+  paragraphs: StructureTemplateParagraphDef[] | null
   created_at: string
   updated_at: string
   children?: StructureTemplate[]
@@ -294,12 +303,8 @@ export interface CreateStructureTemplatePayload {
   parent_id?: string | null
   title: string
   level: number
-  generation_mode?: GenerationMode
-  content_template?: string | null
-  sources?: SourceInfo[] | null
-  default_prompt?: string | null
-  custom_prompt?: string | null
   order_index?: number | null
+  paragraphs?: StructureTemplateParagraphDef[] | null
 }
 
 export interface UpdateStructureTemplatePayload {
@@ -307,12 +312,8 @@ export interface UpdateStructureTemplatePayload {
   title?: string
   field_key?: string
   level?: number
-  generation_mode?: GenerationMode
-  content_template?: string | null
-  sources?: SourceInfo[] | null
-  default_prompt?: string | null
-  custom_prompt?: string | null
   order_index?: number
+  paragraphs?: StructureTemplateParagraphDef[] | null
 }
 
 export interface StructureTemplateReorderPayload {
@@ -323,7 +324,6 @@ export interface StructureTemplateReorderPayload {
 // ============================================================
 // 段落
 // ============================================================
-export type ParaType = "paragraph" | "heading1" | "heading2" | "heading3"
 
 export interface Paragraph {
   paragraph_id: string
@@ -331,6 +331,7 @@ export interface Paragraph {
   content: string
   para_type: ParaType
   order_index: number
+  para_def_idx: number | null
   ai_eval: string | null
   ai_suggestion: string | null
   ai_generate: string | null

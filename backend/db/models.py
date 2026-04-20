@@ -60,6 +60,7 @@ class Paragraph(Base):
     content = Column(Text, nullable=False)
     para_type = Column(String(20), nullable=False)  # 正文、一级标题、二级标题、三级标题、四级标题、五级标题、六级标题
     order_index = Column(Integer, nullable=False)
+    para_def_idx = Column(Integer, nullable=True)   # 对应 StructureTemplate.paragraphs 的下标，应用模板时写入，用户手动创建的段落为 null
     ai_eval = Column(Text, nullable=True)
     ai_suggestion = Column(Text, nullable=True)
     ai_generate = Column(Text, nullable=True)
@@ -253,30 +254,17 @@ class StructureTemplate(Base):
     title = Column(String(200), nullable=False)
     field_key = Column(String(50), nullable=False)
     level = Column(Integer, nullable=False)
-    generation_mode = Column(Integer, default=0)
-    content_template = Column(Text, nullable=True)
-    sources = Column(JSONB, nullable=True)
-    """
-    sources字段结构（数组）：
-    [
-        {
-            "source": {
-                "value": "keyinfo", 
-                "label": "关键信息"
-            },
-            "match_type": "关键信息匹配", 
-            "match_keys": [
-                {"value": "trial_name", "label": "试验名称"}
-            ]
-        }
-    ]
-    - source: 来源类型对象，包含 value (keyinfo/summary/chapter), label (显示名)
-    - match_type: 匹配方式描述
-    - match_keys: 匹配标识列表（多选），每项包含 value 和 label
-    """
-    default_prompt = Column(Text, nullable=True)
-    custom_prompt = Column(Text, nullable=True)
     order_index = Column(Integer, default=0)
+    paragraphs = Column(JSONB, nullable=True)
+    # 段落定义数组，每项结构：
+    # {
+    #   "para_type": "paragraph"|"heading1"|"heading2"|"heading3",
+    #   "content_template": "...",   # mode=0/2/3 时使用，可含 {{变量}}
+    #   "generation_mode": 0|1|2|3,
+    #   "sources": [...] | null,     # mode=0/1/3 时配置来源
+    #   "default_prompt": "..." | null,
+    #   "custom_prompt": "..." | null
+    # }
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
 

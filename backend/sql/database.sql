@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS paragraphs (
     content TEXT NOT NULL,
     para_type VARCHAR(20) NOT NULL,
     order_index INTEGER NOT NULL,
+    para_def_idx INTEGER,
     ai_eval TEXT,
     ai_suggestion TEXT,
     ai_generate TEXT,
@@ -211,11 +212,7 @@ CREATE TABLE IF NOT EXISTS structure_templates (
     title VARCHAR(200) NOT NULL,
     field_key VARCHAR(50) NOT NULL,
     level INTEGER NOT NULL,
-    generation_mode INTEGER DEFAULT 0,
-    content_template TEXT,
-    sources JSONB, -- 来源配置数组，结构同 summary_templates
-    default_prompt TEXT,
-    custom_prompt TEXT,
+    paragraphs JSONB,  -- 段落定义数组，每项含 para_type/content_template/generation_mode/sources/default_prompt/custom_prompt
     order_index INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

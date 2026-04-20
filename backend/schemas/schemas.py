@@ -4,6 +4,9 @@ from datetime import datetime
 from uuid import UUID
 from typing import List, Optional, Dict
 
+
+# 有些字段没做删除处理，实际上使用database.sql创建的库已经删除了遗留字段
+
 # --- 用户相关 (User) ---
 class UserBase(BaseModel):
     email: EmailStr = Field(..., description="邮箱")
@@ -319,17 +322,22 @@ class SummaryTemplateUpdate(BaseModel):
 
 
 # --- 文章结构模板相关 (StructureTemplate) ---
+class StructureTemplateParagraphDef(BaseModel):
+    para_type: str = Field(default="paragraph", description="段落类型：paragraph/heading1/heading2/heading3")
+    content_template: Optional[str] = Field(None, description="内容模板，mode=0/2/3 时使用，可含 {{变量}}")
+    generation_mode: int = Field(default=2, description="生成方式：0=复制 1=AI生成 2=直接使用 3=AI修改")
+    sources: Optional[List[SourceInfo]] = Field(None, description="来源配置，mode=0/1/3 时使用")
+    default_prompt: Optional[str] = Field(None, description="默认AI提示词")
+    custom_prompt: Optional[str] = Field(None, description="自定义AI提示词")
+
+
 class StructureTemplateCreate(BaseModel):
     template_id: UUID = Field(..., description="关联的主模板ID")
     parent_id: Optional[UUID] = Field(None, description="父章节ID")
     title: str = Field(..., description="章节标题")
     level: int = Field(..., description="层级")
-    generation_mode: int = Field(default=0, description="生成方式：0=复制，1=AI总结")
-    content_template: Optional[str] = Field(None, description="内容模板")
-    sources: Optional[List[SourceInfo]] = Field(None, description="来源信息数组")
-    default_prompt: Optional[str] = Field(None, description="默认AI提示词")
-    custom_prompt: Optional[str] = Field(None, description="专属AI提示词")
     order_index: Optional[int] = Field(None, description="排序，不传则追加到末尾")
+    paragraphs: Optional[List[StructureTemplateParagraphDef]] = Field(None, description="段落定义数组")
 
 
 class StructureTemplateUpdate(BaseModel):
@@ -337,12 +345,8 @@ class StructureTemplateUpdate(BaseModel):
     title: Optional[str] = Field(None, description="章节标题")
     field_key: Optional[str] = Field(None, description="字段标识")
     level: Optional[int] = Field(None, description="层级")
-    generation_mode: Optional[int] = Field(None, description="生成方式：0=复制，1=AI总结")
-    content_template: Optional[str] = Field(None, description="内容模板")
-    sources: Optional[List[SourceInfo]] = Field(None, description="来源信息数组")
-    default_prompt: Optional[str] = Field(None, description="默认AI提示词")
-    custom_prompt: Optional[str] = Field(None, description="专属AI提示词")
     order_index: Optional[int] = Field(None, description="排序")
+    paragraphs: Optional[List[StructureTemplateParagraphDef]] = Field(None, description="段落定义数组")
 
 
 # --- 模板导出到个人库 ---

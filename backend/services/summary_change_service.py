@@ -111,7 +111,7 @@ async def _process_downstream(db: AsyncSession, summary_id: UUID):
 
 
 async def _handle_chapter_downstream(db: AsyncSession, chapter_id: UUID, document, structure_templates: list):
-    """更新章节下的段落内容"""
+    """更新章节下的段落内容（按 paragraphs 定义遍历）"""
     result = await db.execute(select(Chapter).where(Chapter.chapter_id == chapter_id))
     chapter = result.scalar_one_or_none()
     if not chapter:
@@ -122,76 +122,65 @@ async def _handle_chapter_downstream(db: AsyncSession, chapter_id: UUID, documen
         logger.warning("找不到章节 %s 对应的结构模板", chapter_id)
         return
 
-    paragraphs = await ParagraphMapper.get_paragraphs_by_chapter_id(db, chapter_id)
-    target_paragraph = next((p for p in paragraphs if p.para_type == "paragraph"), None)
-    if not target_paragraph:
+    para_defs = template.paragraphs or []
+    if not para_defs:
         return
 
-    if template.generation_mode == 0:
-        source_data_map = await SummaryTemplateService.build_sources_data_map(
-            db=db, document=document, sources=template.sources or []
-        )
-        new_content = SummaryTemplateService.generate_content_copy_mode(
-            template.content_template, template.sources, source_data_map
-        )
-        await ParagraphMapper.update_paragraph(db, target_paragraph.paragraph_id, {
-            "content": new_content,
-            "ischange": 2
-        })
-        logger.info("章节 %s 段落 (mode=0) 已重新生成", chapter_id)
+    paragraphs = await ParagraphMapper.get_paragraphs_by_chapter_id(db, chapter_id)
+    para_by_idx = {p.order_index: p for p in paragraphs}
 
-    elif template.generation_mode == 1:
-        try:
-            new_content = await SummaryTemplateService.render_ai_content(
-                db=db,
-                document=document,
-                summary_template=template,
+    for para_idx, para_def in enumerate(para_defs):
+        mode = para_def.get("generation_mode", 2)
+        target_paragraph = para_by_idx.get(para_idx)
+        if not target_paragraph:
+            continue
+
+        if mode == 2:
+            logger.info("章节 %s 段落[%d] (mode=2) 直接使用模式，跳过联动", chapter_id, para_idx)
+            continue
+
+        if mode == 0:
+            source_data_map = await SummaryTemplateService.build_sources_data_map(
+                db=db, document=document, sources=para_def.get("sources") or []
             )
-            if new_content:
-                await ParagraphMapper.update_paragraph(db, target_paragraph.paragraph_id, {
-                    "content": new_content,
-                    "ai_generate": new_content,
-                    "ischange": 2
-                })
-                logger.info("章节 %s 段落 (mode=1) AI 重新生成完成", chapter_id)
-                await publish(str(document.document_id), {
-                    "type": "paragraph_updated",
-                    "chapter_id": str(chapter_id),
-                    "paragraph_id": str(target_paragraph.paragraph_id),
-                })
-            else:
-                logger.warning("章节 %s 段落 (mode=1) AI 返回空内容", chapter_id)
-        except Exception as e:
-            logger.error("章节 %s 段落 AI 重新生成失败: %s", chapter_id, e)
-            await ParagraphMapper.update_paragraph(db, target_paragraph.paragraph_id, {"ischange": 2})
-
-    elif template.generation_mode == 2:
-        # 直接使用模式：内容固定，上游变更不影响
-        logger.info("章节 %s (mode=2) 直接使用模式，跳过联动", chapter_id)
-
-    elif template.generation_mode == 3:
-        # AI修改模式：以 content_template 为草稿重新生成
-        try:
-            new_content = await SummaryTemplateService.render_ai_content(
-                db=db,
-                document=document,
-                summary_template=template,
-                draft=template.content_template,
+            new_content = SummaryTemplateService.generate_content_copy_mode(
+                para_def.get("content_template"), para_def.get("sources"), source_data_map
             )
-            if new_content:
-                await ParagraphMapper.update_paragraph(db, target_paragraph.paragraph_id, {
-                    "content": new_content,
-                    "ai_generate": new_content,
-                    "ischange": 2
-                })
-                logger.info("章节 %s 段落 (mode=3) AI 修改重新生成完成", chapter_id)
-                await publish(str(document.document_id), {
-                    "type": "paragraph_updated",
-                    "chapter_id": str(chapter_id),
-                    "paragraph_id": str(target_paragraph.paragraph_id),
-                })
-            else:
-                logger.warning("章节 %s 段落 (mode=3) AI 返回空内容", chapter_id)
-        except Exception as e:
-            logger.error("章节 %s 段落 (mode=3) AI 修改失败: %s", chapter_id, e)
-            await ParagraphMapper.update_paragraph(db, target_paragraph.paragraph_id, {"ischange": 2})
+            await ParagraphMapper.update_paragraph(db, target_paragraph.paragraph_id, {
+                "content": new_content,
+                "ischange": 2,
+            })
+            logger.info("章节 %s 段落[%d] (mode=0) 已重新生成", chapter_id, para_idx)
+
+        elif mode in (1, 3):
+            try:
+                from services.structure_template_service import StructureTemplateService
+                source_data_map = await SummaryTemplateService.build_sources_data_map(
+                    db=db, document=document, sources=para_def.get("sources") or []
+                )
+                new_content = await StructureTemplateService.render_ai_content_for_paragraph(
+                    db=db,
+                    document=document,
+                    chapter_title=chapter.title,
+                    para_def=para_def,
+                    field_key=f"{template.field_key}[{para_idx}]",
+                    template_id=str(template.structure_template_id),
+                    source_data_map=source_data_map,
+                )
+                if new_content:
+                    await ParagraphMapper.update_paragraph(db, target_paragraph.paragraph_id, {
+                        "content": new_content,
+                        "ai_generate": new_content,
+                        "ischange": 2,
+                    })
+                    logger.info("章节 %s 段落[%d] (mode=%d) AI 重新生成完成", chapter_id, para_idx, mode)
+                    await publish(str(document.document_id), {
+                        "type": "paragraph_updated",
+                        "chapter_id": str(chapter_id),
+                        "paragraph_id": str(target_paragraph.paragraph_id),
+                    })
+                else:
+                    logger.warning("章节 %s 段落[%d] (mode=%d) AI 返回空内容", chapter_id, para_idx, mode)
+            except Exception as e:
+                logger.error("章节 %s 段落[%d] AI 重新生成失败: %s", chapter_id, para_idx, e)
+                await ParagraphMapper.update_paragraph(db, target_paragraph.paragraph_id, {"ischange": 2})

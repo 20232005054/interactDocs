@@ -5,12 +5,12 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from core.response import success_response, ResponseModel
-from core.auth import get_editor_user, get_current_user
+from core.auth import get_current_user
 from core.constants import UserRole, TemplateType
 from db.session import get_db
 from services.structure_template_service import StructureTemplateService
 from services.template_service import TemplateService
-from schemas.schemas import StructureTemplateCreate, StructureTemplateUpdate
+from schemas.schemas import StructureTemplateCreate, StructureTemplateUpdate, StructureTemplateParagraphDef
 from schemas.response_schemas import StructureTemplateResponse, StructureTemplateListResponse, StructureTemplateTreeResponse
 
 router = APIRouter(prefix="/api/v1/structure-templates", tags=["文章结构模板管理"])
@@ -19,7 +19,6 @@ router = APIRouter(prefix="/api/v1/structure-templates", tags=["文章结构模�
 async def _check_template_permission(db, template_id: UUID, current_user):
     tpl = await TemplateService.get_template(db, template_id)
     if tpl and tpl.template_type == TemplateType.SYSTEM and current_user.role not in (UserRole.EDITOR, UserRole.ADMIN):
-        from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="系统模板需要编辑权限")
 
 
@@ -27,11 +26,7 @@ class StructureTemplateInsertAfter(BaseModel):
     after_id: UUID
     title: str
     level: int
-    generation_mode: int = 0
-    content_template: Optional[str] = None
-    sources: Optional[list] = None
-    default_prompt: Optional[str] = None
-    custom_prompt: Optional[str] = None
+    paragraphs: Optional[List[StructureTemplateParagraphDef]] = None
 
 
 class StructureTemplateReorder(BaseModel):
@@ -47,14 +42,10 @@ def _struct_response(t) -> StructureTemplateResponse:
         title=t.title,
         field_key=t.field_key,
         level=t.level,
-        generation_mode=t.generation_mode,
-        content_template=t.content_template,
-        sources=t.sources,
-        default_prompt=t.default_prompt,
-        custom_prompt=t.custom_prompt,
         order_index=t.order_index,
+        paragraphs=t.paragraphs,
         created_at=t.created_at,
-        updated_at=t.updated_at
+        updated_at=t.updated_at,
     )
 
 
@@ -76,13 +67,9 @@ async def get_structure_tree(template_id: UUID, db: AsyncSession = Depends(get_d
             title=d["title"],
             field_key=d["field_key"],
             level=d["level"],
-            generation_mode=d["generation_mode"],
-            content_template=d.get("content_template"),
-            sources=d.get("sources"),
-            default_prompt=d.get("default_prompt"),
-            custom_prompt=d.get("custom_prompt"),
             order_index=d["order_index"],
-            children=[build_node(c) for c in d.get("children", [])]
+            paragraphs=d.get("paragraphs"),
+            children=[build_node(c) for c in d.get("children", [])],
         )
 
     return success_response(data=StructureTemplateTreeResponse(tree=[build_node(n) for n in tree_data]))
@@ -99,18 +86,15 @@ async def get_by_id(structure_template_id: UUID, db: AsyncSession = Depends(get_
 @router.post("", summary="创建结构模板", response_model=ResponseModel[StructureTemplateResponse])
 async def create(data: StructureTemplateCreate, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     await _check_template_permission(db, data.template_id, current_user)
+    paragraphs = [p.model_dump() for p in data.paragraphs] if data.paragraphs else None
     template = await StructureTemplateService.create(
         db,
         template_id=data.template_id,
         title=data.title,
         level=data.level,
         parent_id=data.parent_id,
-        generation_mode=data.generation_mode,
-        content_template=data.content_template,
-        sources=[s.dict() for s in data.sources] if data.sources else None,
-        default_prompt=data.default_prompt,
-        custom_prompt=data.custom_prompt,
-        order_index=data.order_index
+        order_index=data.order_index,
+        paragraphs=paragraphs,
     )
     return success_response(data=_struct_response(template))
 
@@ -120,12 +104,12 @@ async def update(structure_template_id: UUID, data: StructureTemplateUpdate, cur
     tpl_rec = await StructureTemplateService.get_by_id(db, structure_template_id)
     if tpl_rec:
         await _check_template_permission(db, tpl_rec.template_id, current_user)
-    update_data = {}
-    for k, v in data.dict(exclude_unset=True).items():
-        if k == "sources" and v is not None:
-            update_data[k] = [s.dict() if hasattr(s, "dict") else s for s in v]
-        elif v is not None:
-            update_data[k] = v
+    update_data = data.model_dump(exclude_unset=True)
+    if "paragraphs" in update_data and update_data["paragraphs"] is not None:
+        update_data["paragraphs"] = [
+            p.model_dump() if hasattr(p, "model_dump") else p
+            for p in data.paragraphs
+        ]
     if not update_data:
         raise HTTPException(status_code=400, detail="没有要更新的数据")
     await StructureTemplateService.update(db, structure_template_id, **update_data)
@@ -148,8 +132,10 @@ async def delete(structure_template_id: UUID, current_user=Depends(get_current_u
 async def insert_after(template_id: UUID, data: StructureTemplateInsertAfter, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     await _check_template_permission(db, template_id, current_user)
     try:
+        paragraphs = [p.model_dump() for p in data.paragraphs] if data.paragraphs else None
         template = await StructureTemplateService.insert_after(
-            db, template_id, data.after_id, data.model_dump(exclude={"after_id"})
+            db, template_id, data.after_id,
+            {"title": data.title, "level": data.level, "paragraphs": paragraphs},
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

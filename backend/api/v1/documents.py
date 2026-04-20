@@ -163,6 +163,7 @@ async def get_full_content(document_id: UUID, db: AsyncSession = Depends(get_db)
                     content=p.content,
                     para_type=p.para_type,
                     order_index=p.order_index,
+                    para_def_idx=p.para_def_idx,
                     ai_eval=p.ai_eval,
                     ai_suggestion=p.ai_suggestion,
                     ai_generate=p.ai_generate,
@@ -262,15 +263,9 @@ async def apply_structure_template(document_id: UUID, db: AsyncSession = Depends
                 field_key=item["chapter"].field_key,
                 title=item["chapter"].title,
                 order_index=item["chapter"].order_index,
-                generation_mode=item["generation_mode"],
-                content_template=item["content_template"],
-                sources=item["sources"],
-                default_prompt=item["default_prompt"],
-                custom_prompt=item["custom_prompt"],
+                paragraph_count=len(item.get("paragraphs") or []),
                 degraded=item.get("degraded", False),
                 generation_error=item.get("generation_error"),
-                paragraph_id=str(item["paragraph"].paragraph_id) if item.get("paragraph") else None,
-                paragraph_content=item.get("paragraph_content"),
             )
             for item in created_items
         ]

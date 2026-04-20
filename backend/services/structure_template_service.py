@@ -30,12 +30,8 @@ class StructureTemplateService:
         title: str,
         level: int,
         parent_id: UUID = None,
-        generation_mode: int = 0,
-        content_template: str = None,
-        sources: list = None,
-        default_prompt: str = None,
-        custom_prompt: str = None,
-        order_index: int = None
+        order_index: int = None,
+        paragraphs: list = None,
     ):
         from uuid import uuid4 as _uuid4
         field_key = "struct_" + _uuid4().hex[:8]
@@ -56,12 +52,8 @@ class StructureTemplateService:
             title=title,
             field_key=field_key,
             level=level,
-            generation_mode=generation_mode,
-            content_template=content_template,
-            sources=sources,
-            default_prompt=default_prompt,
-            custom_prompt=custom_prompt,
-            order_index=order_index
+            order_index=order_index,
+            paragraphs=paragraphs,
         )
         result = await StructureTemplateMapper.create(db, structure_template)
         await db.commit()
@@ -112,11 +104,7 @@ class StructureTemplateService:
             title=data.get("title", ""),
             field_key=field_key,
             level=data.get("level", after_node.level),
-            generation_mode=data.get("generation_mode", 0),
-            content_template=data.get("content_template"),
-            sources=data.get("sources"),
-            default_prompt=data.get("default_prompt"),
-            custom_prompt=data.get("custom_prompt"),
+            paragraphs=data.get("paragraphs"),
         )
         result = await StructureTemplateMapper.create(db, structure_template)
         await db.commit()
@@ -150,49 +138,28 @@ class StructureTemplateService:
 
     @staticmethod
     async def get_structure_tree(db: AsyncSession, template_id: UUID) -> List[dict]:
-        """
-        获取完整的章节结构树
-        """
+        """获取完整的章节结构树"""
         all_templates = await StructureTemplateMapper.get_by_template_id(db, template_id)
-        
-        template_map = {t.structure_template_id: t for t in all_templates}
-        
+
         def build_tree(parent_id=None):
             children = []
             for t in all_templates:
                 if t.parent_id == parent_id:
                     node = {
                         "structure_template_id": t.structure_template_id,
+                        "template_id": t.template_id,
                         "title": t.title,
                         "field_key": t.field_key,
                         "level": t.level,
-                        "generation_mode": t.generation_mode,
                         "order_index": t.order_index,
-                        "content_template": t.content_template,
-                        "sources": t.sources,
-                        "default_prompt": t.default_prompt,
-                        "custom_prompt": t.custom_prompt,
-                        "children": build_tree(t.structure_template_id)
+                        "paragraphs": t.paragraphs,
+                        "children": build_tree(t.structure_template_id),
                     }
                     children.append(node)
             children.sort(key=lambda x: x["order_index"])
             return children
-        
+
         return build_tree()
-
-    @staticmethod
-    def get_generation_mode(structure_template: StructureTemplate) -> int:
-        """
-        获取生成方式：0=复制，1=AI总结
-        """
-        return structure_template.generation_mode
-
-    @staticmethod
-    def get_prompt(structure_template: StructureTemplate) -> str:
-        """
-        获取提示词（优先使用custom_prompt）
-        """
-        return structure_template.custom_prompt or structure_template.default_prompt
 
     @staticmethod
     async def build_sources_data_map(
@@ -207,23 +174,26 @@ class StructureTemplateService:
         )
 
     @staticmethod
-    async def render_ai_content(
+    async def render_ai_content_for_paragraph(
         db: AsyncSession,
         document: Document,
-        structure_template: StructureTemplate,
-        generated_summary_map: Dict[str, str] = None,
+        chapter_title: str,
+        para_def: dict,
+        field_key: str,
+        template_id: str,
         source_data_map: Dict[str, str] = None,
-        draft: str = None,
     ) -> str:
+        """为单个段落定义调用 AI 生成内容"""
+        prompt = para_def.get("custom_prompt") or para_def.get("default_prompt")
+        draft = para_def.get("content_template") if para_def.get("generation_mode") == 3 else None
         return await TemplateRenderService.render_ai_content(
             db=db,
             document=document,
-            title=structure_template.title,
-            sources=structure_template.sources,
-            prompt=structure_template.custom_prompt or structure_template.default_prompt,
-            field_key=structure_template.field_key,
-            template_id=str(structure_template.structure_template_id),
-            generated_summary_map=generated_summary_map,
+            title=chapter_title,
+            sources=para_def.get("sources"),
+            prompt=prompt,
+            field_key=field_key,
+            template_id=template_id,
             source_data_map=source_data_map,
             draft=draft,
         )

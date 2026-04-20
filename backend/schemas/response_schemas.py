@@ -123,6 +123,7 @@ class ParagraphResponse(BaseModel):
     content: str
     para_type: str
     order_index: int
+    para_def_idx: Optional[int] = None
     ai_eval: Optional[str] = None
     ai_suggestion: Optional[str] = None
     ai_generate: Optional[str] = None
@@ -283,12 +284,8 @@ class StructureTemplateResponse(BaseModel):
     title: str
     field_key: str
     level: int
-    generation_mode: int
-    content_template: Optional[str] = None
-    sources: Optional[Any] = None
-    default_prompt: Optional[str] = None
-    custom_prompt: Optional[str] = None
     order_index: int
+    paragraphs: Optional[Any] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     children: List['StructureTemplateResponse'] = []
@@ -354,15 +351,9 @@ class ApplyStructureItem(BaseModel):
     field_key: Optional[str] = None
     title: str
     order_index: int
-    generation_mode: int
-    content_template: Optional[str] = None
-    sources: Optional[Any] = None
-    default_prompt: Optional[str] = None
-    custom_prompt: Optional[str] = None
+    paragraph_count: int = 0
     degraded: bool
     generation_error: Optional[Any] = None
-    paragraph_id: Optional[str] = None
-    paragraph_content: Optional[str] = None
 
 
 class ApplyStructureResponse(BaseModel):
@@ -469,6 +460,7 @@ class FullContentParagraph(BaseModel):
     content: str
     para_type: str
     order_index: int
+    para_def_idx: Optional[int] = None
     ai_eval: Optional[str] = None
     ai_suggestion: Optional[str] = None
     ai_generate: Optional[str] = None

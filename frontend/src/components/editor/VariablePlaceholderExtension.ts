@@ -77,10 +77,10 @@ export const VariablePlaceholderExtension = Node.create<VariablePlaceholderOptio
     return {
       markdown: {
         // chip → {{field_key}}
-        serialize(_state: unknown, node: { attrs: { fieldKey: string } }) {
-          return `{{${node.attrs.fieldKey}}}`
+        // tiptap-markdown MarkdownNodeSpec: serialize 需调用 state.write()，不能 return
+        serialize(state: { write: (s: string) => void }, node: { attrs: { fieldKey: string } }) {
+          state.write(`{{${node.attrs.fieldKey}}}`)
         },
-        // {{field_key}} → chip 节点（在 parseMarkdown 阶段由 inputRule 处理）
         parse: {},
       },
     }

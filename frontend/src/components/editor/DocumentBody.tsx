@@ -115,7 +115,7 @@ function ParagraphRow({ paragraph, chapterId, onReload }: ParagraphRowProps) {
   return (
     <div
       className={cn(
-        "group relative flex gap-2 py-0.5",
+        "group relative flex gap-2",
         isActive && "bg-blue-50/40 rounded"
       )}
       onClick={() => setActiveParagraphId(paragraph.paragraph_id)}
@@ -262,7 +262,7 @@ function ChapterBlock({ flatChapter, documentId, onReload }: ChapterBlockProps) 
 
       {/* 段落列表 */}
       <div
-        className="flex flex-col gap-1"
+        className="flex flex-col gap-0"
         style={{ paddingLeft: `${depth * 8 + 4}px` }}
       >
         {node.paragraphs.length === 0 ? (
