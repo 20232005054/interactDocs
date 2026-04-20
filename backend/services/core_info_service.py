@@ -64,42 +64,45 @@ class CoreInfoService:
         return await CoreInfoMapper.get_core_info_by_document_id(db, document_id)
 
     @staticmethod
-    async def get_core_info_tree(db: AsyncSession, document_id: uuid.UUID) -> list[dict]:
+    async def get_core_info_tree(db: AsyncSession, document_id: uuid.UUID):
+        from schemas.response_schemas import CoreInfoResponse
+
         core_infos = await CoreInfoMapper.get_core_info_by_document_id(db, document_id)
-        
+
         info_dict_map = {}
         for info in core_infos:
-            info_dict_map[info.core_info_id] = {
-                "core_info_id": info.core_info_id,
-                "document_id": info.document_id,
-                "parent_id": info.parent_id,
-                "title": info.title,
-                "content": info.content,
-                "field_type": info.field_type,
-                "options": info.options,
-                "is_required": info.is_required,
-                "order_index": info.order_index,
-                "is_locked": info.is_locked,
-                "is_change": info.is_change,
-                "created_at": info.created_at,
-                "updated_at": info.updated_at,
-                "children": []
-            }
-            
+            info_dict_map[info.core_info_id] = CoreInfoResponse(
+                core_info_id=info.core_info_id,
+                document_id=info.document_id,
+                parent_id=info.parent_id,
+                title=info.title,
+                field_key=getattr(info, "field_key", None),
+                content=info.content,
+                field_type=info.field_type,
+                options=info.options,
+                is_required=info.is_required,
+                order_index=info.order_index,
+                is_locked=info.is_locked,
+                is_change=info.is_change,
+                created_at=info.created_at,
+                updated_at=info.updated_at,
+                children=[]
+            )
+
         tree = []
         for info in core_infos:
             node = info_dict_map[info.core_info_id]
             if info.parent_id and info.parent_id in info_dict_map:
-                info_dict_map[info.parent_id]["children"].append(node)
+                info_dict_map[info.parent_id].children.append(node)
             else:
                 tree.append(node)
-                
+
         def sort_tree(nodes):
-            nodes.sort(key=lambda x: x["order_index"])
+            nodes.sort(key=lambda x: x.order_index)
             for n in nodes:
-                if n["children"]:
-                    sort_tree(n["children"])
-                    
+                if n.children:
+                    sort_tree(n.children)
+
         sort_tree(tree)
         return tree
     

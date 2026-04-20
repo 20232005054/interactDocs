@@ -188,41 +188,9 @@ async def get_template_info(document_id: UUID, db: AsyncSession = Depends(get_db
 
 @router.post("/{document_id}/apply-core-info-template", summary="应用核心信息模板", response_model=ResponseModel[ApplyCoreInfoResponse])
 async def apply_core_info_template(document_id: UUID, db: AsyncSession = Depends(get_db)):
-    created_items = await TemplateApplyService.apply_core_info_template(db, document_id)
-
-    info_dict_map = {}
-    for item in created_items:
-        info_dict_map[item.core_info_id] = ApplyCoreInfoItem(
-            core_info_id=str(item.core_info_id),
-            parent_id=str(item.parent_id) if item.parent_id else None,
-            title=item.title,
-            field_key=item.field_key,
-            field_type=item.field_type,
-            content=item.content,
-            order_index=item.order_index,
-            is_locked=item.is_locked,
-            is_required=item.is_required,
-            is_change=item.is_change,
-            children=[]
-        )
-
-    tree = []
-    for item in created_items:
-        node = info_dict_map[item.core_info_id]
-        if item.parent_id and item.parent_id in info_dict_map:
-            info_dict_map[item.parent_id].children.append(node)
-        else:
-            tree.append(node)
-
-    def sort_tree(nodes):
-        nodes.sort(key=lambda x: x.order_index)
-        for n in nodes:
-            if n.children:
-                sort_tree(n.children)
-
-    sort_tree(tree)
+    tree, count = await TemplateApplyService.apply_core_info_template_as_tree(db, document_id)
     return success_response(data=ApplyCoreInfoResponse(
-        message=f"成功创建 {len(created_items)} 个核心信息字段",
+        message=f"成功创建 {count} 个核心信息字段",
         items=tree
     ))
 

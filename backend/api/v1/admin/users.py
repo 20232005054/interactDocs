@@ -18,7 +18,7 @@ from core.auth import get_admin_user
 from core.constants import UserRole
 from core.response import success_response, ResponseModel
 from db.session import get_db
-from db.mappers.user_mapper import UserMapper
+from services.admin_service import AdminService
 from services.user_service import UserService
 from schemas.schemas import User as UserSchema
 
@@ -38,10 +38,12 @@ class RoleUpdate(BaseModel):
 async def list_users(
     page: int = 1,
     page_size: int = 20,
+    keyword: str = None,
+    role: str = None,
     admin=Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
-    total, users = await UserMapper.list_all(db, page, page_size)
+    total, users = await AdminService.list_users(db, page, page_size, keyword=keyword, role=role)
     return success_response(data=UserListResponse(
         total=total,
         items=[UserSchema(user_id=u.user_id, email=u.email, name=u.name, role=u.role) for u in users]
@@ -54,10 +56,7 @@ async def get_user(
     admin=Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
-    from fastapi import HTTPException
-    user = await UserMapper.get_by_id(db, user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="用户不存在")
+    user = await AdminService.get_user(db, user_id)
     return success_response(data=UserSchema(user_id=user.user_id, email=user.email, name=user.name, role=user.role))
 
 
@@ -72,7 +71,7 @@ async def update_role(
     return success_response(data=UserSchema(user_id=updated.user_id, email=updated.email, name=updated.name, role=updated.role))
 
 
-@router.delete("/{user_id}", summary="删除用户")
+@router.delete("/{user_id}", summary="删除用户", response_model=ResponseModel[None])
 async def delete_user(
     user_id: UUID,
     admin=Depends(get_admin_user),

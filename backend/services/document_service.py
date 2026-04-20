@@ -139,33 +139,47 @@ class DocumentService:
         return created_document
 
     @staticmethod
-    async def list_documents(db: AsyncSession, pagination: PaginationParams, user_id=None):
+    async def list_documents(
+        db: AsyncSession,
+        pagination: PaginationParams,
+        user_id=None,
+        keyword: str = None,
+        filter_user_id=None,
+        purpose: str = None,
+    ):
         page = pagination.page
         page_size = pagination.page_size
-        count_query = select(func.count()).select_from(Document)
-        if user_id is not None:
-            count_query = count_query.where(Document.user_id == user_id)
-        count_result = await db.execute(count_query)
-        total = count_result.scalar_one()
 
-        offset = (page - 1) * page_size
+        base_filter = []
+        if user_id is not None:
+            base_filter.append(Document.user_id == user_id)
+        if filter_user_id is not None:
+            base_filter.append(Document.user_id == filter_user_id)
+        if keyword:
+            base_filter.append(Document.title.ilike(f"%{keyword}%"))
+        if purpose:
+            base_filter.append(Document.purpose == purpose)
+
+        count_query = select(func.count()).select_from(Document)
+        for f in base_filter:
+            count_query = count_query.where(f)
+        total = (await db.execute(count_query)).scalar_one()
+
         query = (
             select(Document, Template.purpose, Template.display_name)
             .outerjoin(Template, Document.template_id == Template.template_id)
             .order_by(Document.updated_at.desc())
-            .offset(offset)
+            .offset((page - 1) * page_size)
             .limit(page_size)
         )
-        if user_id is not None:
-            query = query.where(Document.user_id == user_id)
-        result = await db.execute(query)
-        rows = result.all()
+        for f in base_filter:
+            query = query.where(f)
 
+        rows = (await db.execute(query)).all()
         documents = [
             {"doc": row[0], "purpose": row[1], "display_name": row[2]}
             for row in rows
         ]
-
         return total, documents
 
     @staticmethod

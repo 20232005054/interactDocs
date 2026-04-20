@@ -2,6 +2,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.mappers.operation_history_mapper import OperationHistoryMapper
 from db.models import OperationHistory
 from uuid import UUID
+from typing import Optional
+from datetime import datetime
 
 class EndpointService:
     @staticmethod
@@ -10,10 +12,19 @@ class EndpointService:
         page: int = 1,
         page_size: int = 10,
         document_id: UUID = None,
+        user_id: UUID = None,
+        action: Optional[str] = None,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
     ):
-        """获取操作历史记录，支持按 document_id 过滤"""
+        """获取操作历史记录，支持按 document_id / user_id / action / 时间范围过滤"""
         total, history = await OperationHistoryMapper.get_operation_history(
-            db, page, page_size, document_id=document_id
+            db, page, page_size,
+            document_id=document_id,
+            user_id=user_id,
+            action=action,
+            start_time=start_time,
+            end_time=end_time,
         )
         items = [
             {

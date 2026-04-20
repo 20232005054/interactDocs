@@ -27,6 +27,7 @@ class DocumentListItem(BaseModel):
     purpose: Optional[str] = None
     template_purpose: Optional[str] = None
     template_name: Optional[str] = None
+    user_id: Optional[UUID] = None
     created_at: datetime
     updated_at: datetime
 

@@ -1,15 +1,7 @@
-"""
-管理员 - 文档管理接口
-
-所有接口需要 admin 角色，不过滤 user_id，可查看/操作所有用户的文档。
-
-- GET    /documents         分页查询所有文档
-- DELETE /documents/{id}    强制删除任意文档
-"""
-
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
+from typing import Optional
 
 from core.auth import get_admin_user
 from core.response import success_response, ResponseModel
@@ -24,12 +16,17 @@ router = APIRouter(prefix="/api/v1/admin/documents", tags=["管理员-文档管�
 @router.get("", summary="查询所有文档", response_model=ResponseModel[DocumentListResponse])
 async def list_all_documents(
     pagination: PaginationParams = Depends(),
+    keyword: Optional[str] = None,
+    user_id: Optional[UUID] = None,
+    purpose: Optional[str] = None,
     admin=Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """查询所有用户的文档，不过滤 user_id"""
+    """查询所有用户的文档，支持标题关键词、归属用户、用途过滤"""
     from schemas.response_schemas import DocumentListItem
-    total, documents = await DocumentService.list_documents(db, pagination)
+    total, documents = await DocumentService.list_documents(
+        db, pagination, keyword=keyword, filter_user_id=user_id, purpose=purpose
+    )
     items = [
         DocumentListItem(
             document_id=item["doc"].document_id,
@@ -37,6 +34,7 @@ async def list_all_documents(
             purpose=item["doc"].purpose,
             template_purpose=item["purpose"],
             template_name=item["display_name"],
+            user_id=item["doc"].user_id,
             created_at=item["doc"].created_at,
             updated_at=item["doc"].updated_at,
         )
@@ -50,7 +48,7 @@ async def list_all_documents(
     ))
 
 
-@router.delete("/{document_id}", summary="强制删除任意文档")
+@router.delete("/{document_id}", summary="强制删除任意文档", response_model=ResponseModel[None])
 async def force_delete_document(
     document_id: UUID,
     admin=Depends(get_admin_user),

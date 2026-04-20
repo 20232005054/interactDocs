@@ -5,10 +5,11 @@ from core.response import success_response, ResponseModel
 from services.endpoint_service import EndpointService
 from services.dependency_service import DependencyService
 from schemas.response_schemas import OperationHistoryItem, OperationHistoryListResponse, DependencyEdgeItem, DependenciesResponse
-from core.constants import EdgeSourceType, EdgeTargetType
+from core.constants import EdgeSourceType, EdgeTargetType, UserRole
 from core.auth import get_current_user
 from uuid import UUID
 from typing import Optional, Union
+from datetime import datetime
 
 router = APIRouter(prefix="/api/v1")
 
@@ -17,10 +18,22 @@ async def get_operation_history(
     document_id: UUID = None,
     page: int = 1,
     page_size: int = 10,
+    action: Optional[str] = None,
+    start_time: Optional[datetime] = None,
+    end_time: Optional[datetime] = None,
     current_user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    total, items = await EndpointService.get_operation_history(db, page, page_size, document_id=document_id)
+    # admin 可查全量，普通用户只能查自己的
+    filter_user_id = None if current_user.role == UserRole.ADMIN else current_user.user_id
+    total, items = await EndpointService.get_operation_history(
+        db, page, page_size,
+        document_id=document_id,
+        user_id=filter_user_id,
+        action=action,
+        start_time=start_time,
+        end_time=end_time,
+    )
     return success_response(data=OperationHistoryListResponse(
         total=total,
         items=[OperationHistoryItem(**item) for item in items]

@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from core.auth import get_admin_user
 from core.response import success_response, ResponseModel
 from db.session import get_db
+from services.admin_service import AdminService
 
 router = APIRouter(prefix="/api/v1/admin/stats", tags=["管理员-数据统计"])
 
@@ -29,17 +30,5 @@ async def get_overview(
     db: AsyncSession = Depends(get_db),
 ):
     """返回系统总览数据"""
-    from sqlalchemy import func, select
-    from db.models import User, Document, Template
-
-    user_count = (await db.execute(select(func.count()).select_from(User))).scalar_one()
-    doc_count = (await db.execute(select(func.count()).select_from(Document))).scalar_one()
-    tpl_count = (await db.execute(
-        select(func.count()).select_from(Template).where(Template.template_type == 1)
-    )).scalar_one()
-
-    return success_response(data=StatsOverview(
-        total_users=user_count,
-        total_documents=doc_count,
-        total_templates=tpl_count,
-    ))
+    data = await AdminService.get_overview(db)
+    return success_response(data=StatsOverview(**data))

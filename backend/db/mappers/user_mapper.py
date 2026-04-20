@@ -56,15 +56,34 @@ class UserMapper:
         return result.rowcount > 0
 
     @staticmethod
-    async def list_all(db: AsyncSession, page: int = 1, page_size: int = 20):
-        """分页查询所有用户（admin 用）"""
-        from sqlalchemy import func
-        count_result = await db.execute(select(func.count()).select_from(User))
-        total = count_result.scalar_one()
+    async def list_all(
+        db: AsyncSession,
+        page: int = 1,
+        page_size: int = 20,
+        keyword: str = None,
+        role: str = None,
+    ):
+        """分页查询所有用户（admin 用），支持关键词搜索和角色过滤"""
+        from sqlalchemy import func, or_
+
+        query = select(User)
+        count_query = select(func.count()).select_from(User)
+
+        if keyword:
+            like = f"%{keyword}%"
+            condition = or_(User.email.ilike(like), User.name.ilike(like))
+            query = query.where(condition)
+            count_query = count_query.where(condition)
+
+        if role:
+            query = query.where(User.role == role)
+            count_query = count_query.where(User.role == role)
+
+        total = (await db.execute(count_query)).scalar_one()
 
         offset = (page - 1) * page_size
         result = await db.execute(
-            select(User).order_by(User.created_at.desc()).offset(offset).limit(page_size)
+            query.order_by(User.created_at.desc()).offset(offset).limit(page_size)
         )
         users = result.scalars().all()
         return total, users

@@ -99,6 +99,50 @@ class TemplateApplyService:
         return created_items
 
     @staticmethod
+    async def apply_core_info_template_as_tree(db: AsyncSession, document_id: UUID):
+        """
+        应用核心信息模板并返回树形结构（供路由层直接使用）
+        """
+        from schemas.response_schemas import ApplyCoreInfoItem
+
+        created_items = await TemplateApplyService.apply_core_info_template(db, document_id)
+
+        # 建树
+        info_dict_map = {}
+        for item in created_items:
+            info_dict_map[item.core_info_id] = ApplyCoreInfoItem(
+                core_info_id=str(item.core_info_id),
+                parent_id=str(item.parent_id) if item.parent_id else None,
+                title=item.title,
+                field_key=item.field_key,
+                field_type=item.field_type,
+                content=item.content,
+                order_index=item.order_index,
+                is_locked=item.is_locked,
+                is_required=item.is_required,
+                is_change=item.is_change,
+                children=[]
+            )
+
+        tree = []
+        for item in created_items:
+            node = info_dict_map[item.core_info_id]
+            if item.parent_id and item.parent_id in info_dict_map:
+                info_dict_map[item.parent_id].children.append(node)
+            else:
+                tree.append(node)
+
+        # 递归排序
+        def sort_tree(nodes):
+            nodes.sort(key=lambda x: x.order_index)
+            for n in nodes:
+                if n.children:
+                    sort_tree(n.children)
+
+        sort_tree(tree)
+        return tree, len(created_items)
+
+    @staticmethod
     async def apply_summary_template(db: AsyncSession, document_id: UUID):
         """
         应用摘要模板：根据模板创建文档的摘要

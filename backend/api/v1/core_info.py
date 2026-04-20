@@ -37,29 +37,6 @@ def _build_core_info_response(info) -> CoreInfoResponse:
     )
 
 
-def _build_tree_response(tree_data: list) -> List[CoreInfoResponse]:
-    """将 get_core_info_tree 返回的 dict 树转为 CoreInfoResponse 树"""
-    def build_node(d) -> CoreInfoResponse:
-        return CoreInfoResponse(
-            core_info_id=d["core_info_id"],
-            document_id=d["document_id"],
-            parent_id=d.get("parent_id"),
-            title=d["title"],
-            field_key=d.get("field_key"),
-            content=d["content"],
-            field_type=d["field_type"],
-            options=d.get("options"),
-            is_required=d["is_required"],
-            order_index=d["order_index"],
-            is_locked=d["is_locked"],
-            is_change=d["is_change"],
-            created_at=d["created_at"],
-            updated_at=d["updated_at"],
-            children=[build_node(c) for c in d.get("children", [])]
-        )
-    return [build_node(n) for n in tree_data]
-
-
 class CoreInfoTreeResponse(BaseModel):
     items: List[CoreInfoResponse]
 
@@ -81,7 +58,7 @@ async def get_core_info(core_info_id: uuid.UUID, db: AsyncSession = Depends(get_
 @router.get("/document/{document_id}", summary="获取文档的核心信息列表（树形结构）", response_model=ResponseModel[CoreInfoTreeResponse])
 async def get_core_info_by_document(document_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     tree = await CoreInfoService.get_core_info_tree(db, document_id)
-    return success_response(data=CoreInfoTreeResponse(items=_build_tree_response(tree)))
+    return success_response(data=CoreInfoTreeResponse(items=tree))
 
 
 @router.put("/{core_info_id}", summary="更新核心信息", response_model=ResponseModel[CoreInfoResponse])
