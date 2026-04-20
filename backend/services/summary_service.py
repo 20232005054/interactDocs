@@ -154,27 +154,49 @@ class SummaryService:
     @staticmethod
     async def apply_ai_assist_result(db: AsyncSession, summary_id: UUID):
         """
-        应用AI帮填结果，将ai_generate字段的内容填入content字段
+        应用AI帮填结果，将ai_generate字段的内容填入content字段。
+        内容变更后触发下游联动（与手动编辑摘要保持一致）。
         """
-        # 获取摘要信息
         summary = await SummaryMapper.get_summary_by_id(db, summary_id)
         if not summary:
             raise HTTPException(status_code=404, detail="摘要不存在")
-        
+
         if not summary.ai_generate:
             raise HTTPException(status_code=400, detail="AI帮填结果不存在")
-        
-        # 构建更新数据
+
+        old_content = summary.content
+        new_content = summary.ai_generate
+
+        # 创建历史记录
+        from db.models import DocumentSummaryHistory
+        history = DocumentSummaryHistory(
+            summary_id=summary_id,
+            version=summary.version,
+            title=summary.title,
+            field_key=summary.field_key,
+            content=old_content,
+        )
+        db.add(history)
+
         update_data = {
-            "content": summary.ai_generate,
-            "is_change": 0  # 标记为已变更
+            "content": new_content,
+            "version": summary.version + 1,
+            "is_change": 1 if new_content != old_content else 0,
         }
-        
-        # 更新摘要
         await SummaryMapper.update_summary(db, summary_id, update_data)
         await db.commit()
-        
-        # 返回更新后的摘要
+
+        # 内容有变化时启动下游联动后台任务（与 update_summary 保持一致）
+        if new_content != old_content:
+            import asyncio
+            from services.summary_change_service import handle_summary_change_async
+            from core.utils import log_task_exception
+            task = asyncio.create_task(
+                handle_summary_change_async(summary_id, old_content, new_content),
+                name=f"summary_change_{summary_id}",
+            )
+            task.add_done_callback(log_task_exception)
+
         return await SummaryMapper.get_summary_by_id(db, summary_id)
 
 

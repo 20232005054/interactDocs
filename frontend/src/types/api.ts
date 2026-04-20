@@ -450,3 +450,11 @@ export interface UpdateCoreInfoPayload {
   is_locked?: boolean
   is_change?: number
 }
+
+export interface CreateCoreInfoPayload {
+  title: string
+  content?: string
+  parent_id?: string | null
+  field_type?: string
+  is_required?: boolean
+}

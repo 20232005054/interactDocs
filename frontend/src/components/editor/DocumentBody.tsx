@@ -49,7 +49,15 @@ function ParagraphRow({ paragraph, chapterId, onReload }: ParagraphRowProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const isEditingRef = useRef(false) // 用户正在输入时不覆盖 localContent
   const isActive = activeParagraphId === paragraph.paragraph_id
+
+  // 当 store 里的 paragraph.content 被外部更新（如 AI apply）时同步到本地
+  useEffect(() => {
+    if (!isEditingRef.current) {
+      setLocalContent(paragraph.content)
+    }
+  }, [paragraph.content])
 
   // 初始渲染后自动撑高 textarea
   useEffect(() => {
@@ -61,6 +69,7 @@ function ParagraphRow({ paragraph, chapterId, onReload }: ParagraphRowProps) {
   }, [localContent])
 
   const handleChange = (val: string) => {
+    isEditingRef.current = true
     setLocalContent(val)
     updateParagraph(chapterId, paragraph.paragraph_id, val)
     // 防抖保存
@@ -71,6 +80,7 @@ function ParagraphRow({ paragraph, chapterId, onReload }: ParagraphRowProps) {
         await paragraphService.update(paragraph.paragraph_id, { content: val })
       } finally {
         setSaving(false)
+        isEditingRef.current = false
       }
     }, 800)
   }

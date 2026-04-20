@@ -158,6 +158,13 @@ async def call_qwen_once(
     messages = [{"role": "system", "content": system_prompt}] + history + [
         {"role": "user", "content": user_input}
     ]
+    print(
+        f"\n{'='*60}\n"
+        f"[AI调用-非流式] model={AI_MODEL} template_id={template_id} field_key={field_key}\n"
+        f"[system] {system_prompt}\n"
+        f"[user]   {user_input}\n"
+        f"{'='*60}"
+    )
     response, duration_ms = await _call_generation_with_retry(
         messages=messages,
         stream=False,
@@ -180,6 +187,11 @@ async def call_qwen_once(
             duration_ms=duration_ms,
         )
     content = str(response.output.choices[0]["message"]["content"]).strip()
+    print(
+        f"[AI响应-非流式] duration_ms={duration_ms} content_len={len(content)}\n"
+        f"[output] {content[:300]}{'...' if len(content) > 300 else ''}\n"
+        f"{'='*60}\n"
+    )
     return {"content": content, "duration_ms": duration_ms, "error_code": None}
 
 
@@ -224,6 +236,13 @@ async def call_qwen_stream(
     messages = [{"role": "system", "content": system_prompt}] + history + [
         {"role": "user", "content": user_input}
     ]
+    print(
+        f"\n{'='*60}\n"
+        f"[AI调用-流式] model={AI_MODEL} template_id={template_id} field_key={field_key}\n"
+        f"[system] {system_prompt}\n"
+        f"[user]   {user_input}\n"
+        f"{'='*60}"
+    )
     responses, _ = await _call_generation_with_retry(
         messages=messages,
         stream=True,
@@ -236,6 +255,7 @@ async def call_qwen_stream(
     # 正确做法：在线程池里迭代，通过 asyncio.Queue 把 chunk 传回事件循环。
     queue: asyncio.Queue = asyncio.Queue()
     loop = asyncio.get_event_loop()
+    full_output: list[str] = []  # 收集完整输出用于打印
 
     def _producer():
         """在线程里同步迭代 generator，把每个 chunk 放入 queue，None 作为结束哨兵。"""
@@ -243,6 +263,7 @@ async def call_qwen_stream(
             for response in responses:
                 if response.status_code == HTTPStatus.OK:
                     chunk = response.output.choices[0]["message"]["content"]
+                    full_output.append(chunk)
                     loop.call_soon_threadsafe(queue.put_nowait, chunk)
                 else:
                     error_code = _extract_error_code(response)
@@ -271,6 +292,14 @@ async def call_qwen_stream(
                 f"Error: {hint}",
             )
         finally:
+            # 流结束后打印完整输出
+            full_text = "".join(full_output)
+            print(
+                f"[AI响应-流式] template_id={template_id} field_key={field_key} "
+                f"content_len={len(full_text)}\n"
+                f"[output] {full_text[:300]}{'...' if len(full_text) > 300 else ''}\n"
+                f"{'='*60}\n"
+            )
             # 无论正常结束还是异常，都放入哨兵，防止消费端死锁
             loop.call_soon_threadsafe(queue.put_nowait, None)
 

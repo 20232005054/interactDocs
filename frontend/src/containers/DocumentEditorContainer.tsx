@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { chapterService } from "@/services/chapterService"
 import { summaryService } from "@/services/summaryService"
@@ -44,8 +44,36 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showApplyTemplate, setShowApplyTemplate] = useState(false)
+  const [rightPanelWidth, setRightPanelWidth] = useState(360)
+  const isDraggingRef = useRef(false)
+  const dragStartXRef = useRef(0)
+  const dragStartWidthRef = useRef(0)
+
+  const handleDragStart = (e: React.MouseEvent) => {
+    isDraggingRef.current = true
+    dragStartXRef.current = e.clientX
+    dragStartWidthRef.current = rightPanelWidth
+    document.body.style.cursor = "col-resize"
+    document.body.style.userSelect = "none"
+
+    const onMove = (ev: MouseEvent) => {
+      if (!isDraggingRef.current) return
+      const delta = dragStartXRef.current - ev.clientX
+      const newWidth = Math.min(720, Math.max(280, dragStartWidthRef.current + delta))
+      setRightPanelWidth(newWidth)
+    }
+    const onUp = () => {
+      isDraggingRef.current = false
+      document.body.style.cursor = ""
+      document.body.style.userSelect = ""
+      window.removeEventListener("mousemove", onMove)
+      window.removeEventListener("mouseup", onUp)
+    }
+    window.addEventListener("mousemove", onMove)
+    window.addEventListener("mouseup", onUp)
+  }
   const [templateId, setTemplateId] = useState<string | null>(null)
+  const [showApplyTemplate, setShowApplyTemplate] = useState(false)
 
   // SSE 订阅文档变更事件
   useDocumentSSE({ documentId, enabled: !loading && !error })
@@ -145,8 +173,17 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
           <DocumentBody documentId={documentId} onReload={load} />
         </main>
 
-        {/* 右侧：信息面板 */}
-        <aside className="w-80 shrink-0 border-l border-gray-200 bg-white flex flex-col overflow-hidden">
+        {/* 右侧：信息面板（宽度可拖拽，280~720px） */}
+        <aside
+          className="relative shrink-0 border-l border-gray-200 bg-white flex flex-col overflow-hidden"
+          style={{ width: rightPanelWidth }}
+        >
+          {/* 拖拽手柄 */}
+          <div
+            onMouseDown={handleDragStart}
+            className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-300 transition-colors z-10"
+            style={{ marginLeft: -2 }}
+          />
           {/* Tab 切换 */}
           <div className="flex border-b border-gray-200 shrink-0">
             {tabs.map(tab => (
@@ -167,8 +204,8 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
 
           {/* Tab 内容 */}
           <div className="flex-1 overflow-y-auto">
-            {rightPanelTab === "core-info" && <CoreInfoPanel />}
-            {rightPanelTab === "summary" && <SummaryPanel />}
+            {rightPanelTab === "core-info" && <CoreInfoPanel documentId={documentId} />}
+            {rightPanelTab === "summary" && <SummaryPanel documentId={documentId} />}
             {rightPanelTab === "chat" && <AIChatPanel documentId={documentId} />}
           </div>
         </aside>

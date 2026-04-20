@@ -89,8 +89,12 @@ async def ai_assist_paragraph(paragraph_id: UUID, assist_request: AIAssistReques
         raise HTTPException(status_code=404, detail="段落不存在")
     if paragraph.para_type != "paragraph":
         raise HTTPException(status_code=400, detail="只有正文类型的段落才能使用AI帮填功能")
+    
+    instruction = assist_request.instruction if assist_request.instruction else None
+    print(f"[AI帮填] paragraph_id={paragraph_id}, instruction={instruction!r}")
+    
     return StreamingResponse(
-        ai_service.ai_assist_paragraph(paragraph_id, assist_request, instruction=assist_request.instruction),
+        ai_service.ai_assist_paragraph(paragraph_id, assist_request, instruction=instruction),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
     )

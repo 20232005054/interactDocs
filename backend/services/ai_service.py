@@ -54,11 +54,13 @@ async def _build_assist_prompt(
         db, EdgeSourceType.CHAPTER, chapter.chapter_id, EdgeTargetType.SUMMARY
     )
     if edges:
-        summary_texts = []
-        for edge in edges:
-            summary = await SummaryMapper.get_summary_by_id(db, edge.target_id)
-            if summary and summary.content:
-                summary_texts.append(f"  {summary.title}：{summary.content}")
+        summary_ids = [edge.target_id for edge in edges]
+        summaries = await SummaryMapper.get_summaries_by_ids(db, summary_ids)
+        summary_texts = [
+            f"  {s.title}：{s.content}"
+            for s in summaries
+            if s.content
+        ]
         if summary_texts:
             parts.append("章节相关摘要：\n" + "\n".join(summary_texts))
 
@@ -183,6 +185,11 @@ async def ai_assist_paragraph(
                 upstream_summary=upstream_summary,
                 instruction=instruction,
             )
+            print(
+                f"[AI帮填] 阶段1完成 paragraph_id={paragraph_id} "
+                f"chapter={chapter.title!r} instruction={instruction!r} "
+                f"prompt_len={len(prompt)}"
+            )
     except Exception as e:
         yield f"data: {json.dumps({'error': f'准备阶段失败: {str(e)}'})}\n\n"
         yield "data: [DONE]\n\n"
@@ -190,14 +197,18 @@ async def ai_assist_paragraph(
 
     # ── 阶段2：流式输出，不持有任何 db 连接 ──
     full_content = ""
+    print(f"[AI帮填] 阶段2开始 paragraph_id={paragraph_id}")
     try:
         async for chunk in call_qwen_stream(SYSTEM_PROMPT_ASSIST, [], ctx.prompt):
             full_content += chunk
             yield f"data: {json.dumps({'content': chunk})}\n\n"
     except Exception as e:
+        print(f"[AI帮填] 阶段2失败 paragraph_id={paragraph_id} error={e}")
         yield f"data: {json.dumps({'error': f'AI 生成失败: {str(e)}'})}\n\n"
         yield "data: [DONE]\n\n"
         return
+    
+    print(f"[AI帮填] 阶段2完成 paragraph_id={paragraph_id} content_len={len(full_content)}")
 
     # ── 阶段3：保存结果，独立 session ──
     try:
@@ -207,6 +218,7 @@ async def ai_assist_paragraph(
                 .where(Paragraph.paragraph_id == paragraph_id)
                 .values(
                     ai_generate=full_content,
+                    # 暂存本次用户修改意见，与 ai_generate 配对；apply 时读取用于反哺模板
                     ai_instruction=ctx.instruction if hasattr(ctx, "instruction") else None,
                 )
             )
@@ -229,8 +241,9 @@ async def ai_assist_paragraph(
                     print(f"建立依赖边失败: {e}")
 
             await db.commit()
+            print(f"[AI帮填] 阶段3完成 paragraph_id={paragraph_id} ai_instruction={ctx.instruction!r}")
     except Exception as e:
-        print(f"保存 AI 帮填结果失败: {e}")
+        print(f"[AI帮填] 阶段3失败 paragraph_id={paragraph_id} error={e}")
 
     yield "data: [DONE]\n\n"
 

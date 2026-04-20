@@ -12,6 +12,9 @@ export const summaryService = {
   get: (summaryId: string): Promise<Summary> =>
     request.get(`/api/v1/summaries/${summaryId}`),
 
+  create: (documentId: string): Promise<Summary> =>
+    request.post(`/api/v1/documents/${documentId}/summaries`),
+
   update: (summaryId: string, payload: UpdateSummaryPayload): Promise<Summary> =>
     request.put(`/api/v1/summaries/${summaryId}`, payload),
 
@@ -20,6 +23,9 @@ export const summaryService = {
 
   insertAfter: (summaryId: string): Promise<Summary> =>
     request.post(`/api/v1/summaries/${summaryId}/insert-after`),
+
+  aiAssist: (summaryId: string): Promise<{ summary_id: string; ai_generate: string }> =>
+    request.post(`/api/v1/summaries/${summaryId}/ai/assist`),
 
   applyAI: (summaryId: string): Promise<Summary> =>
     request.post(`/api/v1/summaries/${summaryId}/ai/apply`),
