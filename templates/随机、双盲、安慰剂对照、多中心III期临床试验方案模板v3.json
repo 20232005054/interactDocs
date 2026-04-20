@@ -416,7 +416,7 @@
       "paragraphs": [
         {
           "para_type": "heading2",
-          "content_template": "1. 疾病负担与未满足的临床需求",
+          "content_template": "1.1 疾病负担与未满足的临床需求",
           "generation_mode": 2,
           "sources": null,
           "default_prompt": null,
@@ -441,7 +441,7 @@
         },
         {
           "para_type": "heading2",
-          "content_template": "2. 试验药物简介",
+          "content_template": "1.2 试验药物简介",
           "generation_mode": 2,
           "sources": null,
           "default_prompt": null,

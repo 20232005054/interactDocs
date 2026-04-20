@@ -335,9 +335,10 @@ interface EditPanelProps {
   structureOptions: VariableOption[]
   variables: VariableOption[]
   onDeleted: () => void
+  onSaved: (patch: Partial<StructureTemplate>) => void
 }
 
-function EditPanel({ node, coreInfoOptions, summaryOptions, structureOptions, variables, onDeleted }: EditPanelProps) {
+function EditPanel({ node, coreInfoOptions, summaryOptions, structureOptions, variables, onDeleted, onSaved }: EditPanelProps) {
   const [title, setTitle] = useState(node.title)
   const [paraDefs, setParaDefs] = useState<StructureTemplateParagraphDef[]>(node.paragraphs ?? [])
   const [saving, setSaving] = useState(false)
@@ -357,11 +358,13 @@ function EditPanel({ node, coreInfoOptions, summaryOptions, structureOptions, va
       setSaving(true)
       try {
         await structureTemplateService.update(node.structure_template_id, patch)
+        // 保存成功后通知父组件同步 tree，避免切换章节后显示旧数据
+        onSaved(patch as Partial<StructureTemplate>)
       } finally {
         setSaving(false)
       }
     }, 600)
-  }, [node.structure_template_id])
+  }, [node.structure_template_id, onSaved])
 
   const handleParaDefsChange = (next: StructureTemplateParagraphDef[]) => {
     setParaDefs(next)
@@ -599,6 +602,18 @@ export default function StructureTemplateStep({ templateId, onCountChange }: Str
   const structureOptions = flattenStructure(tree)
   const variables = coreInfoOptions
 
+  // 保存成功后同步更新 tree 和 selectedNode，避免切换章节后显示旧数据
+  const handleSaved = useCallback((nodeId: string, patch: Partial<StructureTemplate>) => {
+    const updateNode = (nodes: StructureTemplate[]): StructureTemplate[] =>
+      nodes.map(n => {
+        if (n.structure_template_id === nodeId) return { ...n, ...patch }
+        if (n.children?.length) return { ...n, children: updateNode(n.children) }
+        return n
+      })
+    setTree(prev => updateNode(prev))
+    setSelectedNode(prev => prev?.structure_template_id === nodeId ? { ...prev, ...patch } : prev)
+  }, [])
+
   if (loading) return (
     <div className="flex gap-4">
       <div className="w-44 h-64 bg-gray-100 rounded animate-pulse" />
@@ -656,6 +671,7 @@ export default function StructureTemplateStep({ templateId, onCountChange }: Str
             structureOptions={structureOptions}
             variables={variables}
             onDeleted={() => { setSelectedNode(null); load() }}
+            onSaved={(patch) => handleSaved(selectedNode.structure_template_id, patch)}
           />
         ) : (
           <div className="flex items-center justify-center h-full text-sm text-gray-400">
