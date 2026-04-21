@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback, useRef } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { chapterService } from "@/services/chapterService"
 import { summaryService } from "@/services/summaryService"
@@ -31,36 +31,7 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [rightPanelWidth, setRightPanelWidth] = useState(360)
-  const isDraggingRef = useRef(false)
-  const dragStartXRef = useRef(0)
-  const dragStartWidthRef = useRef(0)
-
-  const handleDragStart = (e: React.MouseEvent) => {
-    isDraggingRef.current = true
-    dragStartXRef.current = e.clientX
-    dragStartWidthRef.current = rightPanelWidth
-    document.body.style.cursor = "col-resize"
-    document.body.style.userSelect = "none"
-
-    const onMove = (ev: MouseEvent) => {
-      if (!isDraggingRef.current) return
-      const delta = dragStartXRef.current - ev.clientX
-      const newWidth = Math.min(720, Math.max(280, dragStartWidthRef.current + delta))
-      setRightPanelWidth(newWidth)
-    }
-    const onUp = () => {
-      isDraggingRef.current = false
-      document.body.style.cursor = ""
-      document.body.style.userSelect = ""
-      window.removeEventListener("mousemove", onMove)
-      window.removeEventListener("mouseup", onUp)
-    }
-    window.addEventListener("mousemove", onMove)
-    window.addEventListener("mouseup", onUp)
-  }
   const [templateId, setTemplateId] = useState<string | null>(null)
-  const [showApplyTemplate, setShowApplyTemplate] = useState(false)
 
   // SSE 订阅文档变更事件
   useDocumentSSE({ documentId, enabled: !loading && !error })
@@ -155,17 +126,8 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
           <DocumentBody onReload={load} />
         </main>
 
-        {/* 右侧：信息面板（宽度可拖拽，280~720px） */}
-        <aside
-          className="relative shrink-0 border-l border-gray-200 bg-white flex flex-col overflow-hidden"
-          style={{ width: rightPanelWidth }}
-        >
-          {/* 拖拽手柄 */}
-          <div
-            onMouseDown={handleDragStart}
-            className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-300 transition-colors z-10"
-            style={{ marginLeft: -2 }}
-          />
+        {/* 右侧：信息面板 */}
+        <aside className="w-80 shrink-0 border-l border-gray-200 bg-white flex flex-col overflow-hidden">
           {/* Tab 切换 */}
           <div className="flex border-b border-gray-200 shrink-0">
             {tabs.map(tab => (
@@ -186,8 +148,8 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
 
           {/* Tab 内容 */}
           <div className="flex-1 overflow-y-auto">
-            {rightPanelTab === "core-info" && <CoreInfoPanel documentId={documentId} />}
-            {rightPanelTab === "summary" && <SummaryPanel documentId={documentId} />}
+            {rightPanelTab === "core-info" && <CoreInfoPanel />}
+            {rightPanelTab === "summary" && <SummaryPanel />}
             {rightPanelTab === "chat" && <AIChatPanel documentId={documentId} />}
           </div>
         </aside>
@@ -226,11 +188,55 @@ function EditorHeader({ title, onBack, userName, onApplyTemplate, documentId }: 
           应用模板
         </button>
       )}
+      <ExportTemplateButton documentId={documentId} documentTitle={title} />
       <ExportMenu documentId={documentId} documentTitle={title} />
       {userName && (
         <span className="text-xs text-gray-400 shrink-0">{userName}</span>
       )}
     </header>
+  )
+}
+
+// ----------------------------------------------------------------
+// 导出模板到个人库
+// ----------------------------------------------------------------
+function ExportTemplateButton({ documentId, documentTitle }: { documentId: string; documentTitle: string }) {
+  const [exporting, setExporting] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+
+  const handleExportTemplate = async () => {
+    const input = window.prompt("导出到个人模板库的名称，可留空使用当前模板名", `${documentTitle} 模板`)
+    if (input === null) return
+
+    setExporting(true)
+    setMessage(null)
+    try {
+      const exported = await documentService.exportTemplate(documentId, {
+        display_name: input.trim() || undefined,
+      })
+      setMessage(`已导出模板：${exported.display_name}`)
+      window.setTimeout(() => {
+        setMessage((current) => (current === `已导出模板：${exported.display_name}` ? null : current))
+      }, 2500)
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "导出模板失败")
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2 shrink-0">
+      {message && <span className="text-xs text-green-600">{message}</span>}
+      <button
+        type="button"
+        onClick={handleExportTemplate}
+        disabled={exporting}
+        className="h-7 px-3 rounded border border-amber-300 text-amber-700 text-xs font-medium hover:bg-amber-50 disabled:opacity-50 transition"
+      >
+        {exporting ? "导出中..." : "导出模板"}
+      </button>
+    </div>
   )
 }
 
@@ -246,7 +252,12 @@ function ExportMenu({ documentId, documentTitle }: ExportMenuProps) {
   const [open, setOpen] = useState(false)
   const [exporting, setExporting] = useState<string | null>(null)
 
-  const formats = [
+  const formats: Array<{
+    key: "docx" | "pdf" | "md"
+    label: string
+    mime: string
+    ext: string
+  }> = [
     { key: "docx", label: "Word (.docx)", mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", ext: "docx" },
     { key: "pdf",  label: "PDF (.pdf)",   mime: "application/pdf", ext: "pdf" },
     { key: "md",   label: "Markdown (.md)", mime: "text/markdown", ext: "md" },
@@ -255,13 +266,8 @@ function ExportMenu({ documentId, documentTitle }: ExportMenuProps) {
   const handleExport = async (fmt: typeof formats[0]) => {
     setOpen(false)
     setExporting(fmt.key)
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
     try {
-      const res = await fetch(`/api/v1/documents/${documentId}/export/${fmt.key}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      })
-      if (!res.ok) throw new Error("导出失败")
-      const blob = await res.blob()
+      const blob = await documentService.exportFile(documentId, fmt.key)
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url

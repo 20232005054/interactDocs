@@ -1,16 +1,18 @@
 "use client"
 
-import { Fragment, useEffect, useRef, useState, useCallback, type PointerEvent as ReactPointerEvent, type ReactNode } from "react"
+import { Fragment, useEffect, useRef, useState, useCallback, useMemo, type PointerEvent as ReactPointerEvent, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { documentService } from "@/services/documentService"
 import { coreInfoService } from "@/services/coreInfoService"
 import { summaryService } from "@/services/summaryService"
 import { chapterService } from "@/services/chapterService"
+import { templateService } from "@/services/templateService"
 import { useDocumentStore } from "@/store/documentStore"
 import CoreInfoTemplateStep from "@/components/template/CoreInfoTemplateStep"
 import SummaryTemplateStep from "@/components/template/SummaryTemplateStep"
 import StructureTemplateStep from "@/components/template/StructureTemplateStep"
 import { cn } from "@/lib/utils"
+import type { TemplateDependenciesResponse, TemplateDependencyRef } from "@/types/api"
 
 type ApplyKey = "core-info" | "summary" | "structure"
 type ApplyStatus = "idle" | "applying" | "done" | "error"
@@ -20,6 +22,14 @@ const HANDLE_WIDTH_PX = 16
 
 interface ApplyTemplateEditorContainerProps {
   documentId: string
+}
+
+function uniqueRefs(refs: TemplateDependencyRef[]): TemplateDependencyRef[] {
+  const map = new Map<string, TemplateDependencyRef>()
+  for (const ref of refs) {
+    map.set(`${ref.type}:${ref.field_key}`, ref)
+  }
+  return Array.from(map.values())
 }
 
 export default function ApplyTemplateEditorContainer({ documentId }: ApplyTemplateEditorContainerProps) {
@@ -39,6 +49,9 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [savingTemplate, setSavingTemplate] = useState(false)
   const [applying, setApplying] = useState(false)
+  const [dependencies, setDependencies] = useState<TemplateDependenciesResponse | null>(null)
+  const [dependenciesLoading, setDependenciesLoading] = useState(false)
+  const [dependenciesError, setDependenciesError] = useState<string | null>(null)
   const [applyStatus, setApplyStatus] = useState<Record<ApplyKey, ApplyStatus>>({
     "core-info": "idle",
     "summary": "idle",
@@ -47,6 +60,19 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
   const [panelWidths, setPanelWidths] = useState<[number, number, number]>([24, 28, 48])
   const [activeHandle, setActiveHandle] = useState<number | null>(null)
 
+  const loadDependencies = useCallback(async (id: string) => {
+    setDependenciesLoading(true)
+    setDependenciesError(null)
+    try {
+      const data = await templateService.getDependencies(id)
+      setDependencies(data)
+    } catch (err: unknown) {
+      setDependenciesError(err instanceof Error ? err.message : "依赖信息加载失败")
+    } finally {
+      setDependenciesLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -54,6 +80,7 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
         if (!doc.template_id) throw new Error("文档未关联模板")
         setTemplateId(doc.template_id)
         setDocTitle(doc.title)
+        void loadDependencies(doc.template_id)
       } catch (err: unknown) {
         setApplyError(err instanceof Error ? err.message : "加载失败")
       } finally {
@@ -62,7 +89,20 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
     }
 
     load()
-  }, [documentId])
+  }, [documentId, loadDependencies])
+
+  const dependencySummary = useMemo(() => {
+    if (!dependencies) return null
+    const upstream = uniqueRefs([
+      ...dependencies.summary_templates.flatMap((item) => item.references),
+      ...dependencies.structure_templates.flatMap((item) => item.references),
+    ])
+    const downstream = uniqueRefs([
+      ...dependencies.core_info_templates.flatMap((item) => item.referenced_by),
+      ...dependencies.summary_templates.flatMap((item) => item.referenced_by),
+    ])
+    return { upstream, downstream }
+  }, [dependencies])
 
   const setStatus = useCallback((key: ApplyKey, status: ApplyStatus) => {
     setApplyStatus((prev) => ({ ...prev, [key]: status }))
@@ -202,21 +242,37 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
       title: "核心信息模板",
       desc: "编辑文档的核心信息字段结构，并作为拖拽填充源。",
       accentClass: "bg-[#234d3b]",
-      children: <CoreInfoTemplateStep templateId={templateId} enableDrag />,
+      children: (
+        <CoreInfoTemplateStep
+          templateId={templateId}
+          enableDrag
+          dependencyItems={dependencies?.core_info_templates ?? []}
+        />
+      ),
     },
     {
       key: "summary",
       title: "摘要模板",
       desc: "摘要卡片支持接收核心信息拖拽，快速填入来源、内容模板和提示词。",
       accentClass: "bg-[#8d5f23]",
-      children: <SummaryTemplateStep templateId={templateId} />,
+      children: (
+        <SummaryTemplateStep
+          templateId={templateId}
+          dependencyItems={dependencies?.summary_templates ?? []}
+        />
+      ),
     },
     {
       key: "structure",
       title: "章节结构模板",
       desc: "桌面端保持更宽布局，方便横向拖拽核心信息到章节配置区。",
       accentClass: "bg-[#5d3d72]",
-      children: <StructureTemplateStep templateId={templateId} />,
+      children: (
+        <StructureTemplateStep
+          templateId={templateId}
+          dependencyItems={dependencies?.structure_templates ?? []}
+        />
+      ),
     },
   ] : []
 
@@ -274,6 +330,55 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
           <p className="mt-1 text-sm text-gray-500">
             从“核心信息模板”中的字段拖出后，可放到另外两个板块的来源匹配框中自动建立映射，也可放入内容模板与提示词框中自动插入变量占位符。
           </p>
+          <div className="mt-3 border-t border-[#ece7d8] pt-3">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+              <span>{`引用来源 ${dependencySummary?.upstream.length ?? 0}`}</span>
+              <span>{`被引用 ${dependencySummary?.downstream.length ?? 0}`}</span>
+              {dependenciesLoading && <span>加载中...</span>}
+              {!dependenciesLoading && templateId && (
+                <button
+                  type="button"
+                  onClick={() => void loadDependencies(templateId)}
+                  className="text-xs text-[#234d3b] hover:underline"
+                >
+                  刷新
+                </button>
+              )}
+            </div>
+            {!dependenciesLoading && dependenciesError && (
+              <p className="mt-1 text-xs text-red-500">{dependenciesError}</p>
+            )}
+            {!dependenciesLoading && !dependenciesError && dependencySummary && (
+              <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+                {dependencySummary.upstream.slice(0, 5).map((ref) => (
+                  <span
+                    key={`up-${ref.type}-${ref.field_key}`}
+                    className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-blue-700"
+                    title={`来源: ${ref.type}/${ref.field_key}`}
+                  >
+                    {`引:${ref.label || ref.field_key}`}
+                  </span>
+                ))}
+                {dependencySummary.downstream.slice(0, 5).map((ref) => (
+                  <span
+                    key={`down-${ref.type}-${ref.field_key}`}
+                    className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700"
+                    title={`被引用: ${ref.type}/${ref.field_key}`}
+                  >
+                    {`被引:${ref.label || ref.field_key}`}
+                  </span>
+                ))}
+                {dependencySummary.upstream.length + dependencySummary.downstream.length > 10 && (
+                  <span className="text-gray-400">
+                    {`+${dependencySummary.upstream.length + dependencySummary.downstream.length - 10} 条`}
+                  </span>
+                )}
+                {dependencySummary.upstream.length === 0 && dependencySummary.downstream.length === 0 && (
+                  <span className="text-gray-400">暂无引用关系</span>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {templateId && (

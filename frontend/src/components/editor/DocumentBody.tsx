@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useCallback, useState, useEffect } from "react"
+import { useRef, useState, useEffect } from "react"
 import { paragraphService } from "@/services/paragraphService"
 import { useDocumentStore } from "@/store/documentStore"
 import { useEditorStore } from "@/store/editorStore"
@@ -10,7 +10,6 @@ import { cn } from "@/lib/utils"
 import ParagraphToolbar from "@/components/editor/ParagraphToolbar"
 
 interface DocumentBodyProps {
-  documentId: string
   onReload: () => void
 }
 
@@ -53,15 +52,7 @@ function ParagraphRow({ paragraph, chapterId, chapterTitle, onReload }: Paragrap
   const [menuOpen, setMenuOpen] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const isEditingRef = useRef(false) // 用户正在输入时不覆盖 localContent
   const isActive = activeParagraphId === paragraph.paragraph_id
-
-  // 当 store 里的 paragraph.content 被外部更新（如 AI apply）时同步到本地
-  useEffect(() => {
-    if (!isEditingRef.current) {
-      setLocalContent(paragraph.content)
-    }
-  }, [paragraph.content])
 
   // 初始渲染后自动撑高 textarea
   useEffect(() => {
@@ -73,7 +64,6 @@ function ParagraphRow({ paragraph, chapterId, chapterTitle, onReload }: Paragrap
   }, [localContent])
 
   const handleChange = (val: string) => {
-    isEditingRef.current = true
     setLocalContent(val)
     updateParagraph(chapterId, paragraph.paragraph_id, val)
     updateParagraphContextContent(paragraph.paragraph_id, val)
@@ -85,7 +75,6 @@ function ParagraphRow({ paragraph, chapterId, chapterTitle, onReload }: Paragrap
         await paragraphService.update(paragraph.paragraph_id, { content: val })
       } finally {
         setSaving(false)
-        isEditingRef.current = false
       }
     }, 800)
   }
@@ -248,11 +237,10 @@ function ParagraphRow({ paragraph, chapterId, chapterTitle, onReload }: Paragrap
 // ----------------------------------------------------------------
 interface ChapterBlockProps {
   flatChapter: FlatChapter
-  documentId: string
   onReload: () => void
 }
 
-function ChapterBlock({ flatChapter, documentId, onReload }: ChapterBlockProps) {
+function ChapterBlock({ flatChapter, onReload }: ChapterBlockProps) {
   const { node, depth } = flatChapter
   const { activeChapterId } = useEditorStore()
   const isActive = activeChapterId === node.chapter_id
@@ -344,7 +332,7 @@ function ChapterBlock({ flatChapter, documentId, onReload }: ChapterBlockProps) 
 // ----------------------------------------------------------------
 // 主组件
 // ----------------------------------------------------------------
-export default function DocumentBody({ documentId, onReload }: DocumentBodyProps) {
+export default function DocumentBody({ onReload }: DocumentBodyProps) {
   const { tree } = useDocumentStore()
   const flatList = flattenTree(tree)
 
@@ -363,7 +351,6 @@ export default function DocumentBody({ documentId, onReload }: DocumentBodyProps
         <ChapterBlock
           key={fc.node.chapter_id}
           flatChapter={fc}
-          documentId={documentId}
           onReload={onReload}
         />
       ))}

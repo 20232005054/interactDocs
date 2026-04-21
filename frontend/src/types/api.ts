@@ -61,6 +61,21 @@ export interface DocumentListResponse {
   items: DocumentListItem[]
 }
 
+export interface DocumentSnapshot {
+  version_id: string
+  document_id: string
+  description: string
+  snapshot_data: Record<string, unknown>
+  created_at: string
+  created_by: string | null
+}
+
+export interface DocumentSnapshotListResponse {
+  snapshots: DocumentSnapshot[]
+}
+
+export type DocumentExportFormat = "docx" | "pdf" | "md"
+
 export interface CreateDocumentPayload {
   title: string
   purpose: string
@@ -94,7 +109,9 @@ export interface AdminUserListResponse {
 // 模板主表
 // ============================================================
 export interface TemplateContent {
+  [key: string]: unknown
   description?: string
+  default_prompt?: string
 }
 
 export interface Template {
@@ -123,6 +140,10 @@ export interface TemplateListResponse {
   items: Template[]
 }
 
+export interface TemplateSimpleListResponse {
+  items: Template[]
+}
+
 export interface TemplateListParams {
   purpose?: string
   template_type?: number
@@ -148,10 +169,41 @@ export interface UpdateTemplatePayload {
   is_active?: boolean
 }
 
+export interface TemplateDependencyRef {
+  type: string
+  field_key: string
+  label: string
+}
+
+export interface CoreInfoDependencyItem {
+  field_key: string
+  field_name: string
+  referenced_by: TemplateDependencyRef[]
+}
+
+export interface SummaryDependencyItem {
+  field_key: string
+  title: string
+  references: TemplateDependencyRef[]
+  referenced_by: TemplateDependencyRef[]
+}
+
+export interface StructureDependencyItem {
+  field_key: string
+  title: string
+  references: TemplateDependencyRef[]
+}
+
+export interface TemplateDependenciesResponse {
+  core_info_templates: CoreInfoDependencyItem[]
+  summary_templates: SummaryDependencyItem[]
+  structure_templates: StructureDependencyItem[]
+}
+
 // ============================================================
 // 核心信息模板
 // ============================================================
-export type FieldType = "text" | "number" | "select" | "group"
+export type FieldType = "text" | "select" | "group"
 
 export interface CoreInfoTemplate {
   core_template_id: string
@@ -202,21 +254,26 @@ export interface CoreInfoTemplateReorderPayload {
 // ============================================================
 // 摘要模板
 // ============================================================
-export type GenerationMode = 0 | 1 | 2 | 3
-// 0=复制（变量替换 content_template）
-// 1=AI生成（调 AI，失败降级到复制）
-// 2=直接使用（content_template 原文，不替换变量）
-// 3=AI修改（以 content_template 为草稿，AI 润色）
+export type GenerationMode = 0 | 1 | 2 | 3  // 0=复制, 1=AI生成, 2=直接使用, 3=AI修改
 
 export interface SourceMatchKey {
   value: string
   label: string
+  ui_type?: string
 }
 
 export interface SourceInfo {
   source: SourceMatchKey
   match_type: string
   match_keys: SourceMatchKey[]
+  target_field: string
+}
+
+export interface TemplateInfoResponse {
+  template_id: string
+  core_info_templates: CoreInfoTemplate[]
+  summary_templates: SummaryTemplate[]
+  structure_templates: StructureTemplate[]
 }
 
 export interface SummaryTemplate {
@@ -263,19 +320,6 @@ export interface UpdateSummaryTemplatePayload {
 // ============================================================
 // 章节结构模板
 // ============================================================
-
-export type ParaType = "paragraph" | "heading1" | "heading2" | "heading3"
-
-export interface StructureTemplateParagraphDef {
-  para_type: ParaType
-  content_template: string | null
-  /** 0=复制 1=AI生成 2=直接使用 3=AI修改 */
-  generation_mode: GenerationMode
-  sources: SourceInfo[] | null
-  default_prompt: string | null
-  custom_prompt: string | null
-}
-
 export interface StructureTemplate {
   structure_template_id: string
   template_id: string
@@ -283,8 +327,12 @@ export interface StructureTemplate {
   title: string
   field_key: string
   level: number
+  generation_mode: GenerationMode
+  content_template: string | null
+  sources: SourceInfo[] | null
+  default_prompt: string | null
+  custom_prompt: string | null
   order_index: number
-  paragraphs: StructureTemplateParagraphDef[] | null
   created_at: string
   updated_at: string
   children?: StructureTemplate[]
@@ -303,8 +351,12 @@ export interface CreateStructureTemplatePayload {
   parent_id?: string | null
   title: string
   level: number
+  generation_mode?: GenerationMode
+  content_template?: string | null
+  sources?: SourceInfo[] | null
+  default_prompt?: string | null
+  custom_prompt?: string | null
   order_index?: number | null
-  paragraphs?: StructureTemplateParagraphDef[] | null
 }
 
 export interface UpdateStructureTemplatePayload {
@@ -312,8 +364,12 @@ export interface UpdateStructureTemplatePayload {
   title?: string
   field_key?: string
   level?: number
+  generation_mode?: GenerationMode
+  content_template?: string | null
+  sources?: SourceInfo[] | null
+  default_prompt?: string | null
+  custom_prompt?: string | null
   order_index?: number
-  paragraphs?: StructureTemplateParagraphDef[] | null
 }
 
 export interface StructureTemplateReorderPayload {
@@ -324,6 +380,7 @@ export interface StructureTemplateReorderPayload {
 // ============================================================
 // 段落
 // ============================================================
+export type ParaType = "paragraph" | "heading1" | "heading2" | "heading3"
 
 export interface Paragraph {
   paragraph_id: string
@@ -331,7 +388,6 @@ export interface Paragraph {
   content: string
   para_type: ParaType
   order_index: number
-  para_def_idx: number | null
   ai_eval: string | null
   ai_suggestion: string | null
   ai_generate: string | null
@@ -480,12 +536,4 @@ export interface UpdateCoreInfoPayload {
   parent_id?: string | null
   is_locked?: boolean
   is_change?: number
-}
-
-export interface CreateCoreInfoPayload {
-  title: string
-  content?: string
-  parent_id?: string | null
-  field_type?: string
-  is_required?: boolean
 }

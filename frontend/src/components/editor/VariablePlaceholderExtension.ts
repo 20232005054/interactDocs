@@ -14,9 +14,7 @@ declare module "@tiptap/core" {
 
 /**
  * 挖空节点：在富文本中插入 {{field_key}} 变量占位符
- * - 渲染为带样式的 inline chip，显示 label（面向用户）
- * - 序列化为 Markdown 时输出 {{field_key}}（面向后端）
- * - 从 Markdown 解析时把 {{field_key}} 还原为 chip 节点
+ * 渲染为带样式的 inline chip，序列化为 {{field_key}}
  */
 export const VariablePlaceholderExtension = Node.create<VariablePlaceholderOptions>({
   name: "variablePlaceholder",
@@ -30,8 +28,20 @@ export const VariablePlaceholderExtension = Node.create<VariablePlaceholderOptio
 
   addAttributes() {
     return {
-      fieldKey: { default: null },
-      label: { default: null },
+      fieldKey: {
+        default: null,
+        parseHTML: (element) =>
+          element.getAttribute("data-variable") ??
+          element.getAttribute("data-field-key") ??
+          element.getAttribute("fieldkey"),
+      },
+      label: {
+        default: null,
+        parseHTML: (element) =>
+          element.getAttribute("data-variable-label") ??
+          element.getAttribute("data-label") ??
+          element.getAttribute("label"),
+      },
     }
   },
 
@@ -39,17 +49,34 @@ export const VariablePlaceholderExtension = Node.create<VariablePlaceholderOptio
     return [{ tag: "span[data-variable]" }]
   },
 
-  renderHTML({ HTMLAttributes }) {
+  renderHTML({ node, HTMLAttributes }) {
+    const rest = { ...(HTMLAttributes as Record<string, unknown>) }
+    delete rest.fieldKey
+    delete rest.label
+    const fieldKey = String(node.attrs.fieldKey ?? "")
+    const label = String(node.attrs.label ?? fieldKey)
+
     return [
       "span",
-      mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
-        "data-variable": HTMLAttributes.fieldKey,
+      mergeAttributes(this.options.HTMLAttributes, rest, {
+        "data-variable": fieldKey,
+        "data-field-key": fieldKey,
+        "data-variable-label": label,
+        "data-label": label,
         class:
-          "inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary border border-primary/20 cursor-default select-none mx-0.5",
+          "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs bg-primary/10 text-primary border border-primary/20 cursor-default select-none mx-0.5",
         contenteditable: "false",
       }),
-      // 显示 label，不显示 key
-      HTMLAttributes.label ?? `{{${HTMLAttributes.fieldKey}}}`,
+      [
+        "span",
+        { class: "hidden" },
+        `{{${fieldKey}}}`,
+      ],
+      [
+        "span",
+        { class: "font-medium" },
+        label,
+      ],
     ]
   },
 
@@ -66,7 +93,7 @@ export const VariablePlaceholderExtension = Node.create<VariablePlaceholderOptio
     }
   },
 
-  // 序列化为纯文本时输出 {{field_key}}（后端替换依赖此格式）
+  // 序列化为纯文本时输出 {{field_key}}
   renderText({ node }) {
     return `{{${node.attrs.fieldKey}}}`
   },
@@ -76,8 +103,6 @@ export const VariablePlaceholderExtension = Node.create<VariablePlaceholderOptio
   addStorage(): any {
     return {
       markdown: {
-        // chip → {{field_key}}
-        // tiptap-markdown MarkdownNodeSpec: serialize 需调用 state.write()，不能 return
         serialize(state: { write: (s: string) => void }, node: { attrs: { fieldKey: string } }) {
           state.write(`{{${node.attrs.fieldKey}}}`)
         },

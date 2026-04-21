@@ -9,24 +9,15 @@ export function useAIAssist() {
   const { updateParagraph } = useDocumentStore()
   const {
     setAiAssistingParagraphId,
+    setAiAssistPreview,
     appendAiAssistPreview,
     clearAiAssistPreview,
     aiAssistingParagraphId,
     aiAssistPreview,
   } = useEditorStore()
 
-  /**
-   * 发起 AI 帮填请求（流式）。
-   * @param paragraphId 目标段落 ID
-   * @param chapterId   所属章节 ID
-   * @param instruction 用户修改意见（可选，有值时后端存入 ai_instruction 用于反哺）
-   */
-  const startAssist = useCallback(async (
-    paragraphId: string,
-    chapterId: string,
-    instruction?: string,
-  ) => {
-    if (aiAssistingParagraphId) return
+  const startAssist = useCallback(async (paragraphId: string, chapterId: string) => {
+    if (aiAssistingParagraphId) return // 已有进行中的帮填
 
     setAiAssistingParagraphId(paragraphId)
     clearAiAssistPreview()
@@ -40,7 +31,7 @@ export function useAIAssist() {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify(instruction ? { instruction } : {}),
+        body: JSON.stringify({}),
       })
 
       if (!res.ok || !res.body) throw new Error("请求失败")

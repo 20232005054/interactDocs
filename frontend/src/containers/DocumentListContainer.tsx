@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback, useRef } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { documentService } from "@/services/documentService"
 import { templateService } from "@/services/templateService"
@@ -23,6 +23,7 @@ function CreateDocumentModal({ onClose, onCreated }: CreateDocumentModalProps) {
   const [templates, setTemplates] = useState<Template[]>([])
   const [filteredTemplates, setFilteredTemplates] = useState<Template[]>([])
   const [loadingTemplates, setLoadingTemplates] = useState(true)
+  const [filteringTemplates, setFilteringTemplates] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -30,7 +31,7 @@ function CreateDocumentModal({ onClose, onCreated }: CreateDocumentModalProps) {
     const load = async () => {
       try {
         const [purposeRes, templateRes] = await Promise.all([
-          templateService.getPurposes(1),
+          templateService.getPurposes(true),
           templateService.list({ include_user: true, is_active: true, page_size: 100 }),
         ])
         setPurposes(purposeRes.purposes)
@@ -47,7 +48,22 @@ function CreateDocumentModal({ onClose, onCreated }: CreateDocumentModalProps) {
   const handlePurposeChange = (val: string) => {
     setPurpose(val)
     setTemplateId("")
-    setFilteredTemplates(val ? templates.filter(t => t.purpose === val) : templates)
+    if (!val) {
+      setFilteredTemplates(templates)
+      return
+    }
+
+    setFilteringTemplates(true)
+    void templateService.getByPurpose(val, { is_system: true, is_active: true })
+      .then((res) => {
+        setFilteredTemplates(res.items)
+      })
+      .catch(() => {
+        setFilteredTemplates(templates.filter(t => t.purpose === val))
+      })
+      .finally(() => {
+        setFilteringTemplates(false)
+      })
   }
 
   // 选择模板时自动填充用途
@@ -126,7 +142,7 @@ function CreateDocumentModal({ onClose, onCreated }: CreateDocumentModalProps) {
 
           <div className="flex flex-col gap-1.5">
             <label className="text-sm text-gray-600">选择模板 <span className="text-red-500">*</span></label>
-            {loadingTemplates ? (
+            {loadingTemplates || filteringTemplates ? (
               <div className="h-9 bg-gray-100 rounded animate-pulse" />
             ) : (
               <select
@@ -287,10 +303,10 @@ export default function DocumentListContainer() {
             ))}
           </div>
         ) : items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-gray-400">
+            <div className="flex flex-col items-center justify-center py-24 text-gray-400">
             <div className="text-5xl mb-4">📄</div>
             <p className="text-base">还没有文档</p>
-            <p className="text-sm mt-1">点击"新建文档"开始创建</p>
+            <p className="text-sm mt-1">点击&quot;新建文档&quot;开始创建</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

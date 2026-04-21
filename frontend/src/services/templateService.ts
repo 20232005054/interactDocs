@@ -2,8 +2,10 @@ import request from "@/lib/request"
 import type {
   Template,
   TemplateDetail,
+  TemplateDependenciesResponse,
   TemplateListResponse,
   TemplateListParams,
+  TemplateSimpleListResponse,
   CreateTemplatePayload,
   UpdateTemplatePayload,
   CoreInfoTemplate,
@@ -32,6 +34,9 @@ export const templateService = {
   get: (templateId: string): Promise<TemplateDetail> =>
     request.get(`/api/v1/templates/${templateId}`),
 
+  getDependencies: (templateId: string): Promise<TemplateDependenciesResponse> =>
+    request.get(`/api/v1/templates/${templateId}/dependencies`),
+
   create: (payload: CreateTemplatePayload): Promise<TemplateDetail> =>
     request.post("/api/v1/templates", {
       purpose: payload.purpose,
@@ -49,8 +54,24 @@ export const templateService = {
   rollback: (templateId: string): Promise<Template> =>
     request.post(`/api/v1/templates/rollback/${templateId}`),
 
-  getPurposes: (templateType = 1): Promise<{ purposes: string[] }> =>
-    request.get("/api/v1/templates/purposes/list", { params: { template_type: templateType } }),
+  getByPurpose: (
+    purpose: string,
+    params?: { template_type?: number; is_system?: boolean; is_active?: boolean }
+  ): Promise<TemplateSimpleListResponse> => {
+    const templateType = params?.template_type ?? (
+      params?.is_system === undefined ? undefined : (params.is_system ? 1 : 2)
+    )
+    return request.get(`/api/v1/templates/by-purpose/${encodeURIComponent(purpose)}`, {
+      params: { template_type: templateType, is_active: params?.is_active },
+    })
+  },
+
+  getPurposes: (templateTypeOrIsSystem: number | boolean = 1): Promise<{ purposes: string[] }> => {
+    const templateType = typeof templateTypeOrIsSystem === "boolean"
+      ? (templateTypeOrIsSystem ? 1 : 2)
+      : templateTypeOrIsSystem
+    return request.get("/api/v1/templates/purposes/list", { params: { template_type: templateType } })
+  },
 
   import: (file: File, asSystem = false): Promise<TemplateDetail> => {
     const form = new FormData()

@@ -3,7 +3,6 @@ import type {
   CoreInfo,
   CoreInfoTreeResponse,
   UpdateCoreInfoPayload,
-  CreateCoreInfoPayload,
 } from "@/types/api"
 
 export const coreInfoService = {
@@ -12,9 +11,6 @@ export const coreInfoService = {
 
   get: (coreInfoId: string): Promise<CoreInfo> =>
     request.get(`/api/v1/core-info/${coreInfoId}`),
-
-  create: (documentId: string, payload: CreateCoreInfoPayload): Promise<CoreInfo> =>
-    request.post(`/api/v1/core-info/documents/${documentId}`, payload),
 
   update: (coreInfoId: string, payload: UpdateCoreInfoPayload): Promise<CoreInfo> =>
     request.put(`/api/v1/core-info/${coreInfoId}`, payload),

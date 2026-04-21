@@ -1,27 +1,36 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useEffect, useState, useCallback, useMemo } from "react"
+import { useRouter } from "next/navigation"
 import TemplateStepper, { type StepKey, type Step } from "@/components/template/TemplateStepper"
 import BasicInfoStep from "@/components/template/BasicInfoStep"
 import CoreInfoTemplateStep from "@/components/template/CoreInfoTemplateStep"
 import SummaryTemplateStep from "@/components/template/SummaryTemplateStep"
 import StructureTemplateStep from "@/components/template/StructureTemplateStep"
 import { templateService, coreInfoTemplateService, summaryTemplateService, structureTemplateService } from "@/services/templateService"
-import type { TemplateDetail } from "@/types/api"
+import type { TemplateDependenciesResponse, TemplateDependencyRef, TemplateDetail } from "@/types/api"
 
 interface TemplateEditorContainerProps {
   templateId?: string  // undefined = 新建
 }
 
+function uniqueRefs(refs: TemplateDependencyRef[]): TemplateDependencyRef[] {
+  const map = new Map<string, TemplateDependencyRef>()
+  for (const ref of refs) {
+    map.set(`${ref.type}:${ref.field_key}`, ref)
+  }
+  return Array.from(map.values())
+}
+
 export default function TemplateEditorContainer({ templateId }: TemplateEditorContainerProps) {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const initialStep = (searchParams.get("step") as StepKey) ?? "basic"
-  const [activeStep, setActiveStep] = useState<StepKey>(initialStep)
+  const [activeStep, setActiveStep] = useState<StepKey>("basic")
   const [template, setTemplate] = useState<TemplateDetail | null>(null)
   const [loading, setLoading] = useState(!!templateId)
   const [error, setError] = useState<string | null>(null)
+  const [dependencies, setDependencies] = useState<TemplateDependenciesResponse | null>(null)
+  const [dependenciesLoading, setDependenciesLoading] = useState(false)
+  const [dependenciesError, setDependenciesError] = useState<string | null>(null)
 
   // 各步骤填充状态
   const [coreInfoCount, setCoreInfoCount] = useState(0)
@@ -39,6 +48,19 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
       setError(err instanceof Error ? err.message : "加载失败")
     } finally {
       setLoading(false)
+    }
+  }, [])
+
+  const loadDependencies = useCallback(async (id: string) => {
+    setDependenciesLoading(true)
+    setDependenciesError(null)
+    try {
+      const data = await templateService.getDependencies(id)
+      setDependencies(data)
+    } catch (err: unknown) {
+      setDependenciesError(err instanceof Error ? err.message : "依赖关系加载失败")
+    } finally {
+      setDependenciesLoading(false)
     }
   }, [])
 
@@ -68,7 +90,24 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
     }
   }, [templateId, loadTemplate, loadSubCounts])
 
+  useEffect(() => {
+    if (!templateId) return
+    loadDependencies(templateId)
+  }, [loadDependencies, templateId])
+
   const basicFilled = !!(template?.display_name && template?.purpose)
+  const dependencySummary = useMemo(() => {
+    if (!dependencies) return null
+    const upstream = uniqueRefs([
+      ...dependencies.summary_templates.flatMap((item) => item.references),
+      ...dependencies.structure_templates.flatMap((item) => item.references),
+    ])
+    const downstream = uniqueRefs([
+      ...dependencies.core_info_templates.flatMap((item) => item.referenced_by),
+      ...dependencies.summary_templates.flatMap((item) => item.referenced_by),
+    ])
+    return { upstream, downstream }
+  }, [dependencies])
 
   const steps: Step[] = [
     { key: "basic", label: "基础信息", filled: basicFilled },
@@ -80,12 +119,12 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
   // 基础信息保存后回调
   const handleBasicSaved = (saved: TemplateDetail) => {
     setTemplate(saved)
-    // 新建成功后跳转到编辑路由，带上初始步骤参数
+    void loadDependencies(saved.template_id)
+    // 新建成功后跳转到编辑路由，并切换到下一步
     if (!templateId) {
-      router.replace(`/admin/templates/${saved.template_id}?step=core-info`)
-    } else {
-      setActiveStep("core-info")
+      router.replace(`/admin/templates/${saved.template_id}`)
     }
+    setActiveStep("core-info")
   }
 
   if (loading) {
@@ -119,6 +158,59 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
         <p className="text-sm text-muted-foreground mt-0.5">
           {templateId ? "修改模板的各项配置" : "按步骤完成模板配置，可随时跳转"}
         </p>
+        {template && (
+          <div className="mt-3 rounded-lg border border-border bg-muted/20 px-3 py-2">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span>{`引用来源 ${dependencySummary?.upstream.length ?? 0}`}</span>
+              <span>{`被引用 ${dependencySummary?.downstream.length ?? 0}`}</span>
+              {dependenciesLoading && <span>加载中...</span>}
+              {!dependenciesLoading && (
+                <button
+                  type="button"
+                  onClick={() => void loadDependencies(template.template_id)}
+                  className="text-xs text-primary hover:underline"
+                >
+                  刷新
+                </button>
+              )}
+            </div>
+
+            {!dependenciesLoading && dependenciesError && (
+              <p className="mt-1 text-xs text-destructive">{dependenciesError}</p>
+            )}
+
+            {!dependenciesLoading && !dependenciesError && dependencySummary && (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+                {dependencySummary.upstream.slice(0, 6).map((ref) => (
+                  <span
+                    key={`up-${ref.type}-${ref.field_key}`}
+                    className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-blue-700"
+                    title={`来源: ${ref.type}/${ref.field_key}`}
+                  >
+                    {`引:${ref.label || ref.field_key}`}
+                  </span>
+                ))}
+                {dependencySummary.downstream.slice(0, 6).map((ref) => (
+                  <span
+                    key={`down-${ref.type}-${ref.field_key}`}
+                    className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700"
+                    title={`被引用: ${ref.type}/${ref.field_key}`}
+                  >
+                    {`被引:${ref.label || ref.field_key}`}
+                  </span>
+                ))}
+                {dependencySummary.upstream.length + dependencySummary.downstream.length > 12 && (
+                  <span className="text-muted-foreground">
+                    {`+${dependencySummary.upstream.length + dependencySummary.downstream.length - 12} 条`}
+                  </span>
+                )}
+                {dependencySummary.upstream.length === 0 && dependencySummary.downstream.length === 0 && (
+                  <span className="text-muted-foreground">暂无引用关系</span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Stepper */}
@@ -147,18 +239,21 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
           <CoreInfoTemplateStep
             templateId={template.template_id}
             onCountChange={setCoreInfoCount}
+            dependencyItems={dependencies?.core_info_templates ?? []}
           />
         )}
         {activeStep === "summary" && template && (
           <SummaryTemplateStep
             templateId={template.template_id}
             onCountChange={setSummaryCount}
+            dependencyItems={dependencies?.summary_templates ?? []}
           />
         )}
         {activeStep === "structure" && template && (
           <StructureTemplateStep
             templateId={template.template_id}
             onCountChange={setStructureCount}
+            dependencyItems={dependencies?.structure_templates ?? []}
           />
         )}
         {(activeStep !== "basic") && !template && (

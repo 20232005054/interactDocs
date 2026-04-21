@@ -1,11 +1,21 @@
 import request from "@/lib/request"
 import type {
+  DocumentExportFormat,
   DocumentListItem,
   DocumentListResponse,
   DocumentDetail,
+  DocumentSnapshot,
+  DocumentSnapshotListResponse,
   CreateDocumentPayload,
+  TemplateDetail,
+  TemplateInfoResponse,
   UpdateDocumentPayload,
 } from "@/types/api"
+
+function getAuthHeaders(): HeadersInit {
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
 
 export const documentService = {
   list: (params?: { page?: number; page_size?: number }): Promise<DocumentListResponse> =>
@@ -23,17 +33,52 @@ export const documentService = {
   delete: (documentId: string): Promise<void> =>
     request.delete(`/api/v1/documents/${documentId}`),
 
+  getSnapshots: (documentId: string): Promise<DocumentSnapshotListResponse> =>
+    request.get(`/api/v1/documents/${documentId}/snapshots`),
+
+  createSnapshot: (documentId: string): Promise<DocumentSnapshot> =>
+    request.post(`/api/v1/documents/${documentId}/snapshots`),
+
+  restoreSnapshot: (documentId: string, snapshotId: string): Promise<void> =>
+    request.post(`/api/v1/documents/${documentId}/snapshots/${snapshotId}/restore`),
+
+  getTemplateInfo: (documentId: string): Promise<TemplateInfoResponse> =>
+    request.get(`/api/v1/documents/${documentId}/template-info`),
+
+  exportTemplate: (documentId: string, payload?: { display_name?: string }): Promise<TemplateDetail> =>
+    request.post(
+      `/api/v1/documents/${documentId}/export-template`,
+      payload?.display_name ? { display_name: payload.display_name } : {}
+    ),
+
+  exportFile: async (documentId: string, format: DocumentExportFormat): Promise<Blob> => {
+    const response = await fetch(`/api/v1/documents/${documentId}/export/${format}`, {
+      headers: getAuthHeaders(),
+    })
+
+    const contentType = response.headers.get("content-type") ?? ""
+    if (contentType.includes("application/json")) {
+      const errorBody = await response.json().catch(() => null)
+      throw new Error(errorBody?.message || "导出失败")
+    }
+
+    if (!response.ok) {
+      throw new Error("导出失败")
+    }
+
+    return response.blob()
+  },
+
   applyCoreInfoTemplate: (documentId: string): Promise<{ message: string; items: unknown[] }> =>
     request.post(`/api/v1/documents/${documentId}/apply-core-info-template`),
 
   applySummaryTemplate: async (documentId: string): Promise<{ message: string; items: unknown[] }> => {
     // AI 总结模式可能耗时较长，使用原生 fetch 避免 axios timeout
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
     const res = await fetch(`/api/v1/documents/${documentId}/apply-summary-template`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...getAuthHeaders(),
       },
     })
     const data = await res.json()
@@ -42,19 +87,15 @@ export const documentService = {
   },
 
   applyStructureTemplate: async (documentId: string): Promise<{ message: string; items: unknown[] }> => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
     const res = await fetch(`/api/v1/documents/${documentId}/apply-structure-template`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...getAuthHeaders(),
       },
     })
     const data = await res.json()
     if (data.code !== 200) throw new Error(data.message || "应用章节结构模板失败")
     return data.data
   },
-
-  exportTemplate: (documentId: string, displayName?: string): Promise<unknown> =>
-    request.post(`/api/v1/documents/${documentId}/export-template`, { display_name: displayName ?? null }),
 }

@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useMemo } from "react"
 import { coreInfoTemplateService } from "@/services/templateService"
-import type { CoreInfoTemplate, FieldType } from "@/types/api"
+import type { CoreInfoDependencyItem, CoreInfoTemplate, FieldType } from "@/types/api"
 import { cn } from "@/lib/utils"
 import { setCoreInfoDragData } from "@/lib/templateDrag"
 
@@ -10,6 +10,7 @@ interface CoreInfoTemplateStepProps {
   templateId: string
   onCountChange?: (count: number) => void
   enableDrag?: boolean
+  dependencyItems?: CoreInfoDependencyItem[]
 }
 
 // ----------------------------------------------------------------
@@ -111,16 +112,6 @@ function RowForm({ templateId, parentId, initial, onDone, onCancel }: RowFormPro
         />
       )}
 
-      {fieldType === "number" && (
-        <input
-          type="number"
-          value={defaultValue}
-          onChange={e => setDefaultValue(e.target.value)}
-          placeholder="默认数值（可选）"
-          className="h-8 rounded border border-input bg-background px-2 text-sm outline-none focus:ring-1 focus:ring-ring w-40"
-        />
-      )}
-
       {fieldType === "select" && (
         <textarea
           value={optionsRaw}
@@ -162,9 +153,10 @@ interface TreeNodeProps {
   depth: number
   onRefresh: () => void
   enableDrag: boolean
+  dependencyMap: Map<string, CoreInfoDependencyItem>
 }
 
-function TreeNode({ node, templateId, depth, onRefresh, enableDrag }: TreeNodeProps) {
+function TreeNode({ node, templateId, depth, onRefresh, enableDrag, dependencyMap }: TreeNodeProps) {
   const [editing, setEditing] = useState(false)
   const [addingChild, setAddingChild] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -182,10 +174,10 @@ function TreeNode({ node, templateId, depth, onRefresh, enableDrag }: TreeNodePr
 
   const fieldTypeLabel: Record<FieldType, string> = {
     text: "文本",
-    number: "数值",
     select: "下拉",
     group: "分组",
   }
+  const dependencyItem = dependencyMap.get(node.field_key)
 
   return (
     <div className={cn("flex flex-col gap-1", depth > 0 && "ml-6 border-l border-border pl-3")}>
@@ -198,54 +190,76 @@ function TreeNode({ node, templateId, depth, onRefresh, enableDrag }: TreeNodePr
           onCancel={() => setEditing(false)}
         />
       ) : (
-        <div className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-muted/40 group">
-          {enableDrag && node.field_type !== "group" && (
-            <button
-              type="button"
-              draggable
-              onDragStart={(event) =>
-                setCoreInfoDragData(event, { fieldKey: node.field_key, label: node.field_name })
-              }
-              className="h-6 shrink-0 rounded border border-dashed border-green-300 px-2 text-[11px] font-medium text-green-700 cursor-grab active:cursor-grabbing"
-              title="拖拽到摘要模板或章节结构模板中自动填入"
-            >
-              拖拽
-            </button>
+        <div
+          draggable={enableDrag && node.field_type !== "group"}
+          onDragStart={(event) => {
+            if (!enableDrag || node.field_type === "group") return
+            setCoreInfoDragData(event, { fieldKey: node.field_key, label: node.field_name })
+          }}
+          className={cn(
+            "group rounded px-2 py-1.5 hover:bg-muted/40",
+            enableDrag && node.field_type !== "group" && "cursor-grab active:cursor-grabbing"
           )}
-          <span className="text-sm font-medium text-foreground flex-1">{node.field_name}</span>
-          <span className="text-xs text-muted-foreground px-1.5 py-0.5 rounded bg-muted">
-            {fieldTypeLabel[node.field_type]}
-          </span>
-          {node.is_required && (
-            <span className="text-xs text-destructive">必填</span>
-          )}
-          {node.default_value && (
-            <span className="text-xs text-muted-foreground truncate max-w-24">默认: {node.default_value}</span>
-          )}
-
-          {/* 操作按钮（hover 显示） */}
-          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
-            {node.field_type === "group" && (
-              <button
-                onClick={() => setAddingChild(true)}
-                className="text-xs text-primary hover:underline"
-              >
-                + 子字段
-              </button>
+          title={enableDrag && node.field_type !== "group" ? "拖拽到摘要模板或章节结构模板中自动填入" : undefined}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-foreground flex-1">{node.field_name}</span>
+            <span className="text-xs text-muted-foreground px-1.5 py-0.5 rounded bg-muted">
+              {fieldTypeLabel[node.field_type]}
+            </span>
+            {node.is_required && (
+              <span className="text-xs text-destructive">必填</span>
             )}
-            <button
-              onClick={() => setEditing(true)}
-              className="text-xs text-muted-foreground hover:text-foreground"
-            >
-              编辑
-            </button>
-            {deleting ? (
-              <>
-                <button onClick={handleDelete} className="text-xs text-destructive hover:underline">确认</button>
-                <button onClick={() => setDeleting(false)} className="text-xs text-muted-foreground hover:underline">取消</button>
-              </>
+            {node.default_value && (
+              <span className="text-xs text-muted-foreground truncate max-w-24">默认: {node.default_value}</span>
+            )}
+
+            {/* 操作按钮（hover 显示） */}
+            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
+              {node.field_type === "group" && (
+                <button
+                  onClick={() => setAddingChild(true)}
+                  className="text-xs text-primary hover:underline"
+                >
+                  + 子字段
+                </button>
+              )}
+              <button
+                onClick={() => setEditing(true)}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                编辑
+              </button>
+              {deleting ? (
+                <>
+                  <button onClick={handleDelete} className="text-xs text-destructive hover:underline">确认</button>
+                  <button onClick={() => setDeleting(false)} className="text-xs text-muted-foreground hover:underline">取消</button>
+                </>
+              ) : (
+                <button onClick={() => setDeleting(true)} className="text-xs text-muted-foreground hover:text-destructive">删除</button>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-1 pl-1 text-[11px] text-muted-foreground">
+            <span className="mr-1">被引用:</span>
+            {dependencyItem?.referenced_by?.length ? (
+              <span className="inline-flex flex-wrap gap-1 align-middle">
+                {dependencyItem.referenced_by.slice(0, 4).map((ref) => (
+                  <span
+                    key={`${node.field_key}-${ref.type}-${ref.field_key}`}
+                    className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700"
+                    title={`${ref.type}/${ref.field_key}`}
+                  >
+                    {ref.label || ref.field_key}
+                  </span>
+                ))}
+                {dependencyItem.referenced_by.length > 4 && (
+                  <span className="text-muted-foreground">{`+${dependencyItem.referenced_by.length - 4}`}</span>
+                )}
+              </span>
             ) : (
-              <button onClick={() => setDeleting(true)} className="text-xs text-muted-foreground hover:text-destructive">删除</button>
+              <span>暂无</span>
             )}
           </div>
         </div>
@@ -272,6 +286,7 @@ function TreeNode({ node, templateId, depth, onRefresh, enableDrag }: TreeNodePr
           depth={depth + 1}
           onRefresh={onRefresh}
           enableDrag={enableDrag}
+          dependencyMap={dependencyMap}
         />
       ))}
     </div>
@@ -281,11 +296,20 @@ function TreeNode({ node, templateId, depth, onRefresh, enableDrag }: TreeNodePr
 // ----------------------------------------------------------------
 // 主组件
 // ----------------------------------------------------------------
-export default function CoreInfoTemplateStep({ templateId, onCountChange, enableDrag = false }: CoreInfoTemplateStepProps) {
+export default function CoreInfoTemplateStep({
+  templateId,
+  onCountChange,
+  enableDrag = false,
+  dependencyItems = [],
+}: CoreInfoTemplateStepProps) {
   const [items, setItems] = useState<CoreInfoTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [addingRoot, setAddingRoot] = useState(false)
+  const dependencyMap = useMemo(
+    () => new Map(dependencyItems.map((item) => [item.field_key, item])),
+    [dependencyItems]
+  )
 
   const countAll = useCallback((nodes: CoreInfoTemplate[]): number =>
     nodes.reduce((acc, n) => acc + 1 + countAll(n.children ?? []), 0), [])
@@ -362,6 +386,7 @@ export default function CoreInfoTemplateStep({ templateId, onCountChange, enable
               depth={0}
               onRefresh={load}
               enableDrag={enableDrag}
+              dependencyMap={dependencyMap}
             />
           ))}
         </div>

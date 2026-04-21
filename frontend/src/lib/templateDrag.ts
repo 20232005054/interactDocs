@@ -65,3 +65,31 @@ export function createCoreInfoSource(item: CoreInfoDragItem): SourceInfo {
     target_field: item.fieldKey,
   }
 }
+
+export function upsertCoreInfoSource(sources: SourceInfo[], item: CoreInfoDragItem): SourceInfo[] {
+  const existingIndex = sources.findIndex((source) => {
+    if (source.target_field === item.fieldKey) return true
+    return source.match_keys.some((key) => key.value === item.fieldKey)
+  })
+
+  if (existingIndex >= 0) {
+    return sources.map((source, index) =>
+      index === existingIndex ? applyCoreInfoToSource(source, item) : source
+    )
+  }
+
+  const emptyKeyinfoIndex = sources.findIndex(
+    (source) =>
+      source.source.value === "keyinfo" &&
+      !source.target_field &&
+      source.match_keys.length === 0
+  )
+
+  if (emptyKeyinfoIndex >= 0) {
+    return sources.map((source, index) =>
+      index === emptyKeyinfoIndex ? applyCoreInfoToSource(source, item) : source
+    )
+  }
+
+  return [...sources, createCoreInfoSource(item)]
+}

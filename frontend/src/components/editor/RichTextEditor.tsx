@@ -23,20 +23,15 @@ interface VariableOption {
 interface RichTextEditorProps {
   value?: string
   onChange?: (markdown: string) => void
+  onVariableDrop?: (item: VariableOption) => void
   placeholder?: string
   variables?: VariableOption[]
   className?: string
   minHeight?: string
 }
 
-// 把 Markdown 中的 {{field_key}} 预处理为 chip 节点可识别的格式
-// tiptap-markdown 先把 MD 转为 HTML，再由 Tiptap 解析 HTML
-// 所以在 MD → HTML 阶段，把 {{key}} 转成 <span data-variable="key" label="..."> 让 parseHTML 规则接管
-function preprocessVariables(
-  markdown: string,
-  variables: VariableOption[]
-): string {
-  const labelMap = Object.fromEntries(variables.map((v) => [v.fieldKey, v.label]))
+function preprocessVariables(markdown: string, variables: VariableOption[]): string {
+  const labelMap = Object.fromEntries(variables.map((item) => [item.fieldKey, item.label]))
   return markdown.replace(/\{\{([a-zA-Z0-9_]+)\}\}/g, (_, key) => {
     const label = labelMap[key] ?? key
     return `<span data-variable="${key}" fieldKey="${key}" label="${label}"></span>`
@@ -78,6 +73,7 @@ function ToolbarButton({
 export default function RichTextEditor({
   value = "",
   onChange,
+  onVariableDrop,
   placeholder = "请输入内容...",
   variables = [],
   className,
@@ -86,7 +82,10 @@ export default function RichTextEditor({
   const [showVarPicker, setShowVarPicker] = useState(false)
   const [dragActive, setDragActive] = useState(false)
   const variablesRef = useRef(variables)
-  variablesRef.current = variables
+
+  useEffect(() => {
+    variablesRef.current = variables
+  }, [variables])
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -106,10 +105,8 @@ export default function RichTextEditor({
       TableCell,
       VariablePlaceholderExtension,
     ],
-    // 初始内容：先预处理 {{}} 为 span，再让 Markdown 扩展解析
     content: preprocessVariables(value, variables),
     onUpdate: ({ editor }) => {
-      // 序列化为 Markdown 输出（chip 通过 renderText 输出 {{field_key}}）
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const md = ((editor.storage as any).markdown as import("tiptap-markdown").MarkdownStorage).getMarkdown()
       onChange?.(md)
@@ -122,7 +119,6 @@ export default function RichTextEditor({
     },
   })
 
-  // value 外部变化时同步（仅在编辑器未聚焦时更新，避免光标跳动）
   useEffect(() => {
     if (!editor || editor.isFocused) return
     const processed = preprocessVariables(value, variablesRef.current)
@@ -161,6 +157,7 @@ export default function RichTextEditor({
         event.preventDefault()
         setDragActive(false)
         insertVariable(dropped.fieldKey, dropped.label)
+        onVariableDrop?.(dropped)
       }}
     >
       {/* 工具栏 */}
@@ -244,10 +241,9 @@ export default function RichTextEditor({
                         e.preventDefault()
                         insertVariable(v.fieldKey, v.label)
                       }}
-                      className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition flex items-center gap-2"
+                      className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition"
                     >
-                      <span className="text-xs font-mono text-primary">{`{{${v.fieldKey}}}`}</span>
-                      <span className="text-muted-foreground">{v.label}</span>
+                      {v.label}
                     </button>
                   ))}
                 </div>
