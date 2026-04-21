@@ -197,3 +197,50 @@ class CoreInfoService:
                 .values(**values)
             )
         await db.commit()
+
+    @staticmethod
+    async def insert_after(
+        db: AsyncSession,
+        document_id: uuid.UUID,
+        after_id: uuid.UUID,
+        core_info_in,
+    ) -> DocumentCoreInfo:
+        """
+        在指定核心信息节点之后插入同级新节点。
+        after_id 所在节点的 order_index + 1 即为新节点位置，
+        后续同级节点全部后移一位。
+        """
+        from fastapi import HTTPException
+
+        target = await CoreInfoMapper.get_core_info_by_id(db, after_id)
+        if not target or target.document_id != document_id:
+            raise HTTPException(status_code=404, detail="目标节点不存在或不属于当前文档")
+
+        new_order = target.order_index + 1
+        parent_id = target.parent_id
+
+        # 同级后续节点后移
+        shift_query = update(DocumentCoreInfo).where(
+            DocumentCoreInfo.document_id == document_id,
+            DocumentCoreInfo.order_index >= new_order,
+        )
+        if parent_id is not None:
+            shift_query = shift_query.where(DocumentCoreInfo.parent_id == parent_id)
+        else:
+            shift_query = shift_query.where(DocumentCoreInfo.parent_id.is_(None))
+        await db.execute(shift_query.values(order_index=DocumentCoreInfo.order_index + 1))
+
+        new_node = DocumentCoreInfo(
+            document_id=document_id,
+            parent_id=parent_id,
+            title=core_info_in.title,
+            content=core_info_in.content,
+            field_type=getattr(core_info_in, "field_type", "text"),
+            options=getattr(core_info_in, "options", None),
+            is_required=getattr(core_info_in, "is_required", True),
+            order_index=new_order,
+            is_locked=False,
+        )
+        result = await CoreInfoMapper.create_core_info(db, new_node)
+        await db.commit()
+        return result

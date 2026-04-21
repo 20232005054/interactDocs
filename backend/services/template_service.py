@@ -184,6 +184,17 @@ class TemplateService:
         根据用途获取模板列表
         """
         return await TemplateMapper.get_templates_by_purpose(db, purpose, template_type, is_active)
+
+    @staticmethod
+    async def get_template_versions(db: AsyncSession, template_id: UUID):
+        """
+        获取指定模板所在 group 的所有历史版本，按版本号升序。
+        """
+        from fastapi import HTTPException
+        template = await TemplateMapper.get_template(db, template_id)
+        if not template:
+            raise HTTPException(status_code=404, detail="模板不存在")
+        return await TemplateMapper.get_versions_by_group_id(db, template.group_id)
     
     @staticmethod
     async def rollback_template(db: AsyncSession, template_id: UUID):

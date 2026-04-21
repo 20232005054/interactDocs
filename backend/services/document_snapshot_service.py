@@ -289,4 +289,15 @@ class DocumentSnapshotService:
             db.add(core_info)
 
         await db.commit()
+
+        # 通知前端文档已恢复，触发全量刷新
+        from services.event_bus import publish
+        import asyncio
+        from core.utils import log_task_exception
+        task = asyncio.create_task(
+            publish(str(document_id), {"type": "document_restored", "snapshot_id": str(snapshot_id)}),
+            name=f"restore_notify_{document_id}",
+        )
+        task.add_done_callback(log_task_exception)
+
         return {"message": f"已从快照 {snapshot.description} 恢复文档"}

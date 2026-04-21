@@ -67,7 +67,7 @@ async def list_documents(
 
 
 @router.get("/{document_id}", summary="获取文档详情", response_model=ResponseModel[DocumentDetailResponse])
-async def get_document(document_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_document(document_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     document, template_name = await DocumentService.get_document(db, document_id)
     return success_response(data=DocumentDetailResponse(
         document_id=document.document_id,
@@ -81,7 +81,7 @@ async def get_document(document_id: UUID, db: AsyncSession = Depends(get_db)):
 
 
 @router.put("/{document_id}", summary="更新文档信息", response_model=ResponseModel[DocumentResponse])
-async def update_document(document_id: UUID, doc_in: DocumentUpdate, db: AsyncSession = Depends(get_db)):
+async def update_document(document_id: UUID, doc_in: DocumentUpdate, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     document = await DocumentService.update_document(db, document_id, doc_in)
     return success_response(data=DocumentResponse(
         document_id=document.document_id,
@@ -94,13 +94,13 @@ async def update_document(document_id: UUID, doc_in: DocumentUpdate, db: AsyncSe
 
 
 @router.delete("/{document_id}", summary="删除文档", response_model=ResponseModel[None])
-async def delete_document(document_id: UUID, db: AsyncSession = Depends(get_db)):
+async def delete_document(document_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await DocumentService.delete_document(db, document_id)
     return success_response(message=result["message"])
 
 
 @router.get("/{document_id}/snapshots", summary="获取文档快照列表", response_model=ResponseModel[SnapshotListResponse])
-async def get_document_snapshots(document_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_document_snapshots(document_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     snapshots = await DocumentSnapshotService.get_document_snapshots(db, document_id)
     return success_response(data=SnapshotListResponse(
         snapshots=[SnapshotResponse(**s) for s in snapshots]
@@ -108,13 +108,13 @@ async def get_document_snapshots(document_id: UUID, db: AsyncSession = Depends(g
 
 
 @router.get("/{document_id}/snapshots/detail/{snapshot_id}", summary="获取快照详情", response_model=ResponseModel[SnapshotResponse])
-async def get_snapshot_detail(document_id: UUID, snapshot_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_snapshot_detail(document_id: UUID, snapshot_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     snapshot = await DocumentSnapshotService.get_snapshot_detail(db, document_id, snapshot_id)
     return success_response(data=SnapshotResponse(**snapshot))
 
 
 @router.post("/{document_id}/snapshots", summary="创建文档快照", response_model=ResponseModel[SnapshotResponse])
-async def create_document_snapshot(document_id: UUID, db: AsyncSession = Depends(get_db)):
+async def create_document_snapshot(document_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     snapshot = await DocumentSnapshotService.create_document_snapshot(db, document_id)
     return success_response(data=SnapshotResponse(**snapshot))
 
@@ -142,7 +142,7 @@ async def restore_snapshot(
 
 
 @router.get("/{document_id}/full-content", summary="获取文档全量内容（章节树+段落）", response_model=ResponseModel[FullContentResponse])
-async def get_full_content(document_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_full_content(document_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     doc_id, tree = await DocumentService.get_full_content(db, document_id)
 
     def build_chapter_node(node) -> FullContentChapter:
@@ -181,13 +181,13 @@ async def get_full_content(document_id: UUID, db: AsyncSession = Depends(get_db)
 
 
 @router.get("/{document_id}/template-info", summary="获取文档关联的模板完整信息", response_model=ResponseModel[TemplateInfoResponse])
-async def get_template_info(document_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_template_info(document_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     template_info = await DocumentService.get_template_info(db, document_id)
     return success_response(data=template_info)
 
 
 @router.post("/{document_id}/apply-core-info-template", summary="应用核心信息模板", response_model=ResponseModel[ApplyCoreInfoResponse])
-async def apply_core_info_template(document_id: UUID, db: AsyncSession = Depends(get_db)):
+async def apply_core_info_template(document_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     tree, count = await TemplateApplyService.apply_core_info_template_as_tree(db, document_id)
     return success_response(data=ApplyCoreInfoResponse(
         message=f"成功创建 {count} 个核心信息字段",
@@ -196,7 +196,7 @@ async def apply_core_info_template(document_id: UUID, db: AsyncSession = Depends
 
 
 @router.post("/{document_id}/apply-summary-template", summary="应用摘要模板", response_model=ResponseModel[ApplySummaryResponse])
-async def apply_summary_template(document_id: UUID, db: AsyncSession = Depends(get_db)):
+async def apply_summary_template(document_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     from schemas.response_schemas import ApplySummaryItem
     created_items = await TemplateApplyService.apply_summary_template(db, document_id)
     return success_response(data=ApplySummaryResponse(
@@ -219,7 +219,7 @@ async def apply_summary_template(document_id: UUID, db: AsyncSession = Depends(g
 
 
 @router.post("/{document_id}/apply-structure-template", summary="应用文章结构模板", response_model=ResponseModel[ApplyStructureResponse])
-async def apply_structure_template(document_id: UUID, db: AsyncSession = Depends(get_db)):
+async def apply_structure_template(document_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     from schemas.response_schemas import ApplyStructureItem
     created_items = await TemplateApplyService.apply_structure_template(db, document_id)
     return success_response(data=ApplyStructureResponse(
@@ -232,6 +232,21 @@ async def apply_structure_template(document_id: UUID, db: AsyncSession = Depends
                 title=item["chapter"].title,
                 order_index=item["chapter"].order_index,
                 paragraph_count=len(item.get("paragraphs") or []),
+                paragraphs=[
+                    FullContentParagraph(
+                        paragraph_id=p.paragraph_id,
+                        chapter_id=p.chapter_id,
+                        content=p.content,
+                        para_type=p.para_type,
+                        order_index=p.order_index,
+                        para_def_idx=p.para_def_idx,
+                        ai_eval=p.ai_eval,
+                        ai_suggestion=p.ai_suggestion,
+                        ai_generate=p.ai_generate,
+                        ischange=p.ischange,
+                    )
+                    for p in (item.get("paragraphs") or [])
+                ],
                 degraded=item.get("degraded", False),
                 generation_error=item.get("generation_error"),
             )
@@ -264,3 +279,39 @@ async def export_template(
         created_at=template.created_at,
         updated_at=template.updated_at,
     ))
+
+
+@router.post("/{document_id}/trigger-linkage", summary="手动触发文档核心信息变更联动", response_model=ResponseModel[None])
+async def trigger_linkage(
+    document_id: UUID,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    手动触发文档内所有 is_change=1 的核心信息的下游联动重新生成。
+    适用于批量更新核心信息后一次性触发，而不是每次 PUT 都自动触发。
+    """
+    from sqlalchemy import select
+    from db.models import DocumentCoreInfo
+    from services.core_info_change_service import handle_core_info_change_async
+    from core.utils import log_task_exception
+    import asyncio
+
+    result = await db.execute(
+        select(DocumentCoreInfo)
+        .where(DocumentCoreInfo.document_id == document_id)
+        .where(DocumentCoreInfo.is_change == 1)
+    )
+    pending = result.scalars().all()
+
+    if not pending:
+        return success_response(message="没有待处理的核心信息变更")
+
+    for ci in pending:
+        task = asyncio.create_task(
+            handle_core_info_change_async(ci.core_info_id, "", ci.content),
+            name=f"manual_linkage_{ci.core_info_id}",
+        )
+        task.add_done_callback(log_task_exception)
+
+    return success_response(message=f"已触发 {len(pending)} 个核心信息的联动更新")

@@ -22,6 +22,10 @@ class UserLogin(BaseModel):
 class UserUpdate(BaseModel):
     name: Optional[str] = Field(None, description="姓名")
 
+class UserPasswordUpdate(BaseModel):
+    old_password: str = Field(..., description="当前密码")
+    new_password: str = Field(..., min_length=6, description="新密码，至少6位")
+
 class User(UserBase):
     user_id: UUID
     role: str = Field(..., description="用户角色")

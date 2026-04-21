@@ -199,7 +199,71 @@ class SummaryService:
 
         return await SummaryMapper.get_summary_by_id(db, summary_id)
 
+    @staticmethod
+    async def reorder(db: AsyncSession, document_id: UUID, ordered_ids: list):
+        """
+        批量重排摘要顺序。
+        ordered_ids 为同文档下摘要 ID 的新顺序列表，按位置赋 order_index。
+        """
+        summaries = await SummaryMapper.get_summaries_by_document_id(db, document_id)
+        existing_ids = {s.summary_id for s in summaries}
 
+        for sid in ordered_ids:
+            if sid not in existing_ids:
+                raise HTTPException(status_code=400, detail=f"摘要 {sid} 不属于该文档")
+
+        order_map = {sid: idx for idx, sid in enumerate(ordered_ids)}
+        await SummaryMapper.bulk_update_order(db, order_map)
+        await db.commit()
+
+    @staticmethod
+    async def confirm_ai_change(db: AsyncSession, summary_id: UUID):
+        """
+        确认 is_change=3 的 AI 重新生成结果：将 ai_generate 写入 content，is_change 归零。
+        """
+        summary = await SummaryMapper.get_summary_by_id(db, summary_id)
+        if not summary:
+            raise HTTPException(status_code=404, detail="摘要不存在")
+        if summary.is_change != 3:
+            raise HTTPException(status_code=400, detail="当前摘要没有待确认的 AI 生成内容")
+        if not summary.ai_generate:
+            raise HTTPException(status_code=400, detail="AI 生成内容为空")
+
+        history = DocumentSummaryHistory(
+            summary_id=summary_id,
+            version=summary.version,
+            title=summary.title,
+            field_key=summary.field_key,
+            content=summary.content,
+        )
+        db.add(history)
+
+        await SummaryMapper.update_summary(db, summary_id, {
+            "content": summary.ai_generate,
+            "ai_generate": None,
+            "version": summary.version + 1,
+            "is_change": 0,
+        })
+        await db.commit()
+        return await SummaryMapper.get_summary_by_id(db, summary_id)
+
+    @staticmethod
+    async def reject_ai_change(db: AsyncSession, summary_id: UUID):
+        """
+        拒绝 is_change=3 的 AI 重新生成结果：清空 ai_generate，is_change 归零。
+        """
+        summary = await SummaryMapper.get_summary_by_id(db, summary_id)
+        if not summary:
+            raise HTTPException(status_code=404, detail="摘要不存在")
+        if summary.is_change != 3:
+            raise HTTPException(status_code=400, detail="当前摘要没有待确认的 AI 生成内容")
+
+        await SummaryMapper.update_summary(db, summary_id, {
+            "ai_generate": None,
+            "is_change": 0,
+        })
+        await db.commit()
+        return await SummaryMapper.get_summary_by_id(db, summary_id)
 
     @staticmethod
     async def get_summary_related_paragraphs(db: AsyncSession, summary_id: UUID):

@@ -16,7 +16,6 @@ from core.constants import UserRole
 from core.security import hash_password, verify_password, create_access_token
 from schemas.schemas import UserCreate, UserLogin, UserUpdate
 
-
 class UserService:
 
     @staticmethod
@@ -87,6 +86,18 @@ class UserService:
         if not update_data:
             raise HTTPException(status_code=400, detail="没有要更新的数据")
         result = await UserMapper.update(db, user_id, update_data)
+        await db.commit()
+        return result
+
+    @staticmethod
+    async def change_password(db: AsyncSession, user_id, old_password: str, new_password: str) -> User:
+        """修改当前用户密码，需验证旧密码"""
+        user = await UserMapper.get_by_id(db, user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="用户不存在")
+        if not verify_password(old_password, user.password_hash):
+            raise HTTPException(status_code=400, detail="当前密码不正确")
+        result = await UserMapper.update(db, user_id, {"password_hash": hash_password(new_password)})
         await db.commit()
         return result
 

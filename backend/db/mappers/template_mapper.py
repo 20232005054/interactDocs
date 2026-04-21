@@ -101,3 +101,13 @@ class TemplateMapper:
             query = query.where(Template.is_active == is_active)
         result = await db.execute(query)
         return result.scalars().all()
+
+    @staticmethod
+    async def get_versions_by_group_id(db: AsyncSession, group_id: UUID):
+        """按 group_id 获取同组所有版本，按版本号升序"""
+        result = await db.execute(
+            select(Template)
+            .where(Template.group_id == group_id)
+            .order_by(Template.version.asc())
+        )
+        return result.scalars().all()

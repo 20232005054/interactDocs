@@ -10,6 +10,7 @@ from db.session import get_db
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from services import ai_service
+from core.auth import get_current_user
 
 router = APIRouter(prefix="/api/v1", tags=["摘要管理"])
 
@@ -18,6 +19,10 @@ class AIAssistSummaryRequest(BaseModel):
     document_id: UUID
     summary_ids: Optional[List[str]] = Field(None, description="摘要ID列表")
     keywords: Optional[List[str]] = Field(None, description="关键词ID列表")
+
+
+class SummaryReorderPayload(BaseModel):
+    ordered_ids: List[UUID] = Field(..., description="摘要 ID 按新顺序排列的列表")
 
 
 def _summary_response(s) -> SummaryResponse:
@@ -129,3 +134,65 @@ async def apply_ai_assist_result(summary_id: UUID, db: AsyncSession = Depends(ge
         raise
     except Exception:
         raise HTTPException(status_code=500, detail="应用AI帮填结果失败")
+
+
+@router.post("/documents/{document_id}/summaries/reorder", summary="批量重排摘要顺序", response_model=ResponseModel[None])
+async def reorder_summaries(
+    document_id: UUID,
+    payload: SummaryReorderPayload,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        await SummaryService.reorder(db, document_id, payload.ordered_ids)
+    except HTTPException:
+        raise
+    return success_response(message="排序更新成功")
+
+
+@router.post("/summaries/{summary_id}/ai/confirm", summary="确认 AI 重新生成的摘要内容", response_model=ResponseModel[SummaryWithAIResponse])
+async def confirm_ai_change(
+    summary_id: UUID,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    将 is_change=3 的 AI 重新生成内容写入 content，is_change 归零。
+    """
+    try:
+        updated = await SummaryService.confirm_ai_change(db, summary_id)
+        return success_response(data=SummaryWithAIResponse(
+            summary_id=updated.summary_id,
+            document_id=updated.document_id,
+            title=updated.title,
+            field_key=updated.field_key,
+            content=updated.content,
+            is_change=updated.is_change,
+            version=updated.version,
+            order_index=updated.order_index,
+            ai_generate=updated.ai_generate,
+            created_at=updated.created_at,
+            updated_at=updated.updated_at,
+        ))
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail="确认 AI 生成内容失败")
+
+
+@router.post("/summaries/{summary_id}/ai/reject", summary="拒绝 AI 重新生成的摘要内容", response_model=ResponseModel[SummaryResponse])
+async def reject_ai_change(
+    summary_id: UUID,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    清空 is_change=3 的 AI 重新生成内容，is_change 归零，保留原 content 不变。
+    """
+    try:
+        updated = await SummaryService.reject_ai_change(db, summary_id)
+        return success_response(data=_summary_response(updated))
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail="拒绝 AI 生成内容失败")

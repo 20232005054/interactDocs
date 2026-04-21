@@ -33,3 +33,6 @@ coverage/
 # 临时文件
 tmp/
 temp/
+
+# 检索知识库
+reference/

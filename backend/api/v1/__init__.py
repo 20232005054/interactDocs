@@ -9,3 +9,4 @@ from . import core_info
 from . import core_info_templates
 from . import summary_templates
 from . import structure_templates
+from . import chat

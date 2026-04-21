@@ -4,8 +4,8 @@ from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer
 from fastapi.exceptions import HTTPException, RequestValidationError
 from api.v1 import documents, chapters, paragraphs, ai, endpoints, summaries, templates, core_info, core_info_templates, summary_templates, structure_templates
-from api.v1 import auth, upload, events, export
-from api.v1.admin import users as admin_users, documents as admin_documents, stats as admin_stats
+from api.v1 import auth, upload, events, export, chat
+from api.v1.admin import users as admin_users, documents as admin_documents, stats as admin_stats, templates as admin_templates
 from core.response import http_exception_handler, validation_exception_handler, generic_exception_handler
 from core.security import decode_token
 import uvicorn
@@ -99,12 +99,14 @@ app.include_router(structure_templates.router, dependencies=_auth_dep)
 app.include_router(upload.router, dependencies=_auth_dep)
 app.include_router(events.router, dependencies=_auth_dep)
 app.include_router(export.router, dependencies=_auth_dep)
+app.include_router(chat.router, dependencies=_auth_dep)
 # 用户认证（公开，不加 Bearer）
 app.include_router(auth.router)
 # 管理员（已有 get_admin_user Depends，不需要额外加）
 app.include_router(admin_users.router)
 app.include_router(admin_documents.router)
 app.include_router(admin_stats.router)
+app.include_router(admin_templates.router)
 
 @app.get("/")
 async def root():

@@ -53,3 +53,21 @@ class SummaryMapper:
             select(DocumentSummary).where(DocumentSummary.summary_id.in_(summary_ids))
         )
         return result.scalars().all()
+
+    @staticmethod
+    async def bulk_update_order(db: AsyncSession, order_map: dict) -> None:
+        """批量更新 order_index，order_map = {summary_id: new_order_index}"""
+        from sqlalchemy import case
+        from uuid import UUID as _UUID
+        if not order_map:
+            return
+        await db.execute(
+            sa_update(DocumentSummary)
+            .where(DocumentSummary.summary_id.in_(list(order_map.keys())))
+            .values(
+                order_index=case(
+                    {sid: idx for sid, idx in order_map.items()},
+                    value=DocumentSummary.summary_id,
+                )
+            )
+        )

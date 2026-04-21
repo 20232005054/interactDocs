@@ -353,6 +353,7 @@ class ApplyStructureItem(BaseModel):
     title: str
     order_index: int
     paragraph_count: int = 0
+    paragraphs: Optional[List[Any]] = None
     degraded: bool
     generation_error: Optional[Any] = None
 

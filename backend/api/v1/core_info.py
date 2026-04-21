@@ -117,3 +117,16 @@ async def reorder_core_info(document_id: uuid.UUID, data: CoreInfoReorder, db: A
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return success_response(None, "排序更新成功")
+
+
+@router.post("/{core_info_id}/insert-after", summary="在指定核心信息节点后插入同级新节点", response_model=ResponseModel[CoreInfoResponse])
+async def insert_core_info_after(
+    core_info_id: uuid.UUID,
+    core_info: CoreInfoCreate,
+    db: AsyncSession = Depends(get_db),
+):
+    existing = await CoreInfoService.get_core_info_by_id(db, core_info_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="核心信息不存在")
+    result = await CoreInfoService.insert_after(db, existing.document_id, core_info_id, core_info)
+    return success_response(data=_build_core_info_response(result))

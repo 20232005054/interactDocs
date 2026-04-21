@@ -38,6 +38,18 @@ async def get_template_dependencies(template_id: UUID, db: AsyncSession = Depend
     return success_response(data=result)
 
 
+@router.get("/{template_id}/versions", summary="获取模板版本历史", response_model=ResponseModel[TemplateListResponse])
+async def get_template_versions(template_id: UUID, db: AsyncSession = Depends(get_db)):
+    """返回该模板所在 group 的所有历史版本，按版本号升序。"""
+    versions = await TemplateService.get_template_versions(db, template_id)
+    return success_response(data=TemplateListResponse(
+        page=1,
+        page_size=len(versions),
+        total=len(versions),
+        items=[_template_response(t) for t in versions],
+    ))
+
+
 @router.get("/{template_id}/export", summary="导出模板为 JSON 文件")
 async def export_template_json(template_id: UUID, db: AsyncSession = Depends(get_db)):
     """将模板主表及三类子表导出为 JSON 文件，可用于备份或跨环境迁移。"""
