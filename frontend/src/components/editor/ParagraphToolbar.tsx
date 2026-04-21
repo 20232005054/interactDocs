@@ -2,16 +2,32 @@
 
 import { useState, useRef } from "react"
 import { useAIAssist } from "@/hooks/useAIAssist"
+import { useChatStore } from "@/store/chatStore"
 import { cn } from "@/lib/utils"
+import type { ParaType } from "@/types/api"
 
 interface ParagraphToolbarProps {
   paragraphId: string
   chapterId: string
+  chapterTitle: string
+  paragraphContent: string
+  paraType: ParaType
   hasContent: boolean
 }
 
-export default function ParagraphToolbar({ paragraphId, chapterId, hasContent }: ParagraphToolbarProps) {
+export default function ParagraphToolbar({
+  paragraphId,
+  chapterId,
+  chapterTitle,
+  paragraphContent,
+  paraType,
+  hasContent,
+}: ParagraphToolbarProps) {
   const { aiAssistingParagraphId, aiAssistPreview, startAssist, applyAssist, discardAssist } = useAIAssist()
+  const upsertManualParagraphContext = useChatStore((state) => state.upsertManualParagraphContext)
+  const hasContext = useChatStore((state) => state.contextItems.some((item) => (
+    item.kind === "paragraph" && item.source === "manual" && item.paragraph_id === paragraphId
+  )))
 
   // 修改意见：组件本地状态，每个段落独立，不污染全局
   const [showInstruction, setShowInstruction] = useState(false)
@@ -33,6 +49,16 @@ export default function ParagraphToolbar({ paragraphId, chapterId, hasContent }:
   const handleDiscard = () => {
     discardAssist()
     // 丢弃时不清空意见，用户可能想调整后重新生成
+  }
+
+  const handleAddContext = () => {
+    upsertManualParagraphContext({
+      paragraph_id: paragraphId,
+      chapter_id: chapterId,
+      chapter_title: chapterTitle,
+      content: paragraphContent,
+      para_type: paraType,
+    })
   }
 
   // AI 评估
@@ -94,8 +120,15 @@ export default function ParagraphToolbar({ paragraphId, chapterId, hasContent }:
 
   return (
     <div className="flex flex-col gap-1">
-      {/* 工具栏按钮行 */}
-      <div className="flex items-center gap-1 flex-wrap">
+      {/* 工具栏按钮（悬浮定位，hover/focus 时显示） */}
+      <div
+        className={cn(
+          "absolute right-2 top-2 z-10 flex items-center gap-1 rounded-lg border border-gray-200 bg-white/95 px-2 py-1 shadow-sm transition",
+          "opacity-0 pointer-events-none group-hover/paragraph:opacity-100 group-hover/paragraph:pointer-events-auto",
+          "group-focus-within/paragraph:opacity-100 group-focus-within/paragraph:pointer-events-auto",
+          (isAssisting || showEval) && "opacity-100 pointer-events-auto"
+        )}
+      >
         {!isAssisting ? (
           <>
             {/* AI 帮填按钮 */}
@@ -148,22 +181,34 @@ export default function ParagraphToolbar({ paragraphId, chapterId, hasContent }:
           </div>
         )}
 
+        {/* 添加上下文 */}
+        <button
+          type="button"
+          onClick={handleAddContext}
+          className={cn(
+            "h-6 px-2 rounded text-xs transition font-medium",
+            hasContext
+              ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
+              : "bg-amber-50 text-amber-600 hover:bg-amber-100"
+          )}
+        >
+          {hasContext ? "已加上下文" : "添加上下文"}
+        </button>
+
         {/* AI 评估 */}
-        {!isAssisting && (
-          <button
-            type="button"
-            onClick={handleEvaluate}
-            disabled={evaluating || !hasContent}
-            className={cn(
-              "h-6 px-2 rounded text-xs transition font-medium",
-              hasContent
-                ? "bg-purple-50 text-purple-600 hover:bg-purple-100"
-                : "bg-gray-50 text-gray-300 cursor-not-allowed"
-            )}
-          >
-            {evaluating ? "评估中..." : "AI 评估"}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={handleEvaluate}
+          disabled={evaluating || !hasContent}
+          className={cn(
+            "h-6 px-2 rounded text-xs transition font-medium",
+            hasContent
+              ? "bg-purple-50 text-purple-600 hover:bg-purple-100"
+              : "bg-gray-50 text-gray-300 cursor-not-allowed"
+          )}
+        >
+          {evaluating ? "评估中..." : "AI 评估"}
+        </button>
       </div>
 
       {/* 修改意见输入区（展开后显示，生成前填写） */}
@@ -181,7 +226,6 @@ export default function ParagraphToolbar({ paragraphId, chapterId, hasContent }:
               "focus:outline-none focus:border-blue-300 transition leading-relaxed"
             )}
           />
-          {/* 有意见时提示用户点 AI 帮填 */}
           {instruction.trim() && (
             <p className="text-xs text-gray-400">
               点击「AI 帮填」将按此意见生成内容
@@ -192,7 +236,7 @@ export default function ParagraphToolbar({ paragraphId, chapterId, hasContent }:
 
       {/* AI 帮填预览 */}
       {isAssisting && aiAssistPreview && (
-        <div className="mt-1 p-2 rounded-md bg-blue-50 border border-blue-200 text-xs text-gray-700 leading-relaxed">
+        <div className="mt-8 p-2 rounded-md bg-blue-50 border border-blue-200 text-xs text-gray-700 leading-relaxed">
           <div className="text-xs text-blue-500 mb-1 font-medium">AI 生成预览</div>
           <p className="whitespace-pre-wrap">{aiAssistPreview}</p>
           {!hasPreview && (
@@ -203,7 +247,7 @@ export default function ParagraphToolbar({ paragraphId, chapterId, hasContent }:
 
       {/* AI 评估结果 */}
       {showEval && (evalPreview || evalResult) && (
-        <div className="mt-1 p-2 rounded-md bg-purple-50 border border-purple-200 text-xs leading-relaxed">
+        <div className={cn("p-2 rounded-md bg-purple-50 border border-purple-200 text-xs leading-relaxed", isAssisting && aiAssistPreview ? "mt-2" : "mt-8")}>
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs text-purple-500 font-medium">AI 评估结果</span>
             <button

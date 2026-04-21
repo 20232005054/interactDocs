@@ -62,7 +62,9 @@ _PUBLIC_PATHS = {
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
-    """全局鉴权中间件：白名单路径放行，其余路径验证 Bearer token"""
+    if request.method == "OPTIONS":
+        return await call_next(request)
+
     if request.url.path in _PUBLIC_PATHS or request.url.path.startswith("/docs"):
         return await call_next(request)
 
@@ -72,11 +74,12 @@ async def auth_middleware(request: Request, call_next):
 
     token = auth_header.removeprefix("Bearer ").strip()
     try:
-        decode_token(token)
+        decode_token(token.strip())
     except Exception:
         return JSONResponse(status_code=200, content={"code": 401, "message": "无效的认证凭据", "data": None})
 
     return await call_next(request)
+
 
 
 

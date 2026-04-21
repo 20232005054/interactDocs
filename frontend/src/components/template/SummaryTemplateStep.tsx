@@ -4,6 +4,13 @@ import { useEffect, useState, useCallback, useRef } from "react"
 import { summaryTemplateService, coreInfoTemplateService, structureTemplateService } from "@/services/templateService"
 import type { SummaryTemplate, CoreInfoTemplate, StructureTemplate, SourceInfo, GenerationMode } from "@/types/api"
 import RichTextEditor from "@/components/editor/RichTextEditor"
+import { cn } from "@/lib/utils"
+import {
+  applyCoreInfoToSource,
+  appendVariableText,
+  createCoreInfoSource,
+  getCoreInfoDragData,
+} from "@/lib/templateDrag"
 
 interface SummaryTemplateStepProps {
   templateId: string
@@ -67,6 +74,7 @@ interface SourceRowProps {
 
 function SourceRow({ source, coreInfoOptions, summaryOptions, structureOptions, onChange, onRemove }: SourceRowProps) {
   const sourceType = source.source.value
+  const [dragActive, setDragActive] = useState(false)
 
   const matchKeyOptions: VariableOption[] =
     sourceType === "keyinfo" ? coreInfoOptions :
@@ -119,13 +127,37 @@ function SourceRow({ source, coreInfoOptions, summaryOptions, structureOptions, 
       </select>
 
       {/* 匹配字段多选 tag */}
-      <div className="flex-1 min-h-9 rounded border border-gray-300 bg-white px-2 py-1 flex flex-wrap gap-1 items-center relative">
+      <div
+        className={cn(
+          "flex-1 min-h-9 rounded border bg-white px-2 py-1 flex flex-wrap gap-1 items-center relative transition",
+          dragActive ? "border-green-400 ring-2 ring-green-100" : "border-gray-300"
+        )}
+        onDragOver={(event) => {
+          const dropped = getCoreInfoDragData(event)
+          if (!dropped) return
+          event.preventDefault()
+          if (!dragActive) setDragActive(true)
+        }}
+        onDragLeave={() => {
+          if (dragActive) setDragActive(false)
+        }}
+        onDrop={(event) => {
+          const dropped = getCoreInfoDragData(event)
+          if (!dropped) return
+          event.preventDefault()
+          setDragActive(false)
+          onChange(applyCoreInfoToSource(source, dropped))
+        }}
+      >
         {source.match_keys.map(k => (
           <span key={k.value} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-yellow-100 text-yellow-800 text-xs font-medium">
             {k.label}
             <button type="button" onClick={() => removeKey(k.value)} className="hover:text-red-500 leading-none">×</button>
           </span>
         ))}
+        {source.match_keys.length === 0 && (
+          <span className="text-xs text-gray-400">拖拽核心信息字段到这里自动填入</span>
+        )}
         {/* 下拉选择器 */}
         <MatchKeyDropdown options={matchKeyOptions} selectedKeys={selectedKeys} onToggle={toggleKey} />
       </div>
@@ -187,19 +219,17 @@ function MatchKeyDropdown({ options, selectedKeys, onToggle }: {
 interface SummaryCardProps {
   item: SummaryTemplate
   index: number
-  templateId: string
   coreInfoOptions: VariableOption[]
   summaryOptions: VariableOption[]
   structureOptions: VariableOption[]
   variables: VariableOption[]
-  onRefresh: () => void
   onDelete: (id: string) => void
 }
 
 function SummaryCard({
-  item, index, templateId,
+  item, index,
   coreInfoOptions, summaryOptions, structureOptions,
-  variables, onRefresh, onDelete,
+  variables, onDelete,
 }: SummaryCardProps) {
   const [title, setTitle] = useState(item.title)
   const [generationMode, setGenerationMode] = useState<GenerationMode>(item.generation_mode)
@@ -209,6 +239,7 @@ function SummaryCard({
   const [customPrompt, setCustomPrompt] = useState(item.custom_prompt ?? "")
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [sourceDropActive, setSourceDropActive] = useState(false)
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -326,6 +357,33 @@ function SummaryCard({
                 onRemove={() => handleSourcesChange(sources.filter((_, idx) => idx !== i))}
               />
             ))}
+            {/* 拖拽放置区：拖入核心信息字段自动新增来源 */}
+            <div
+              className={cn(
+                "rounded-lg border border-dashed px-3 py-3 text-sm transition",
+                sourceDropActive
+                  ? "border-green-400 bg-green-50 text-green-700"
+                  : "border-gray-300 bg-gray-50 text-gray-500"
+              )}
+              onDragOver={(event) => {
+                const dropped = getCoreInfoDragData(event)
+                if (!dropped) return
+                event.preventDefault()
+                if (!sourceDropActive) setSourceDropActive(true)
+              }}
+              onDragLeave={() => {
+                if (sourceDropActive) setSourceDropActive(false)
+              }}
+              onDrop={(event) => {
+                const dropped = getCoreInfoDragData(event)
+                if (!dropped) return
+                event.preventDefault()
+                setSourceDropActive(false)
+                handleSourcesChange([...sources, createCoreInfoSource(dropped)])
+              }}
+            >
+              拖拽核心信息字段到这里，可自动新增一条来源
+            </div>
             <button
               type="button"
               onClick={addSource}
@@ -352,6 +410,7 @@ function SummaryCard({
           }
           minHeight="120px"
         />
+        <p className="mt-2 text-xs text-gray-400">支持将核心信息字段拖入编辑区，自动插入变量占位符。</p>
       </div>
 
       {/* AI 模式：提示词双栏（mode=1 和 mode=3） */}
@@ -367,6 +426,17 @@ function SummaryCard({
               <textarea
                 value={defaultPrompt}
                 onChange={e => handleDefaultPromptChange(e.target.value)}
+                onDragOver={(event) => {
+                  const dropped = getCoreInfoDragData(event)
+                  if (!dropped) return
+                  event.preventDefault()
+                }}
+                onDrop={(event) => {
+                  const dropped = getCoreInfoDragData(event)
+                  if (!dropped) return
+                  event.preventDefault()
+                  handleDefaultPromptChange(appendVariableText(defaultPrompt, dropped))
+                }}
                 rows={6}
                 className="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-green-400 resize-none"
               />
@@ -376,6 +446,17 @@ function SummaryCard({
               <textarea
                 value={customPrompt}
                 onChange={e => handleCustomPromptChange(e.target.value)}
+                onDragOver={(event) => {
+                  const dropped = getCoreInfoDragData(event)
+                  if (!dropped) return
+                  event.preventDefault()
+                }}
+                onDrop={(event) => {
+                  const dropped = getCoreInfoDragData(event)
+                  if (!dropped) return
+                  event.preventDefault()
+                  handleCustomPromptChange(appendVariableText(customPrompt, dropped))
+                }}
                 rows={6}
                 className="rounded border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-green-400 resize-none"
               />
@@ -485,12 +566,10 @@ export default function SummaryTemplateStep({ templateId, onCountChange }: Summa
           key={item.summary_template_id}
           item={item}
           index={idx}
-          templateId={templateId}
           coreInfoOptions={coreInfoOptions}
           summaryOptions={summaryOptions}
           structureOptions={structureOptions}
           variables={variables}
-          onRefresh={load}
           onDelete={() => {
             setItems(prev => prev.filter(i => i.summary_template_id !== item.summary_template_id))
             onCountChange?.(items.length - 1)

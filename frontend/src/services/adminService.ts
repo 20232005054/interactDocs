@@ -4,6 +4,7 @@ import type {
   AdminUserListResponse,
   DocumentListResponse,
   User,
+  UserRole,
 } from "@/types/api"
 
 export const adminService = {
@@ -15,7 +16,7 @@ export const adminService = {
   listUsers: (page = 1, pageSize = 20): Promise<AdminUserListResponse> =>
     request.get("/api/v1/admin/users", { params: { page, page_size: pageSize } }),
 
-  updateUserRole: (userId: string, role: string): Promise<User> =>
+  updateUserRole: (userId: string, role: UserRole): Promise<User> =>
     request.put(`/api/v1/admin/users/${userId}/role`, { role }),
 
   deleteUser: (userId: string): Promise<void> =>

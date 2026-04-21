@@ -16,7 +16,14 @@ export const metadata: Metadata = {
   title: "InteractiveDocs - 智能文档编辑器",
   description: "基于 AI 的智能文档编辑平台，支持关键词提取、摘要生成和章节编辑",
 };
-
+import { initFurryDevOverlay } from 'react-furry-error'
+try {
+  if (process.env.NODE_ENV === 'development') {
+    initFurryDevOverlay()
+  }
+} catch (err) {
+  console.log(err)
+}
 export default function RootLayout({
   children,
 }: Readonly<{

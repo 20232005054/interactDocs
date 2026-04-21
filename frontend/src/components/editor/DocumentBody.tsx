@@ -2,9 +2,9 @@
 
 import { useRef, useCallback, useState, useEffect } from "react"
 import { paragraphService } from "@/services/paragraphService"
-import { chapterService } from "@/services/chapterService"
 import { useDocumentStore } from "@/store/documentStore"
 import { useEditorStore } from "@/store/editorStore"
+import { useChatStore } from "@/store/chatStore"
 import type { ChapterTreeNode, Paragraph } from "@/types/api"
 import { cn } from "@/lib/utils"
 import ParagraphToolbar from "@/components/editor/ParagraphToolbar"
@@ -37,12 +37,16 @@ function flattenTree(nodes: ChapterTreeNode[], depth = 0): FlatChapter[] {
 interface ParagraphRowProps {
   paragraph: Paragraph
   chapterId: string
+  chapterTitle: string
   onReload: () => void
 }
 
-function ParagraphRow({ paragraph, chapterId, onReload }: ParagraphRowProps) {
+function ParagraphRow({ paragraph, chapterId, chapterTitle, onReload }: ParagraphRowProps) {
   const { updateParagraph } = useDocumentStore()
   const { setActiveParagraphId, activeParagraphId } = useEditorStore()
+  const upsertSelectionParagraphContext = useChatStore((state) => state.upsertSelectionParagraphContext)
+  const updateParagraphContextContent = useChatStore((state) => state.updateParagraphContextContent)
+  const removeParagraphContexts = useChatStore((state) => state.removeParagraphContexts)
 
   const [localContent, setLocalContent] = useState(paragraph.content)
   const [saving, setSaving] = useState(false)
@@ -72,6 +76,7 @@ function ParagraphRow({ paragraph, chapterId, onReload }: ParagraphRowProps) {
     isEditingRef.current = true
     setLocalContent(val)
     updateParagraph(chapterId, paragraph.paragraph_id, val)
+    updateParagraphContextContent(paragraph.paragraph_id, val)
     // 防抖保存
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(async () => {
@@ -99,6 +104,7 @@ function ParagraphRow({ paragraph, chapterId, onReload }: ParagraphRowProps) {
     setMenuOpen(false)
     try {
       await paragraphService.delete(paragraph.paragraph_id)
+      removeParagraphContexts(paragraph.paragraph_id)
       onReload()
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : "删除失败")
@@ -122,16 +128,34 @@ function ParagraphRow({ paragraph, chapterId, onReload }: ParagraphRowProps) {
     heading3: "三级标题",
   }
 
+  const handleTextInteraction = (event: React.MouseEvent<HTMLTextAreaElement>) => {
+    const target = event.currentTarget
+    const selectionStart = target.selectionStart ?? 0
+    const selectionEnd = target.selectionEnd ?? 0
+    const selectedText = selectionStart !== selectionEnd
+      ? target.value.slice(selectionStart, selectionEnd).trim()
+      : undefined
+
+    upsertSelectionParagraphContext({
+      paragraph_id: paragraph.paragraph_id,
+      chapter_id: chapterId,
+      chapter_title: chapterTitle,
+      content: localContent,
+      para_type: paragraph.para_type,
+      selected_text: selectedText || undefined,
+    })
+  }
+
   return (
     <div
       className={cn(
-        "group relative flex gap-2",
+        "group/paragraph relative flex gap-2 py-0.5",
         isActive && "bg-blue-50/40 rounded"
       )}
       onClick={() => setActiveParagraphId(paragraph.paragraph_id)}
     >
       {/* 左侧操作区 */}
-      <div className="w-6 shrink-0 flex items-start justify-center pt-1.5 opacity-0 group-hover:opacity-100 transition">
+      <div className="w-6 shrink-0 flex items-start justify-center pt-1.5 opacity-0 group-hover/paragraph:opacity-100 transition">
         <div className="relative">
           <button
             type="button"
@@ -166,16 +190,18 @@ function ParagraphRow({ paragraph, chapterId, onReload }: ParagraphRowProps) {
       </div>
 
       {/* 编辑区 */}
-      <div className="flex-1 min-w-0">
+      <div className="relative flex-1 min-w-0">
         <textarea
           ref={textareaRef}
           value={localContent}
           onChange={e => handleChange(e.target.value)}
           onFocus={() => setActiveParagraphId(paragraph.paragraph_id)}
+          onMouseUp={handleTextInteraction}
           rows={1}
           className={cn(
             "w-full resize-none bg-transparent outline-none leading-relaxed",
             "overflow-hidden",
+            paragraph.para_type === "paragraph" && "pr-32",
             paragraph.para_type === "heading1" && "text-xl font-bold text-gray-900",
             paragraph.para_type === "heading2" && "text-lg font-semibold text-gray-800",
             paragraph.para_type === "heading3" && "text-base font-medium text-gray-700",
@@ -200,6 +226,9 @@ function ParagraphRow({ paragraph, chapterId, onReload }: ParagraphRowProps) {
             <ParagraphToolbar
               paragraphId={paragraph.paragraph_id}
               chapterId={chapterId}
+              chapterTitle={chapterTitle}
+              paragraphContent={localContent}
+              paraType={paragraph.para_type}
               hasContent={localContent.trim().length > 0}
             />
           </div>
@@ -208,7 +237,7 @@ function ParagraphRow({ paragraph, chapterId, onReload }: ParagraphRowProps) {
 
       {/* 保存状态 */}
       {saving && (
-        <span className="absolute right-2 top-1.5 text-xs text-gray-300">保存中</span>
+        <span className="absolute right-28 top-2 text-xs text-gray-300">保存中</span>
       )}
     </div>
   )
@@ -272,7 +301,7 @@ function ChapterBlock({ flatChapter, documentId, onReload }: ChapterBlockProps) 
 
       {/* 段落列表 */}
       <div
-        className="flex flex-col gap-0"
+        className="flex flex-col gap-1"
         style={{ paddingLeft: `${depth * 8 + 4}px` }}
       >
         {node.paragraphs.length === 0 ? (
@@ -293,6 +322,7 @@ function ChapterBlock({ flatChapter, documentId, onReload }: ChapterBlockProps) 
                   key={p.paragraph_id}
                   paragraph={p}
                   chapterId={node.chapter_id}
+                  chapterTitle={node.title}
                   onReload={onReload}
                 />
               ))}
@@ -300,7 +330,7 @@ function ChapterBlock({ flatChapter, documentId, onReload }: ChapterBlockProps) 
             <button
               onClick={handleAddParagraph}
               disabled={addingPara}
-              className="text-xs text-gray-300 hover:text-gray-400 text-left py-1 transition opacity-0 hover:opacity-100 group-hover:opacity-100"
+              className="text-xs text-gray-300 hover:text-gray-400 text-left py-1 transition opacity-0 hover:opacity-100 group-hover/paragraph:opacity-100"
             >
               + 添加段落
             </button>

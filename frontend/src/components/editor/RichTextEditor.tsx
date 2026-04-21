@@ -13,6 +13,7 @@ import { Markdown } from "tiptap-markdown"
 import { VariablePlaceholderExtension } from "./VariablePlaceholderExtension"
 import { cn } from "@/lib/utils"
 import { useState, useCallback, useEffect, useRef } from "react"
+import { getCoreInfoDragData } from "@/lib/templateDrag"
 
 interface VariableOption {
   fieldKey: string
@@ -83,6 +84,7 @@ export default function RichTextEditor({
   minHeight = "120px",
 }: RichTextEditorProps) {
   const [showVarPicker, setShowVarPicker] = useState(false)
+  const [dragActive, setDragActive] = useState(false)
   const variablesRef = useRef(variables)
   variablesRef.current = variables
 
@@ -138,9 +140,38 @@ export default function RichTextEditor({
   if (!editor) return null
 
   return (
-    <div className={cn("border border-input rounded-md overflow-hidden bg-background", className)}>
+    <div
+      className={cn(
+        "group/editor relative border border-input rounded-md overflow-hidden bg-background transition",
+        dragActive && "border-green-400 ring-2 ring-green-100",
+        className
+      )}
+      onDragOver={(event) => {
+        const dropped = getCoreInfoDragData(event)
+        if (!dropped) return
+        event.preventDefault()
+        if (!dragActive) setDragActive(true)
+      }}
+      onDragLeave={() => {
+        if (dragActive) setDragActive(false)
+      }}
+      onDrop={(event) => {
+        const dropped = getCoreInfoDragData(event)
+        if (!dropped) return
+        event.preventDefault()
+        setDragActive(false)
+        insertVariable(dropped.fieldKey, dropped.label)
+      }}
+    >
       {/* 工具栏 */}
-      <div className="flex items-center gap-0.5 px-2 py-1 border-b border-input bg-muted/30 flex-wrap">
+      <div
+        className={cn(
+          "absolute inset-x-0 top-0 z-10 flex items-center justify-end gap-0.5 border-b border-input bg-background/95 px-3 py-2 shadow-sm transition",
+          "opacity-0 pointer-events-none group-hover/editor:opacity-100 group-hover/editor:pointer-events-auto",
+          "group-focus-within/editor:opacity-100 group-focus-within/editor:pointer-events-auto",
+          showVarPicker && "opacity-100 pointer-events-auto"
+        )}
+      >
         <ToolbarButton
           onClick={() => editor.chain().focus().toggleBold().run()}
           active={editor.isActive("bold")}
@@ -180,7 +211,7 @@ export default function RichTextEditor({
           ①
         </ToolbarButton>
 
-        {/* 变量插入（仅当有变量可选时显示） */}
+        {/* 挖空变量插入（仅当有变量可选时显示） */}
         {variables.length > 0 && (
           <>
             <div className="w-px h-4 bg-border mx-1" />
@@ -204,7 +235,7 @@ export default function RichTextEditor({
               </button>
 
               {showVarPicker && (
-                <div className="absolute top-full left-0 mt-1 z-50 bg-card border border-border rounded-md shadow-md min-w-36 py-1">
+                <div className="absolute right-0 top-full mt-2 z-50 bg-card border border-border rounded-md shadow-md min-w-40 py-1">
                   {variables.map((v) => (
                     <button
                       key={v.fieldKey}
@@ -213,10 +244,10 @@ export default function RichTextEditor({
                         e.preventDefault()
                         insertVariable(v.fieldKey, v.label)
                       }}
-                      className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition"
+                      className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition flex items-center gap-2"
                     >
-                      {/* 只显示 label，不显示 key */}
-                      {v.label}
+                      <span className="text-xs font-mono text-primary">{`{{${v.fieldKey}}}`}</span>
+                      <span className="text-muted-foreground">{v.label}</span>
                     </button>
                   ))}
                 </div>
@@ -227,7 +258,9 @@ export default function RichTextEditor({
       </div>
 
       {/* 编辑区 */}
-      <EditorContent editor={editor} />
+      <div className="pt-14">
+        <EditorContent editor={editor} />
+      </div>
     </div>
   )
 }
