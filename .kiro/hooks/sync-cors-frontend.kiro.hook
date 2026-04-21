@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "同步 CORS 前端到 rebuildBackend",
+  "description": "fetch 最新的 origin/CORS，然后用它的 frontend/ 目录覆盖当前分支，并自动提交",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "请执行以下步骤同步同事的前端代码：\n1. 运行 git fetch origin 拉取最新远程分支\n2. 运行 git checkout origin/CORS -- frontend/ 用CORS分支的frontend目录覆盖当前分支\n3. 运行 git add frontend/ 暂存所有改动\n4. 运行 git status --short 查看改动文件列表\n5. 运行 git commit -m \"sync: 同步 origin/CORS 最新前端进度\" 提交\n6. 告诉我同步了哪些文件有变化"
+  }
+}
