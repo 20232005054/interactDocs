@@ -245,9 +245,9 @@ function TreeNode({ node, templateId, depth, onRefresh, enableDrag, dependencyMa
             <span className="mr-1">被引用:</span>
             {dependencyItem?.referenced_by?.length ? (
               <span className="inline-flex flex-wrap gap-1 align-middle">
-                {dependencyItem.referenced_by.slice(0, 4).map((ref) => (
+                {dependencyItem.referenced_by.slice(0, 4).map((ref, i) => (
                   <span
-                    key={`${node.field_key}-${ref.type}-${ref.field_key}`}
+                    key={`${node.field_key}-${ref.type}-${ref.field_key}-${i}`}
                     className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700"
                     title={`${ref.type}/${ref.field_key}`}
                   >

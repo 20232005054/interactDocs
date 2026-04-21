@@ -161,9 +161,9 @@ function EditPanel({ node, variables, onDeleted, dependencyItem }: EditPanelProp
           <span className="shrink-0 text-gray-500">引用来源:</span>
           {dependencyItem?.references?.length ? (
             <div className="flex flex-wrap gap-1.5">
-              {dependencyItem.references.slice(0, 5).map((ref) => (
+              {dependencyItem.references.slice(0, 5).map((ref, i) => (
                 <span
-                  key={`struct-ref-${node.field_key}-${ref.type}-${ref.field_key}`}
+                  key={`struct-ref-${node.field_key}-${ref.type}-${ref.field_key}-${i}`}
                   className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-blue-700"
                   title={`${ref.type}/${ref.field_key}`}
                 >
