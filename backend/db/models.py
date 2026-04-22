@@ -295,3 +295,56 @@ class DependencyEdge(Base):
 
 
 
+
+
+class Literature(Base):
+    """文献主表，绑定到原始模板（type=1 或 type=2）"""
+    __tablename__ = "literature"
+
+    literature_id   = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    template_id     = Column(UUID(as_uuid=True), ForeignKey("templates.template_id", ondelete="CASCADE"), nullable=False)
+    title           = Column(String(500), nullable=True)
+    authors         = Column(Text, nullable=True)
+    journal         = Column(String(200), nullable=True)
+    publish_date    = Column(TIMESTAMP, nullable=True)
+    doi             = Column(String(100), nullable=True)
+    impact_factor   = Column(Float, nullable=True)
+    source_file     = Column(String(500), nullable=True)   # OSS 文件路径
+    upload_status   = Column(String(20), nullable=False, default="pending")
+    # upload_status: pending / processing / ready / failed
+    error_message   = Column(Text, nullable=True)
+    created_at      = Column(TIMESTAMP, server_default=func.now())
+
+    chunks          = relationship("LiteratureChunk", back_populates="literature", cascade="all, delete-orphan")
+    citations       = relationship("DocumentCitation", back_populates="literature", cascade="all, delete-orphan")
+
+
+class LiteratureChunk(Base):
+    """文献分块向量表"""
+    __tablename__ = "literature_chunks"
+
+    chunk_id        = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    literature_id   = Column(UUID(as_uuid=True), ForeignKey("literature.literature_id", ondelete="CASCADE"), nullable=False)
+    section_type    = Column(String(30), nullable=True)
+    # section_type: abstract / intro / method / result / conclusion / other
+    content         = Column(Text, nullable=False)
+    embedding       = Column(Text, nullable=True)   # 存储时用 pgvector vector 类型，ORM 层用 Text 占位，实际 DDL 见 SQL
+    chunk_index     = Column(Integer, nullable=False)
+    created_at      = Column(TIMESTAMP, server_default=func.now())
+
+    literature      = relationship("Literature", back_populates="chunks")
+
+
+class DocumentCitation(Base):
+    """文档引用关联表，记录段落/摘要引用了哪篇文献"""
+    __tablename__ = "document_citations"
+
+    citation_id     = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    document_id     = Column(UUID(as_uuid=True), ForeignKey("documents.document_id", ondelete="CASCADE"), nullable=False)
+    source_type     = Column(String(20), nullable=False)   # paragraph / summary
+    source_id       = Column(UUID(as_uuid=True), nullable=False)
+    literature_id   = Column(UUID(as_uuid=True), ForeignKey("literature.literature_id", ondelete="CASCADE"), nullable=False)
+    citation_number = Column(Integer, nullable=False)      # [1][2] 里的编号
+    created_at      = Column(TIMESTAMP, server_default=func.now())
+
+    literature      = relationship("Literature", back_populates="citations")

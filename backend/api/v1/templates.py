@@ -8,7 +8,7 @@ import json
 from core.response import success_response, ResponseModel
 from db.session import get_db
 from services.template_service import TemplateService
-from schemas.response_schemas import TemplateResponse, TemplateDetailResponse, TemplateListResponse, TemplateSimpleListResponse, PurposeListResponse, TemplateDependenciesResponse
+from schemas.response_schemas import TemplateResponse, TemplateDetailResponse, TemplateListResponse, TemplateSimpleListResponse, PurposeListResponse, TemplateDependenciesResponse, TemplateInfoResponse
 from schemas.schemas import ExportTemplatePayload, TemplateContent, TemplateCreatePayload, TemplateUpdatePayload
 from core.auth import get_editor_user, get_admin_user, get_current_user
 from core.constants import TemplateType
@@ -48,6 +48,16 @@ async def get_template_versions(template_id: UUID, db: AsyncSession = Depends(ge
         total=len(versions),
         items=[_template_response(t) for t in versions],
     ))
+
+
+@router.get("/{template_id}/preview", summary="获取模板完整预览（核心信息+摘要+结构）", response_model=ResponseModel[TemplateInfoResponse])
+async def get_template_preview(template_id: UUID, db: AsyncSession = Depends(get_db)):
+    """
+    用于用户创建文档前预览模板内容。
+    一次返回核心信息模板树、摘要模板列表、章节结构模板树。
+    """
+    preview = await TemplateService.get_template_preview(db, template_id)
+    return success_response(data=preview)
 
 
 @router.get("/{template_id}/export", summary="导出模板为 JSON 文件")

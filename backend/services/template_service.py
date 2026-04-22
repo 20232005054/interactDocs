@@ -195,6 +195,71 @@ class TemplateService:
         if not template:
             raise HTTPException(status_code=404, detail="模板不存在")
         return await TemplateMapper.get_versions_by_group_id(db, template.group_id)
+
+    @staticmethod
+    async def get_template_preview(db: AsyncSession, template_id: UUID):
+        """
+        获取模板完整预览信息（核心信息模板树 + 摘要模板列表 + 结构模板树）。
+        用于用户创建文档前预览模板内容。
+        """
+        from fastapi import HTTPException
+        from db.mappers.core_info_template_mapper import CoreInfoTemplateMapper
+        from db.mappers.summary_template_mapper import SummaryTemplateMapper
+        from services.structure_template_service import StructureTemplateService
+        from schemas.response_schemas import (
+            TemplateInfoResponse, CoreInfoTemplateResponse, SummaryTemplateResponse
+        )
+
+        template = await TemplateMapper.get_template(db, template_id)
+        if not template:
+            raise HTTPException(status_code=404, detail="模板不存在")
+
+        core_info_templates = await CoreInfoTemplateMapper.get_by_template_id(db, template_id)
+        summary_templates = await SummaryTemplateMapper.get_by_template_id(db, template_id)
+        structure_tree = await StructureTemplateService.get_structure_tree(db, template_id)
+
+        def build_ci_node(items, parent_id=None):
+            nodes = []
+            for t in sorted([x for x in items if x.parent_id == parent_id], key=lambda x: x.order_index):
+                nodes.append(CoreInfoTemplateResponse(
+                    core_template_id=t.core_template_id,
+                    template_id=t.template_id,
+                    parent_id=t.parent_id,
+                    field_name=t.field_name,
+                    field_key=t.field_key,
+                    field_type=t.field_type,
+                    default_value=t.default_value,
+                    options=t.options,
+                    is_required=t.is_required,
+                    order_index=t.order_index,
+                    created_at=t.created_at,
+                    updated_at=t.updated_at,
+                    children=build_ci_node(items, t.core_template_id),
+                ))
+            return nodes
+
+        return TemplateInfoResponse(
+            template_id=template_id,
+            core_info_templates=build_ci_node(core_info_templates),
+            summary_templates=[
+                SummaryTemplateResponse(
+                    summary_template_id=t.summary_template_id,
+                    template_id=t.template_id,
+                    title=t.title,
+                    field_key=t.field_key,
+                    generation_mode=t.generation_mode,
+                    content_template=t.content_template,
+                    sources=t.sources,
+                    default_prompt=t.default_prompt,
+                    custom_prompt=t.custom_prompt,
+                    order_index=t.order_index,
+                    created_at=t.created_at,
+                    updated_at=t.updated_at,
+                )
+                for t in sorted(summary_templates, key=lambda x: x.order_index)
+            ],
+            structure_templates=structure_tree,
+        )
     
     @staticmethod
     async def rollback_template(db: AsyncSession, template_id: UUID):

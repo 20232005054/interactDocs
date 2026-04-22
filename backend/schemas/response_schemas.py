@@ -535,3 +535,27 @@ class TemplateDependenciesResponse(BaseModel):
     core_info_templates: List[CoreInfoDependencyItem]
     summary_templates: List[SummaryDependencyItem]
     structure_templates: List[StructureDependencyItem]
+
+
+# ============================================================
+# 文献 RAG 相关
+# ============================================================
+
+class LiteratureResponse(BaseModel):
+    literature_id: UUID
+    template_id: UUID
+    title: Optional[str] = None
+    authors: Optional[str] = None
+    journal: Optional[str] = None
+    publish_date: Optional[datetime] = None
+    doi: Optional[str] = None
+    impact_factor: Optional[float] = None
+    source_file: Optional[str] = None
+    upload_status: str
+    error_message: Optional[str] = None
+    created_at: datetime
+
+
+class LiteratureListResponse(BaseModel):
+    items: List[LiteratureResponse]
+    total: int

@@ -43,6 +43,22 @@ def extract_image_urls(content: str) -> list[str]:
 # 文档数据组装（格式无关）
 # ---------------------------------------------------------------------------
 
+async def _build_references(db: AsyncSession, document_id: UUID) -> list[dict]:
+    """获取文档参考文献列表，格式化为温哥华引文"""
+    try:
+        from services.literature_rag_service import LiteratureRagService
+        citations = await LiteratureRagService.get_document_reference_list(db, document_id)
+        return [
+            {
+                "number": c["citation_number"],
+                "formatted": LiteratureRagService.format_vancouver_reference(c, c["citation_number"]),
+            }
+            for c in citations
+        ]
+    except Exception:
+        return []
+
+
 async def build_document_data(db: AsyncSession, document_id: UUID) -> dict:
     """组装文档完整数据，返回格式无关的中间结构"""
     # 文档基本信息
@@ -124,6 +140,7 @@ async def build_document_data(db: AsyncSession, document_id: UUID) -> dict:
             for s in summaries
         ],
         "chapters": root_chapters,
+        "references": await _build_references(db, document_id),
     }
 
 
@@ -218,6 +235,15 @@ async def export_docx(db: AsyncSession, document_id: UUID) -> bytes:
     for chapter in data["chapters"]:
         write_chapter(chapter)
 
+    # 参考文献列表
+    if data.get("references"):
+        ref_heading = doc.add_heading("参考文献", level=1)
+        for run in ref_heading.runs:
+            _set_run_font(run)
+        for ref in data["references"]:
+            p = doc.add_paragraph()
+            _set_run_font(p.add_run(ref["formatted"]))
+
     buf = io.BytesIO()
     doc.save(buf)
     return buf.getvalue()
@@ -259,6 +285,13 @@ async def export_pdf(db: AsyncSession, document_id: UUID) -> bytes:
 
     chapters_html = "".join(chapter_to_html(c) for c in data["chapters"])
 
+    references_html = ""
+    if data.get("references"):
+        references_html = "<h2>参考文献</h2>\n<ol>\n"
+        for ref in data["references"]:
+            references_html += f"<li>{ref['formatted']}</li>\n"
+        references_html += "</ol>\n"
+
     full_html = f"""<!DOCTYPE html>
 <html><head>
 <meta charset="utf-8">
@@ -272,6 +305,7 @@ async def export_pdf(db: AsyncSession, document_id: UUID) -> bytes:
 <h1>{data['title']}</h1>
 {summaries_html}
 {chapters_html}
+{references_html}
 </body></html>"""
 
     pdf_bytes = weasyprint.HTML(string=full_html).write_pdf()
@@ -323,5 +357,10 @@ async def export_markdown(db: AsyncSession, document_id: UUID) -> str:
 
     for chapter in data["chapters"]:
         lines.extend(chapter_to_md(chapter))
+
+    if data.get("references"):
+        lines.append("\n## 参考文献\n")
+        for ref in data["references"]:
+            lines.append(f"{ref['formatted']}\n")
 
     return "\n".join(lines)

@@ -166,6 +166,33 @@ class SummaryTemplateService:
         )
 
     @staticmethod
+    async def render_ai_content_with_citations(
+        db: AsyncSession,
+        document: Document,
+        summary_template: SummaryTemplate,
+        generated_summary_map: Dict[str, str] = None,
+        source_data_map: Dict[str, str] = None,
+        draft: str = None,
+    ) -> tuple:
+        """返回 (content, citations)"""
+        template_id = getattr(
+            summary_template, "summary_template_id",
+            getattr(summary_template, "structure_template_id", None),
+        )
+        return await TemplateRenderService.render_ai_content_with_citations(
+            db=db,
+            document=document,
+            title=summary_template.title,
+            sources=summary_template.sources,
+            prompt=summary_template.custom_prompt or summary_template.default_prompt,
+            field_key=getattr(summary_template, "field_key", None),
+            template_id=str(template_id) if template_id else None,
+            generated_summary_map=generated_summary_map,
+            source_data_map=source_data_map,
+            draft=draft,
+        )
+
+    @staticmethod
     async def _call_ai_renderer(prompt: str, template_id: str = None, field_key: str = None) -> str:
         return await TemplateRenderService._call_ai_renderer(prompt, template_id=template_id, field_key=field_key)
 

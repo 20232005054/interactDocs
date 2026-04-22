@@ -182,7 +182,7 @@ class TemplateApplyService:
             async with semaphore:
                 try:
                     draft = template.content_template if template.generation_mode == 3 else None
-                    return await SummaryTemplateService.render_ai_content(
+                    content, citations = await SummaryTemplateService.render_ai_content_with_citations(
                         db=db,
                         document=document,
                         summary_template=template,
@@ -190,6 +190,7 @@ class TemplateApplyService:
                         source_data_map=source_data_map,
                         draft=draft,
                     )
+                    return content, citations
                 except Exception as exc:
                     return exc
 
@@ -243,6 +244,7 @@ class TemplateApplyService:
                 )
             elif generation_mode in (1, 3):
                 ai_result = ai_results.get(idx)
+                ai_citations = []
                 if isinstance(ai_result, Exception):
                     error_code, duration_ms = TemplateApplyService._extract_ai_error_fields(ai_result)
                     generation_error = TemplateApplyService._build_generation_error(
@@ -255,7 +257,12 @@ class TemplateApplyService:
                         duration_ms=duration_ms,
                     )
                 elif ai_result:
-                    content = ai_result
+                    # ai_result 现在是 (content, citations) 元组
+                    if isinstance(ai_result, tuple):
+                        content, ai_citations = ai_result
+                    else:
+                        content = ai_result
+                        ai_citations = []
 
                 if not content:
                     if generation_error is None:
@@ -303,6 +310,22 @@ class TemplateApplyService:
 
             generated_summary_map[template.field_key] = content
             summary_id_map[template.field_key] = summary.summary_id
+
+            # 保存文献引用记录
+            if generation_mode in (1, 3) and not degraded and content and ai_citations:
+                try:
+                    from services.literature_rag_service import LiteratureRagService
+                    await LiteratureRagService.save_citations(
+                        db=db,
+                        document_id=document_id,
+                        source_type="summary",
+                        source_id=summary.summary_id,
+                        ai_content=content,
+                        citations=ai_citations,
+                    )
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).warning("保存摘要引用记录失败: %s", e)
 
             # 建立依赖边
             if template.sources:
