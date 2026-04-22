@@ -20,7 +20,7 @@ from core.response import success_response, ResponseModel
 from db.session import get_db
 from services.admin_service import AdminService
 from services.user_service import UserService
-from schemas.schemas import User as UserSchema
+from schemas.user_schemas import User as UserSchema
 
 router = APIRouter(prefix="/api/v1/admin/users", tags=["管理员-用户管理"])
 

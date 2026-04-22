@@ -7,7 +7,7 @@ from db.mappers.core_info_template_mapper import CoreInfoTemplateMapper
 from db.mappers.summary_template_mapper import SummaryTemplateMapper
 from db.mappers.structure_template_mapper import StructureTemplateMapper
 from db.models import Document, DocumentCoreInfo, Template, CoreInfoTemplate, SummaryTemplate, StructureTemplate
-from schemas.schemas import DocumentCreate, DocumentUpdate, PaginationParams
+from schemas.document_schemas import DocumentCreate, DocumentUpdate, PaginationParams
 from uuid import UUID, uuid4
 from fastapi import HTTPException
 from services.structure_template_service import StructureTemplateService

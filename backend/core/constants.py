@@ -37,3 +37,20 @@ class EdgeTargetType(str, Enum):
     CORE_INFO = "core_info"
     SUMMARY   = "summary"
     CHAPTER   = "chapter"
+
+
+class ChapterStatus(int, Enum):
+    """章节状态：0=编辑中，1=已完成"""
+    EDITING = 0
+    DONE = 1
+
+
+class ParaType(str, Enum):
+    """段落类型"""
+    PARAGRAPH = "paragraph"
+    HEADING_1 = "heading-1"
+    HEADING_2 = "heading-2"
+    HEADING_3 = "heading-3"
+    HEADING_4 = "heading-4"
+    HEADING_5 = "heading-5"
+    HEADING_6 = "heading-6"

@@ -6,10 +6,10 @@ from db.mappers.paragraph_mapper import ParagraphMapper
 from db.mappers.dependency_edge_mapper import DependencyEdgeMapper
 from db.mappers.summary_mapper import SummaryMapper
 from db.models import Paragraph, Chapter, Document, StructureTemplate
-from schemas.schemas import ParagraphCreate, ParagraphUpdate
+from schemas.document_schemas import ParagraphCreate, ParagraphUpdate
 from uuid import UUID
 from fastapi import HTTPException
-from core.constants import EdgeSourceType, EdgeTargetType
+from core.constants import EdgeSourceType, EdgeTargetType, ParaType
 from core.utils import log_task_exception
 from services.ai_client import call_qwen_once
 
@@ -30,12 +30,12 @@ class ParagraphService:
         new_paragraph = Paragraph(
             chapter_id=chapter_id,
             content=paragraph_in.content,
-            para_type="paragraph",  # 默认类型为正文
+            para_type=ParaType.PARAGRAPH,
             order_index=order_index,
-            ai_eval=None,  # 默认为null
-            ai_suggestion=None,  # 默认为null
-            ai_generate=None,  # 默认为null
-            ischange=0  # 默认为0
+            ai_eval=None,
+            ai_suggestion=None,
+            ai_generate=None,
+            ischange=0
         )
         
         result = await ParagraphMapper.create_paragraph(db, new_paragraph)
@@ -107,7 +107,7 @@ class ParagraphService:
         new_paragraph = Paragraph(
             chapter_id=chapter_id,
             content=paragraph_in.content,
-            para_type="paragraph",
+            para_type=ParaType.PARAGRAPH,
             order_index=insert_index,
             ai_eval=None,
             ai_suggestion=None,

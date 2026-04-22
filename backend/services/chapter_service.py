@@ -3,9 +3,10 @@ from db.mappers.chapter_mapper import ChapterMapper
 from db.mappers.paragraph_mapper import ParagraphMapper
 from db.mappers.document_mapper import DocumentMapper
 from db.models import Chapter
-from schemas.schemas import ChapterUpdate
+from schemas.document_schemas import ChapterUpdate
 from uuid import UUID
 from fastapi import HTTPException
+from core.constants import ChapterStatus, ParaType
 
 class ChapterService:
     @staticmethod
@@ -127,8 +128,8 @@ class ChapterService:
         # 创建新章节，使用默认值
         new_chapter = Chapter(
             document_id=document_id,
-            title=f"新章节",  # 默认标题
-            status=0,  # 默认状态：0-编辑中
+            title=f"新章节",
+            status=ChapterStatus.EDITING,
             order_index=order_index
         )
         
@@ -159,8 +160,8 @@ class ChapterService:
         new_chapter = Chapter(
             document_id=document_id,
             parent_id=parent_id,
-            title=f"新子章节",  # 默认标题
-            status=0,  # 默认状态：0-编辑中
+            title=f"新子章节",
+            status=ChapterStatus.EDITING,
             order_index=order_index
         )
         
@@ -233,7 +234,7 @@ class ChapterService:
             document_id=document_id,
             parent_id=parent_id,
             title="新章节",
-            status=0,
+            status=ChapterStatus.EDITING,
             order_index=insert_index
         )
         result = await ChapterMapper.create_chapter(db, new_chapter)
@@ -252,15 +253,24 @@ class ChapterService:
             if not parent_chapter or parent_chapter.document_id != document_id:
                 raise HTTPException(status_code=404, detail="父章节不存在或不属于当前文档")
 
+        # 批量查询所有节点（1次查询）
+        chapters = await ChapterMapper.get_by_ids(db, ordered_ids)
+        chapter_map = {c.chapter_id: c for c in chapters}
+
+        # 验证所有节点存在
+        if len(chapters) != len(ordered_ids):
+            missing = set(ordered_ids) - set(chapter_map.keys())
+            raise HTTPException(status_code=404, detail=f"章节 {missing} 不存在")
+
+        # 构建更新列表
         items = []
         for idx, cid in enumerate(ordered_ids):
-            chapter = await ChapterMapper.get_chapter_by_id(db, cid)
-            if not chapter:
-                raise HTTPException(status_code=404, detail=f"章节 {cid} 不存在")
+            chapter = chapter_map[cid]
             item = {"chapter_id": cid, "order_index": idx}
             if chapter.parent_id != parent_id:
                 item["parent_id"] = parent_id
             items.append(item)
+
         await ChapterMapper.batch_update_order(db, items)
         await db.commit()
 
@@ -276,7 +286,10 @@ class ChapterService:
         # 提取目录结构
         toc = []
         for para in paragraphs:
-            if para.para_type in ['heading-1', 'heading-2', 'heading-3', 'heading-4', 'heading-5', 'heading-6']:
+            if para.para_type in (
+            ParaType.HEADING_1, ParaType.HEADING_2, ParaType.HEADING_3,
+            ParaType.HEADING_4, ParaType.HEADING_5, ParaType.HEADING_6,
+        ):
                 toc.append({
                     "id": str(para.paragraph_id),
                     "type": para.para_type,

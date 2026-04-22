@@ -1,6 +1,6 @@
 from core.response import success_response, ResponseModel
-from schemas.schemas import ChapterUpdate
-from schemas.response_schemas import ChapterResponse, ChapterTreeResponse, ChapterTocResponse
+from schemas.document_schemas import ChapterUpdate
+from schemas.response_schemas import ChapterResponse, ChapterTreeResponse, ChapterTocResponse, ChapterTreeNode, ParagraphInChapter, TocItem
 from services.chapter_service import ChapterService
 from services import ai_service
 
@@ -21,7 +21,6 @@ class ChapterReorder(BaseModel):
 
 @router.get("/chapters/document/{document_id}/tree", summary="获取文档章节层级目录", response_model=ResponseModel[ChapterTreeResponse])
 async def get_chapter_tree(document_id: UUID, db: AsyncSession = Depends(get_db)):
-    from schemas.response_schemas import ChapterTreeNode
     tree_data = await ChapterService.get_chapter_tree(db, document_id)
 
     def build_node(d) -> ChapterTreeNode:
@@ -42,7 +41,6 @@ async def get_chapter_tree(document_id: UUID, db: AsyncSession = Depends(get_db)
 
 @router.get("/chapters/{chapter_id}", summary="获取章节段落详情", response_model=ResponseModel[ChapterResponse])
 async def get_chapter_detail(chapter_id: UUID, db: AsyncSession = Depends(get_db)):
-    from schemas.response_schemas import ParagraphInChapter
     d = await ChapterService.get_chapter_detail(db, chapter_id)
     return success_response(data=ChapterResponse(
         chapter_id=d["chapter_id"],
@@ -137,7 +135,6 @@ async def reorder_chapters(document_id: UUID, data: ChapterReorder, db: AsyncSes
 
 @router.get("/chapters/{chapter_id}/toc", summary="获取章节内容目录", response_model=ResponseModel[ChapterTocResponse])
 async def get_chapter_toc(chapter_id: UUID, db: AsyncSession = Depends(get_db)):
-    from schemas.response_schemas import TocItem
     toc = await ChapterService.get_chapter_toc(db, chapter_id)
     return success_response(data=ChapterTocResponse(toc=[TocItem(**t) for t in toc]))
 

@@ -17,7 +17,7 @@ from uuid import UUID
 from core.auth import get_current_user
 from core.response import success_response, ResponseModel
 from db.session import get_db
-from schemas.schemas import UserCreate, UserLogin, UserUpdate, UserPasswordUpdate, Token, User as UserSchema
+from schemas.user_schemas import UserCreate, UserLogin, UserUpdate, UserPasswordUpdate, Token, User as UserSchema
 from services.user_service import UserService
 
 router = APIRouter(prefix="/api/v1/auth", tags=["认证"])

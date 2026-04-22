@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.session import get_db
-from schemas.schemas import CoreInfoCreate, CoreInfoUpdate, CoreInfoOrderUpdate
+from schemas.document_schemas import CoreInfoCreate, CoreInfoUpdate, CoreInfoOrderUpdate
 from schemas.response_schemas import CoreInfoResponse
 from services.core_info_service import CoreInfoService
 import uuid

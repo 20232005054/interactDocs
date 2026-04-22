@@ -9,7 +9,7 @@ from core.response import success_response, ResponseModel
 from db.session import get_db
 from services.paragraph_service import ParagraphService
 from services import ai_service
-from schemas.schemas import ParagraphCreate, ParagraphUpdate, AIAssistRequest
+from schemas.document_schemas import ParagraphCreate, ParagraphUpdate, AIAssistRequest
 from schemas.response_schemas import ParagraphResponse, ParagraphListResponse, ParagraphRelatedSummariesResponse, RelatedSummaryItem
 
 router = APIRouter(prefix="/api/v1", tags=["段落管理"])

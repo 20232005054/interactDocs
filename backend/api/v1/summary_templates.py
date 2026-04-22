@@ -10,7 +10,7 @@ from core.constants import UserRole, TemplateType
 from db.session import get_db
 from services.summary_template_service import SummaryTemplateService
 from services.template_service import TemplateService
-from schemas.schemas import SummaryTemplateCreate, SummaryTemplateUpdate
+from schemas.template_schemas import SummaryTemplateCreate, SummaryTemplateUpdate, SummaryTemplateInsertAfter, SummaryTemplateReorder
 from schemas.response_schemas import SummaryTemplateResponse, SummaryTemplateListResponse
 
 router = APIRouter(prefix="/api/v1/summary-templates", tags=["摘要模板管理"])
@@ -20,22 +20,7 @@ async def _check_template_permission(db, template_id: UUID, current_user):
     """系统模板只有 editor/admin 可写，私有模板所有登录用户可写"""
     tpl = await TemplateService.get_template(db, template_id)
     if tpl and tpl.template_type == TemplateType.SYSTEM and current_user.role not in (UserRole.EDITOR, UserRole.ADMIN):
-        from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="系统模板需要编辑权限")
-
-
-class SummaryTemplateInsertAfter(BaseModel):
-    after_id: UUID
-    title: str
-    generation_mode: int = 0
-    content_template: Optional[str] = None
-    sources: Optional[list] = None
-    default_prompt: Optional[str] = None
-    custom_prompt: Optional[str] = None
-
-
-class SummaryTemplateReorder(BaseModel):
-    ordered_ids: list[UUID]
 
 
 def _st_response(t) -> SummaryTemplateResponse:

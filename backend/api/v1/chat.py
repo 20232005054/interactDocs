@@ -10,32 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel
 
 from core.auth import get_current_user
 from core.response import success_response, ResponseModel
 from db.session import get_db
 from db.mappers.chat_mapper import ChatMapper
+from schemas.response_schemas import ChatRecordItem, ChatHistoryResponse
 
 router = APIRouter(prefix="/api/v1/documents", tags=["对话历史"])
-
-
-class ChatRecordItem(BaseModel):
-    chat_id: UUID
-    document_id: UUID
-    chapter_id: Optional[UUID] = None
-    role: str
-    message: str
-    response: Optional[str] = None
-    mode: str
-    created_at: datetime
-
-
-class ChatHistoryResponse(BaseModel):
-    total: int
-    page: int
-    page_size: int
-    items: list[ChatRecordItem]
 
 
 @router.get(

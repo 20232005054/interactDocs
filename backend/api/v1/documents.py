@@ -5,11 +5,13 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
-from schemas.schemas import DocumentCreate, DocumentUpdate, SnapshotUpdate, PaginationParams, ExportTemplatePayload
+from schemas.document_schemas import DocumentCreate, DocumentUpdate, SnapshotUpdate, PaginationParams, ExportTemplatePayload
 from schemas.response_schemas import (
     DocumentResponse, DocumentDetailResponse, DocumentListResponse,
+    DocumentListItem,
     SnapshotResponse, SnapshotListResponse,
     ApplyCoreInfoResponse, ApplySummaryResponse, ApplyStructureResponse, ApplyCoreInfoItem,
+    ApplySummaryItem, ApplyStructureItem,
     TemplateInfoResponse, FullContentResponse, FullContentChapter, FullContentParagraph,
     TemplateDetailResponse,
 )
@@ -44,7 +46,6 @@ async def list_documents(
     current_user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    from schemas.response_schemas import DocumentListItem
     total, documents = await DocumentService.list_documents(db, pagination, user_id=current_user.user_id)
     items = [
         DocumentListItem(
@@ -197,7 +198,6 @@ async def apply_core_info_template(document_id: UUID, current_user=Depends(get_c
 
 @router.post("/{document_id}/apply-summary-template", summary="应用摘要模板", response_model=ResponseModel[ApplySummaryResponse])
 async def apply_summary_template(document_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    from schemas.response_schemas import ApplySummaryItem
     created_items = await TemplateApplyService.apply_summary_template(db, document_id)
     return success_response(data=ApplySummaryResponse(
         message=f"成功创建 {len(created_items)} 个摘要",
@@ -220,7 +220,6 @@ async def apply_summary_template(document_id: UUID, current_user=Depends(get_cur
 
 @router.post("/{document_id}/apply-structure-template", summary="应用文章结构模板", response_model=ResponseModel[ApplyStructureResponse])
 async def apply_structure_template(document_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    from schemas.response_schemas import ApplyStructureItem
     created_items = await TemplateApplyService.apply_structure_template(db, document_id)
     return success_response(data=ApplyStructureResponse(
         message=f"成功创建 {len(created_items)} 个章节",
@@ -281,37 +280,4 @@ async def export_template(
     ))
 
 
-@router.post("/{document_id}/trigger-linkage", summary="手动触发文档核心信息变更联动", response_model=ResponseModel[None])
-async def trigger_linkage(
-    document_id: UUID,
-    current_user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    手动触发文档内所有 is_change=1 的核心信息的下游联动重新生成。
-    适用于批量更新核心信息后一次性触发，而不是每次 PUT 都自动触发。
-    """
-    from sqlalchemy import select
-    from db.models import DocumentCoreInfo
-    from services.core_info_change_service import handle_core_info_change_async
-    from core.utils import log_task_exception
-    import asyncio
 
-    result = await db.execute(
-        select(DocumentCoreInfo)
-        .where(DocumentCoreInfo.document_id == document_id)
-        .where(DocumentCoreInfo.is_change == 1)
-    )
-    pending = result.scalars().all()
-
-    if not pending:
-        return success_response(message="没有待处理的核心信息变更")
-
-    for ci in pending:
-        task = asyncio.create_task(
-            handle_core_info_change_async(ci.core_info_id, "", ci.content),
-            name=f"manual_linkage_{ci.core_info_id}",
-        )
-        task.add_done_callback(log_task_exception)
-
-    return success_response(message=f"已触发 {len(pending)} 个核心信息的联动更新")

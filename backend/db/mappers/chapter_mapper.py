@@ -28,6 +28,16 @@ class ChapterMapper:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def get_by_ids(db: AsyncSession, ids: list) -> list:
+        """批量按 ID 查询，用于 reorder 等需要一次取多个节点的场景"""
+        if not ids:
+            return []
+        result = await db.execute(
+            select(Chapter).where(Chapter.chapter_id.in_(ids))
+        )
+        return result.scalars().all()
+
+    @staticmethod
     async def create_chapter(db: AsyncSession, chapter):
         db.add(chapter)
         await db.flush()

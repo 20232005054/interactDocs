@@ -6,7 +6,7 @@ from typing import Optional
 from core.auth import get_admin_user
 from core.response import success_response, ResponseModel
 from db.session import get_db
-from schemas.schemas import PaginationParams
+from schemas.document_schemas import PaginationParams
 from schemas.response_schemas import DocumentListResponse
 from services.document_service import DocumentService
 

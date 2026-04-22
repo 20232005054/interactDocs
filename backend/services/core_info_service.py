@@ -1,9 +1,15 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.models import DocumentCoreInfo
 from db.mappers.core_info_mapper import CoreInfoMapper
-from schemas.schemas import CoreInfoCreate, CoreInfoUpdate
+from schemas.document_schemas import CoreInfoCreate, CoreInfoUpdate
+from schemas.response_schemas import CoreInfoResponse
+from fastapi import HTTPException
+import asyncio
 import uuid
 from sqlalchemy import select, func, update
+from sqlalchemy import update as sa_update
+from services.core_info_change_service import handle_core_info_change_async
+from core.utils import log_task_exception
 
 class CoreInfoService:
     @staticmethod
@@ -65,7 +71,6 @@ class CoreInfoService:
 
     @staticmethod
     async def get_core_info_tree(db: AsyncSession, document_id: uuid.UUID):
-        from schemas.response_schemas import CoreInfoResponse
 
         core_infos = await CoreInfoMapper.get_core_info_by_document_id(db, document_id)
 
@@ -135,9 +140,6 @@ class CoreInfoService:
 
         # 启动后台任务处理下游联动
         if "content" in update_data and new_content != old_content:
-            import asyncio
-            from services.core_info_change_service import handle_core_info_change_async
-            from core.utils import log_task_exception
             task = asyncio.create_task(
                 handle_core_info_change_async(core_info_id, old_content, new_content),
                 name=f"core_info_change_{core_info_id}",
@@ -176,18 +178,24 @@ class CoreInfoService:
         批量重排：传入同级节点新顺序 ID 列表，按下标重写 order_index。
         支持跨父节点移动：若节点原 parent_id 与传入 parent_id 不同，同时更新 parent_id。
         """
-        from sqlalchemy import update as sa_update
-
         # 前置验证 parent_id 存在性
         if parent_id is not None:
             parent_node = await CoreInfoMapper.get_core_info_by_id(db, parent_id)
             if not parent_node or parent_node.document_id != document_id:
                 raise ValueError(f"父节点 {parent_id} 不存在或不属于当前文档")
 
+        # 批量查询所有节点（1次查询）
+        nodes = await CoreInfoMapper.get_by_ids(db, ordered_ids)
+        node_map = {n.core_info_id: n for n in nodes}
+
+        # 验证所有节点存在
+        if len(nodes) != len(ordered_ids):
+            missing = set(ordered_ids) - set(node_map.keys())
+            raise ValueError(f"节点 {missing} 不存在")
+
+        # 批量更新（N 次 UPDATE，但 SELECT 已优化为 1 次）
         for idx, cid in enumerate(ordered_ids):
-            node = await CoreInfoMapper.get_core_info_by_id(db, cid)
-            if not node:
-                raise ValueError(f"节点 {cid} 不存在")
+            node = node_map[cid]
             values = {"order_index": idx}
             if node.parent_id != parent_id:
                 values["parent_id"] = parent_id
@@ -210,8 +218,6 @@ class CoreInfoService:
         after_id 所在节点的 order_index + 1 即为新节点位置，
         后续同级节点全部后移一位。
         """
-        from fastapi import HTTPException
-
         target = await CoreInfoMapper.get_core_info_by_id(db, after_id)
         if not target or target.document_id != document_id:
             raise HTTPException(status_code=404, detail="目标节点不存在或不属于当前文档")

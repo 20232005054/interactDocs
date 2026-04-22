@@ -10,7 +10,7 @@ from core.constants import UserRole, TemplateType
 from db.session import get_db
 from services.structure_template_service import StructureTemplateService
 from services.template_service import TemplateService
-from schemas.schemas import StructureTemplateCreate, StructureTemplateUpdate, StructureTemplateParagraphDef
+from schemas.template_schemas import StructureTemplateCreate, StructureTemplateUpdate, StructureTemplateParagraphDef, StructureTemplateInsertAfter, StructureTemplateReorder
 from schemas.response_schemas import StructureTemplateResponse, StructureTemplateListResponse, StructureTemplateTreeResponse
 
 router = APIRouter(prefix="/api/v1/structure-templates", tags=["文章结构模板管理"])
@@ -20,18 +20,6 @@ async def _check_template_permission(db, template_id: UUID, current_user):
     tpl = await TemplateService.get_template(db, template_id)
     if tpl and tpl.template_type == TemplateType.SYSTEM and current_user.role not in (UserRole.EDITOR, UserRole.ADMIN):
         raise HTTPException(status_code=403, detail="系统模板需要编辑权限")
-
-
-class StructureTemplateInsertAfter(BaseModel):
-    after_id: UUID
-    title: str
-    level: int
-    paragraphs: Optional[List[StructureTemplateParagraphDef]] = None
-
-
-class StructureTemplateReorder(BaseModel):
-    parent_id: Optional[UUID] = None
-    ordered_ids: List[UUID]
 
 
 def _struct_response(t) -> StructureTemplateResponse:

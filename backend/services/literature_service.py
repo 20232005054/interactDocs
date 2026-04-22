@@ -312,10 +312,15 @@ class LiteratureService:
             raise HTTPException(status_code=400, detail="文献文件不存在，无法重试")
 
         # 从存储读取文件
-        object_key = "literature/" + lit.source_file.split("/literature/")[-1]
+        # 兼容本地路径（/static/literature/xxx.pdf）和 OSS URL，统一提取 object_key
+        source = lit.source_file
+        if "/literature/" in source:
+            object_key = "literature/" + source.split("/literature/")[-1].lstrip("/")
+        else:
+            raise HTTPException(status_code=400, detail="无法解析文献文件路径，无法重试")
         file_content = await read_file(object_key)
 
-        # 清空旧 chunks
+        # 清空旧 chunks，并将状态重置为 pending（独立 session，避免与路由 session 混用）
         async with AsyncSessionLocal() as db2:
             await LiteratureChunkMapper.delete_by_literature_id(db2, literature_id)
             await LiteratureMapper.update_status(db2, literature_id, "pending", None)
@@ -332,4 +337,6 @@ class LiteratureService:
         )
         task.add_done_callback(log_task_exception)
 
-        return await LiteratureMapper.get_by_id(db, literature_id)
+        # 用独立 session 读取最新状态返回，避免路由 session 缓存旧数据
+        async with AsyncSessionLocal() as db3:
+            return await LiteratureMapper.get_by_id(db3, literature_id)

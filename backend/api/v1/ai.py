@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
-from schemas.schemas import AIChatRequest
+from schemas.document_schemas import AIChatRequest
 from services.ai_chat_service import AIChatService
 
 router = APIRouter(prefix="/api/v1/ai")

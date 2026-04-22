@@ -15,8 +15,17 @@ backend/
     models.py     # SQLAlchemy ORM 模型，只定义表结构
     mappers/      # 数据访问层，每个文件对应一张表，只写 SQL/ORM 查询
   schemas/
-    schemas.py    # 请求体 Pydantic 模型（Create / Update / Payload）
-    response_schemas.py  # 响应体 Pydantic 模型（Response / ListResponse）
+    user_schemas.py      # 用户认证相关请求体 schema
+    document_schemas.py  # 文档、章节、段落、摘要、核心信息相关请求体 schema
+    template_schemas.py  # 模板系统相关请求体 schema
+    response_schemas/    # 响应体 schema 包，按业务域分文件
+      __init__.py        # 统一导出，外部 import 路径：from schemas.response_schemas import XxxResponse
+      document.py        # 文档、快照
+      chapter.py         # 段落、章节、全量内容
+      summary.py         # 摘要、摘要 AI、关联查询
+      core_info.py       # 核心信息
+      template.py        # 模板主表 + 三类子模板 + 应用结果 + 依赖关系
+      misc.py            # 操作历史、依赖图谱、文献
   core/           # 全局配置、认证、常量、响应工具
 ```
 
@@ -120,10 +129,13 @@ while True:
 
 ## 7. Schema 规范
 
-- 请求体 schema 放 `schemas/schemas.py`，响应体 schema 放 `schemas/response_schemas.py`
+- 请求体 schema 按业务域分文件存放在 `schemas/` 下（`user_schemas.py` / `document_schemas.py` / `template_schemas.py`），import 直接指向具体文件：`from schemas.document_schemas import XxxCreate`
+- 响应体 schema 存放在 `schemas/response_schemas/` 包中，按业务域分子文件，统一通过包入口导出：`from schemas.response_schemas import XxxResponse`
+- 新增响应 schema 时，根据业务域放入对应子文件，并在 `__init__.py` 补充导出
 - 字段命名与数据库列名保持一致（snake_case）
 - Create schema 必填字段不加 `Optional`，Update schema 所有字段加 `Optional`
 - 树形结构的响应 schema 需要 `model_rebuild()` 处理自引用
+- **禁止使用 `Optional[Any]`**，必须用具体类型；JSONB 字段结构复杂时用 `dict` / `list` 并在注释里说明结构
 
 ```python
 # 正确
@@ -212,4 +224,47 @@ async def run_ai(item):
         return await some_ai_call(...)
 
 results = await asyncio.gather(*[run_ai(item) for item in items])
+```
+
+---
+
+## 14. 文件存储规范
+
+- 所有文件操作（上传/删除/读取）统一通过 `services/oss_service.py` 的公共接口：`upload_file()` / `delete_file()` / `read_file()` / `build_url()`
+- 不在业务代码里直接调用 `oss2` 或 `open()`，不判断 `STORAGE_BACKEND` 环境变量
+- 存储后端通过 `STORAGE_BACKEND=local|oss` 切换，业务代码无感知
+- 图片上传用 `upload_image()` 封装（含格式校验和大小限制）
+
+---
+
+## 15. 接口生命周期原则
+
+- **接口存在的依据是前端有调用，不是"可能有用"**
+- 新增接口前确认前端有明确需求，不提前设计"预留接口"
+- 定期清理无引用的接口（通过前端代码搜索验证）
+- 功能迭代时，旧接口若无人使用应直接删除，不保留"兼容层"
+
+---
+
+## 16. 独立 Session 数据一致性
+
+**问题场景：** 路由注入的 `db` session 有 identity map 缓存，在其他独立 session 提交数据后，用原 `db` 读取会拿到旧对象。
+
+**规范：**
+- 后台任务或独立 `AsyncSessionLocal()` session 提交数据后，若需要返回最新状态给路由，**必须用新 session 读取**
+- 不能复用路由注入的 `db` session 读取其他 session 提交的数据
+
+```python
+# 错误：后台任务在 db2 里提交，但用路由 db 读取
+async with AsyncSessionLocal() as db2:
+    await update_status(db2, obj_id, "pending")
+    await db2.commit()
+return await Mapper.get_by_id(db, obj_id)  # ❌ 拿到的是旧缓存
+
+# 正确：用独立 session 读取最新数据
+async with AsyncSessionLocal() as db2:
+    await update_status(db2, obj_id, "pending")
+    await db2.commit()
+async with AsyncSessionLocal() as db3:
+    return await Mapper.get_by_id(db3, obj_id)  # ✅ 拿到最新状态
 ```

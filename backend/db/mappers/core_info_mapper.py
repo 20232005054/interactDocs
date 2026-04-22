@@ -29,6 +29,16 @@ class CoreInfoMapper:
         return result.scalars().all()
     
     @staticmethod
+    async def get_by_ids(db: AsyncSession, ids: list) -> list:
+        """批量按 ID 查询，用于 reorder 等需要一次取多个节点的场景"""
+        if not ids:
+            return []
+        result = await db.execute(
+            select(DocumentCoreInfo).where(DocumentCoreInfo.core_info_id.in_(ids))
+        )
+        return result.scalars().all()
+
+    @staticmethod
     async def update_core_info(db: AsyncSession, core_info_id: uuid.UUID, update_data: dict) -> DocumentCoreInfo:
         await db.execute(
             update(DocumentCoreInfo)

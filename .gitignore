@@ -36,3 +36,7 @@ temp/
 
 # 检索知识库
 reference/
+
+# 开发日志（本地私人记录，不提交）
+devlogs/
+.kiro/steering/devlog.md

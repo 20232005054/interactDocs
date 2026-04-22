@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.mappers.summary_mapper import SummaryMapper
 from db.mappers.dependency_edge_mapper import DependencyEdgeMapper
 from db.models import DocumentSummary, DocumentSummaryHistory
-from schemas.schemas import DocumentSummaryUpdate
+from schemas.document_schemas import DocumentSummaryUpdate
 from uuid import UUID
 from sqlalchemy import func, select, update
 from fastapi import HTTPException

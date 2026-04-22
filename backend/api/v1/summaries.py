@@ -1,5 +1,5 @@
 from core.response import success_response, ResponseModel
-from schemas.schemas import DocumentSummaryUpdate
+from schemas.document_schemas import DocumentSummaryUpdate, SummaryReorderPayload
 from schemas.response_schemas import SummaryResponse, SummaryWithAIResponse, SummaryListResponse, SummaryAIAssistResponse, SummaryAIGenerateItem, SummaryAIGenerateResponse, SummaryRelatedParagraphsResponse, RelatedParagraphItem
 from services.summary_service import SummaryService
 
@@ -13,16 +13,6 @@ from services import ai_service
 from core.auth import get_current_user
 
 router = APIRouter(prefix="/api/v1", tags=["摘要管理"])
-
-
-class AIAssistSummaryRequest(BaseModel):
-    document_id: UUID
-    summary_ids: Optional[List[str]] = Field(None, description="摘要ID列表")
-    keywords: Optional[List[str]] = Field(None, description="关键词ID列表")
-
-
-class SummaryReorderPayload(BaseModel):
-    ordered_ids: List[UUID] = Field(..., description="摘要 ID 按新顺序排列的列表")
 
 
 def _summary_response(s) -> SummaryResponse:

@@ -14,7 +14,7 @@ from db.models import User
 from db.mappers.user_mapper import UserMapper
 from core.constants import UserRole
 from core.security import hash_password, verify_password, create_access_token
-from schemas.schemas import UserCreate, UserLogin, UserUpdate
+from schemas.user_schemas import UserCreate, UserLogin, UserUpdate
 
 class UserService:
 

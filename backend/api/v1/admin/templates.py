@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from core.auth import get_admin_user
 from core.response import success_response, ResponseModel
 from db.session import get_db
-from schemas.schemas import PaginationParams
+from schemas.document_schemas import PaginationParams
 from schemas.response_schemas import TemplateListResponse, TemplateResponse
 from services.template_service import TemplateService
 

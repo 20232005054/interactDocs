@@ -9,7 +9,8 @@ from core.response import success_response, ResponseModel
 from db.session import get_db
 from services.template_service import TemplateService
 from schemas.response_schemas import TemplateResponse, TemplateDetailResponse, TemplateListResponse, TemplateSimpleListResponse, PurposeListResponse, TemplateDependenciesResponse, TemplateInfoResponse
-from schemas.schemas import ExportTemplatePayload, TemplateContent, TemplateCreatePayload, TemplateUpdatePayload
+from schemas.template_schemas import TemplateContent, TemplateCreatePayload, TemplateUpdatePayload
+from schemas.document_schemas import ExportTemplatePayload
 from core.auth import get_editor_user, get_admin_user, get_current_user
 from core.constants import TemplateType
 
