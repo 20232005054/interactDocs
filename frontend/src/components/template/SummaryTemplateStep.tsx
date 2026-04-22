@@ -220,9 +220,9 @@ function SummaryCard({
               <span className="shrink-0 text-gray-500">引用来源:</span>
               {dependencyItem?.references?.length ? (
                 <div className="flex flex-wrap gap-1.5">
-                  {dependencyItem.references.slice(0, 4).map((ref, i) => (
+                  {dependencyItem.references.slice(0, 4).map((ref) => (
                     <span
-                      key={`summary-ref-${item.field_key}-${ref.type}-${ref.field_key}-${i}`}
+                      key={`summary-ref-${item.field_key}-${ref.type}-${ref.field_key}`}
                       className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-blue-700"
                       title={`${ref.type}/${ref.field_key}`}
                     >
@@ -241,9 +241,9 @@ function SummaryCard({
               <span className="shrink-0 text-gray-500">被章节引用:</span>
               {dependencyItem?.referenced_by?.length ? (
                 <div className="flex flex-wrap gap-1.5">
-                  {dependencyItem.referenced_by.slice(0, 4).map((ref, i) => (
+                  {dependencyItem.referenced_by.slice(0, 4).map((ref) => (
                     <span
-                      key={`summary-down-${item.field_key}-${ref.type}-${ref.field_key}-${i}`}
+                      key={`summary-down-${item.field_key}-${ref.type}-${ref.field_key}`}
                       className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700"
                       title={`${ref.type}/${ref.field_key}`}
                     >

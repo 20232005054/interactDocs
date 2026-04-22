@@ -20,9 +20,9 @@ function RefTags({ title, items, emptyText }: { title: string; items: Array<{ la
       <span className="text-xs font-medium text-gray-500">{title}</span>
       {items.length > 0 ? (
         <div className="flex flex-wrap gap-1.5">
-          {items.map((item, i) => (
+          {items.map((item) => (
             <span
-              key={`${title}-${item.field_key}-${item.label}-${i}`}
+              key={`${title}-${item.field_key}-${item.label}`}
               className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] text-gray-600"
             >
               {item.label}

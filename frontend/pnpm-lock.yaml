@@ -14,6 +14,18 @@ importers:
       '@tiptap/extension-placeholder':
         specifier: ^3.22.3
         version: 3.22.3(@tiptap/extensions@3.22.3(@tiptap/core@3.22.3(@tiptap/pm@3.22.3))(@tiptap/pm@3.22.3))
+      '@tiptap/extension-table':
+        specifier: ^3.22.4
+        version: 3.22.4(@tiptap/core@3.22.3(@tiptap/pm@3.22.3))(@tiptap/pm@3.22.3)
+      '@tiptap/extension-table-cell':
+        specifier: ^3.22.4
+        version: 3.22.4(@tiptap/extension-table@3.22.4(@tiptap/core@3.22.3(@tiptap/pm@3.22.3))(@tiptap/pm@3.22.3))
+      '@tiptap/extension-table-header':
+        specifier: ^3.22.4
+        version: 3.22.4(@tiptap/extension-table@3.22.4(@tiptap/core@3.22.3(@tiptap/pm@3.22.3))(@tiptap/pm@3.22.3))
+      '@tiptap/extension-table-row':
+        specifier: ^3.22.4
+        version: 3.22.4(@tiptap/extension-table@3.22.4(@tiptap/core@3.22.3(@tiptap/pm@3.22.3))(@tiptap/pm@3.22.3))
       '@tiptap/extension-text-align':
         specifier: ^3.22.3
         version: 3.22.3(@tiptap/core@3.22.3(@tiptap/pm@3.22.3))
@@ -56,15 +68,15 @@ importers:
       react-dom:
         specifier: 19.2.4
         version: 19.2.4(react@19.2.4)
-      react-furry-error:
-        specifier: ^0.1.0
-        version: 0.1.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       shadcn:
         specifier: ^4.1.0
         version: 4.2.0(@types/node@20.19.39)(typescript@5.9.3)
       tailwind-merge:
         specifier: ^3.5.0
         version: 3.5.0
+      tiptap-markdown:
+        specifier: ^0.9.0
+        version: 0.9.0(@tiptap/core@3.22.3(@tiptap/pm@3.22.3))
       tw-animate-css:
         specifier: ^1.4.0
         version: 1.4.0
@@ -1579,6 +1591,27 @@ packages:
     peerDependencies:
       '@tiptap/core': ^3.22.3
 
+  '@tiptap/extension-table-cell@3.22.4':
+    resolution: {integrity: sha512-uvFegCc1UQYK2nfIV2sIHg+hzLIMroJJm00XomzBgC1w/eSO7Ui8APiDh/baBcTPpCSU3SLiQLTgx7AU7oE3pg==}
+    peerDependencies:
+      '@tiptap/extension-table': 3.22.4
+
+  '@tiptap/extension-table-header@3.22.4':
+    resolution: {integrity: sha512-V4kLLWeRdc/I+IXiXZZhLAjsaHHiJWuLXTuOtZRDrCxQUiFLi4AgNg1DPQ09JAANkEWDhXq3x6BoUXaFwumbEw==}
+    peerDependencies:
+      '@tiptap/extension-table': 3.22.4
+
+  '@tiptap/extension-table-row@3.22.4':
+    resolution: {integrity: sha512-9tdS6jgS6DqUu5TpEmNrRoo/DL5Xam0PyrQaUEXUC+ssci+bMRCJ8PAWMcunNsI9NKf/Tb3wYrv6hGFChaT9uA==}
+    peerDependencies:
+      '@tiptap/extension-table': 3.22.4
+
+  '@tiptap/extension-table@3.22.4':
+    resolution: {integrity: sha512-kjvLv3Z4JI+1tLDqZKa+bKU8VcxY+ZOyMCKWQA7wYmy8nKWkLJ60W+xy8AcXXpHB2goCIgSFLhsTyswx0GXH4w==}
+    peerDependencies:
+      '@tiptap/core': 3.22.4
+      '@tiptap/pm': 3.22.4
+
   '@tiptap/extension-text-align@3.22.3':
     resolution: {integrity: sha512-dG1NHE0yGf7fYiOdabCJuecI2IJ1uogyY/QvZqvPNaxRjZDoXYuGlMtz9jEDiIdQSaPED2MSsS7KkuNFQIEMGg==}
     peerDependencies:
@@ -1636,11 +1669,20 @@ packages:
   '@types/json5@0.0.29':
     resolution: {integrity: sha512-dRLjCWHYg4oaA77cxO64oO+7JwCwnIzkZPdrrC71jQmQtlhM556pwKo5bUzqvZndkVbeFLIIi+9TC40JNF5hNQ==}
 
+  '@types/linkify-it@3.0.5':
+    resolution: {integrity: sha512-yg6E+u0/+Zjva+buc3EIb+29XEg4wltq7cSmd4Uc2EE/1nUVmxyzpX6gUXD0V8jIrG0r7YeOGVIbYRkxeooCtw==}
+
   '@types/linkify-it@5.0.0':
     resolution: {integrity: sha512-sVDA58zAw4eWAffKOaQH5/5j3XeayukzDk+ewSsnv3p4yJEZHCCzMDiZM8e0OUrRvmpGZ85jf4yDHkHsgBNr9Q==}
 
+  '@types/markdown-it@13.0.9':
+    resolution: {integrity: sha512-1XPwR0+MgXLWfTn9gCsZ55AHOKW1WN+P9vr0PaQh5aerR9LLQXUbjfEAFhjmEmyoYFWAyuN2Mqkn40MZ4ukjBw==}
+
   '@types/markdown-it@14.1.2':
     resolution: {integrity: sha512-promo4eFwuiW+TfGxhi+0x3czqTYJkG8qB17ZUJiVF10Xm7NLVRSLUsfRTU/6h1e24VvRnXCx+hG7li58lkzog==}
+
+  '@types/mdurl@1.0.5':
+    resolution: {integrity: sha512-6L6VymKTzYSrEf4Nev4Xa1LCHKrlTlYCBMTlQKFuddo1CvQcE52I0mwfOJayueUC7MJuXOeHTcIU683lzd0cUA==}
 
   '@types/mdurl@2.0.0':
     resolution: {integrity: sha512-RGdgjQUZba5p6QEFAVx2OGb8rQDL/cPRG7GiedRzMcJ1tYnUANBncjbSB1NRGwbvjcPeikRABz2nshyPk1bhWg==}
@@ -3109,6 +3151,9 @@ packages:
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
 
+  markdown-it-task-lists@2.1.1:
+    resolution: {integrity: sha512-TxFAc76Jnhb2OUu+n3yz9RMu4CwGfaT788br6HhEDlvWfdeJcLUsxk1Hgw2yJio0OXsxv7pyIPmvECY7bMbluA==}
+
   markdown-it@14.1.1:
     resolution: {integrity: sha512-BuU2qnTti9YKgK5N+IeMubp14ZUKUUw7yeJbkjtosvHiP0AZ5c8IAgEMk79D0eC8F23r4Ac/q8cAIFdm2FtyoA==}
     hasBin: true
@@ -3533,12 +3578,6 @@ packages:
     peerDependencies:
       react: ^19.2.4
 
-  react-furry-error@0.1.0:
-    resolution: {integrity: sha512-jNzYcHLuB3p+SIhfhK4jiivlmgs1Si1F2bfUKYDd6cvBHbVQn7tlu4yBeAJXEw8uQultkJzT++RQHfydfWqDRQ==}
-    peerDependencies:
-      react: '>=16.8.0'
-      react-dom: '>=16.8.0'
-
   react-is@16.13.1:
     resolution: {integrity: sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==}
 
@@ -3851,6 +3890,11 @@ packages:
   tinyglobby@0.2.16:
     resolution: {integrity: sha512-pn99VhoACYR8nFHhxqix+uvsbXineAasWm5ojXoN8xEwK5Kd3/TrhNn1wByuD52UxWRLy8pu+kRMniEi6Eq9Zg==}
     engines: {node: '>=12.0.0'}
+
+  tiptap-markdown@0.9.0:
+    resolution: {integrity: sha512-dKLQ9iiuGNgrlGVjrNauF/UBzWu4LYOx5pkD0jNkmQt/GOwfCJsBuzZTsf1jZ204ANHOm572mZ9PYvGh1S7tpQ==}
+    peerDependencies:
+      '@tiptap/core': ^3.0.1
 
   tldts-core@7.0.28:
     resolution: {integrity: sha512-7W5Efjhsc3chVdFhqtaU0KtK32J37Zcr9RKtID54nG+tIpcY79CQK/veYPODxtD/LJ4Lue66jvrQzIX2Z2/pUQ==}
@@ -5603,6 +5647,23 @@ snapshots:
     dependencies:
       '@tiptap/core': 3.22.3(@tiptap/pm@3.22.3)
 
+  '@tiptap/extension-table-cell@3.22.4(@tiptap/extension-table@3.22.4(@tiptap/core@3.22.3(@tiptap/pm@3.22.3))(@tiptap/pm@3.22.3))':
+    dependencies:
+      '@tiptap/extension-table': 3.22.4(@tiptap/core@3.22.3(@tiptap/pm@3.22.3))(@tiptap/pm@3.22.3)
+
+  '@tiptap/extension-table-header@3.22.4(@tiptap/extension-table@3.22.4(@tiptap/core@3.22.3(@tiptap/pm@3.22.3))(@tiptap/pm@3.22.3))':
+    dependencies:
+      '@tiptap/extension-table': 3.22.4(@tiptap/core@3.22.3(@tiptap/pm@3.22.3))(@tiptap/pm@3.22.3)
+
+  '@tiptap/extension-table-row@3.22.4(@tiptap/extension-table@3.22.4(@tiptap/core@3.22.3(@tiptap/pm@3.22.3))(@tiptap/pm@3.22.3))':
+    dependencies:
+      '@tiptap/extension-table': 3.22.4(@tiptap/core@3.22.3(@tiptap/pm@3.22.3))(@tiptap/pm@3.22.3)
+
+  '@tiptap/extension-table@3.22.4(@tiptap/core@3.22.3(@tiptap/pm@3.22.3))(@tiptap/pm@3.22.3)':
+    dependencies:
+      '@tiptap/core': 3.22.3(@tiptap/pm@3.22.3)
+      '@tiptap/pm': 3.22.3
+
   '@tiptap/extension-text-align@3.22.3(@tiptap/core@3.22.3(@tiptap/pm@3.22.3))':
     dependencies:
       '@tiptap/core': 3.22.3(@tiptap/pm@3.22.3)
@@ -5706,12 +5767,21 @@ snapshots:
 
   '@types/json5@0.0.29': {}
 
+  '@types/linkify-it@3.0.5': {}
+
   '@types/linkify-it@5.0.0': {}
+
+  '@types/markdown-it@13.0.9':
+    dependencies:
+      '@types/linkify-it': 3.0.5
+      '@types/mdurl': 1.0.5
 
   '@types/markdown-it@14.1.2':
     dependencies:
       '@types/linkify-it': 5.0.0
       '@types/mdurl': 2.0.0
+
+  '@types/mdurl@1.0.5': {}
 
   '@types/mdurl@2.0.0': {}
 
@@ -7263,6 +7333,8 @@ snapshots:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
 
+  markdown-it-task-lists@2.1.1: {}
+
   markdown-it@14.1.1:
     dependencies:
       argparse: 2.0.1
@@ -7785,11 +7857,6 @@ snapshots:
       react: 19.2.4
       scheduler: 0.27.0
 
-  react-furry-error@0.1.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4):
-    dependencies:
-      react: 19.2.4
-      react-dom: 19.2.4(react@19.2.4)
-
   react-is@16.13.1: {}
 
   react-remove-scroll-bar@2.3.8(@types/react@19.2.14)(react@19.2.4):
@@ -8212,6 +8279,14 @@ snapshots:
     dependencies:
       fdir: 6.5.0(picomatch@4.0.4)
       picomatch: 4.0.4
+
+  tiptap-markdown@0.9.0(@tiptap/core@3.22.3(@tiptap/pm@3.22.3)):
+    dependencies:
+      '@tiptap/core': 3.22.3(@tiptap/pm@3.22.3)
+      '@types/markdown-it': 13.0.9
+      markdown-it: 14.1.1
+      markdown-it-task-lists: 2.1.1
+      prosemirror-markdown: 1.13.4
 
   tldts-core@7.0.28: {}
 
