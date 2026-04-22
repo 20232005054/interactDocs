@@ -30,8 +30,16 @@ JWT_ALGORITHM: str = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "10080"))  # 默认 7 天
 
 # ============================================================
-# 阿里云 OSS
+# 文件存储
 # ============================================================
+# STORAGE_BACKEND: local（默认）或 oss（阿里云）
+STORAGE_BACKEND: str = os.getenv("STORAGE_BACKEND", "local")
+
+# 本地存储配置（STORAGE_BACKEND=local 时生效）
+LOCAL_STORAGE_PATH: str = os.getenv("LOCAL_STORAGE_PATH", os.path.join(os.path.dirname(__file__), "..", "static"))
+LOCAL_STORAGE_URL_PREFIX: str = os.getenv("LOCAL_STORAGE_URL_PREFIX", "/static")
+
+# 阿里云 OSS 配置（STORAGE_BACKEND=oss 时生效）
 OSS_ACCESS_KEY_ID: str = os.getenv("OSS_ACCESS_KEY_ID", "")
 OSS_ACCESS_KEY_SECRET: str = os.getenv("OSS_ACCESS_KEY_SECRET", "")
 OSS_ENDPOINT: str = os.getenv("OSS_ENDPOINT", "oss-cn-beijing.aliyuncs.com")

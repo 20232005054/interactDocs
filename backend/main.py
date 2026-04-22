@@ -3,11 +3,13 @@ from fastapi import FastAPI, Request, Depends
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer
 from fastapi.exceptions import HTTPException, RequestValidationError
+from fastapi.staticfiles import StaticFiles
 from api.v1 import documents, chapters, paragraphs, ai, endpoints, summaries, templates, core_info, core_info_templates, summary_templates, structure_templates
 from api.v1 import auth, upload, events, export, chat, literature
 from api.v1.admin import users as admin_users, documents as admin_documents, stats as admin_stats, templates as admin_templates
 from core.response import http_exception_handler, validation_exception_handler, generic_exception_handler
 from core.security import decode_token
+import os
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -65,7 +67,7 @@ async def auth_middleware(request: Request, call_next):
     if request.method == "OPTIONS":
         return await call_next(request)
 
-    if request.url.path in _PUBLIC_PATHS or request.url.path.startswith("/docs"):
+    if request.url.path in _PUBLIC_PATHS or request.url.path.startswith("/docs") or request.url.path.startswith("/static"):
         return await call_next(request)
 
     auth_header = request.headers.get("Authorization", "")
@@ -112,6 +114,13 @@ app.include_router(admin_templates.router)
 @app.get("/")
 async def root():
     return {"message": "Protocol Generation API is running."}
+
+
+# 挂载本地静态文件目录（STORAGE_BACKEND=local 时提供文件访问）
+from core.config import STORAGE_BACKEND, LOCAL_STORAGE_PATH
+if STORAGE_BACKEND == "local":
+    os.makedirs(LOCAL_STORAGE_PATH, exist_ok=True)
+    app.mount("/static", StaticFiles(directory=LOCAL_STORAGE_PATH), name="static")
 
 if __name__ == "__main__":
     import uvicorn

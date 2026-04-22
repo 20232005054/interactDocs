@@ -28,7 +28,7 @@ from db.mappers.literature_chunk_mapper import LiteratureChunkMapper
 from db.models import Literature, LiteratureChunk
 from db.session import AsyncSessionLocal
 from services.ai_client import get_embedding
-from services.oss_service import _get_bucket, _build_url
+from services.oss_service import build_url, upload_file, delete_file, read_file
 
 logger = logging.getLogger(__name__)
 
@@ -241,17 +241,9 @@ class LiteratureService:
             from fastapi import HTTPException
             raise HTTPException(status_code=400, detail="文件大小不能超过 30MB")
 
-        # 上传 OSS
-        import asyncio
+        # 上传文件
         object_key = f"literature/{uuid4().hex}.pdf"
-        bucket = _get_bucket()
-        await asyncio.to_thread(
-            bucket.put_object,
-            object_key,
-            file_content,
-            headers={"Content-Type": "application/pdf"},
-        )
-        file_url = _build_url(object_key)
+        file_url = await upload_file(file_content, object_key, "application/pdf")
 
         # 创建记录
         literature = Literature(
@@ -292,18 +284,15 @@ class LiteratureService:
         if not lit:
             raise HTTPException(status_code=404, detail="文献不存在")
 
-        # 异步清理 OSS 文件
+        # 异步清理文件
         if lit.source_file:
-            async def _delete_oss():
+            async def _delete_storage():
                 try:
-                    import asyncio
-                    object_key = lit.source_file.split("/literature/")[-1]
-                    object_key = f"literature/{object_key}"
-                    bucket = _get_bucket()
-                    await asyncio.to_thread(bucket.delete_object, object_key)
+                    object_key = "literature/" + lit.source_file.split("/literature/")[-1]
+                    await delete_file(object_key)
                 except Exception as e:
-                    logger.warning("OSS 文件删除失败: %s", e)
-            task = asyncio.create_task(_delete_oss(), name=f"oss_delete_{literature_id}")
+                    logger.warning("文件删除失败: %s", e)
+            task = asyncio.create_task(_delete_storage(), name=f"storage_delete_{literature_id}")
             task.add_done_callback(log_task_exception)
 
         await LiteratureMapper.delete(db, literature_id)
@@ -322,11 +311,9 @@ class LiteratureService:
         if not lit.source_file:
             raise HTTPException(status_code=400, detail="文献文件不存在，无法重试")
 
-        # 从 OSS 下载文件
+        # 从存储读取文件
         object_key = "literature/" + lit.source_file.split("/literature/")[-1]
-        bucket = _get_bucket()
-        result = await asyncio.to_thread(bucket.get_object, object_key)
-        file_content = await asyncio.to_thread(result.read)
+        file_content = await read_file(object_key)
 
         # 清空旧 chunks
         async with AsyncSessionLocal() as db2:
