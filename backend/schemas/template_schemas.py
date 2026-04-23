@@ -170,3 +170,16 @@ class StructureTemplateInsertAfter(BaseModel):
 class StructureTemplateReorder(BaseModel):
     parent_id: Optional[UUID] = Field(None, description="同级父节点ID，根节点传 null")
     ordered_ids: List[UUID] = Field(..., description="同级节点按新顺序排列的 ID 列表")
+
+
+# ============================================================
+# 文献
+# ============================================================
+
+class LiteratureUpdate(BaseModel):
+    """更新文献元数据（用于 CrossRef 解析失败时手动补充）"""
+    title: Optional[str] = Field(None, description="文献标题")
+    authors: Optional[str] = Field(None, description="作者列表，逗号分隔")
+    journal: Optional[str] = Field(None, description="期刊名称")
+    doi: Optional[str] = Field(None, description="DOI")
+    impact_factor: Optional[float] = Field(None, description="影响因子")

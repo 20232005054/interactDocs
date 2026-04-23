@@ -2,6 +2,7 @@ from sqlalchemy import Column, String, Text, Integer, TIMESTAMP, ForeignKey, ARR
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship, declarative_base
 from sqlalchemy.sql import func
+from pgvector.sqlalchemy import Vector
 import uuid
 
 Base = declarative_base()
@@ -298,11 +299,12 @@ class DependencyEdge(Base):
 
 
 class Literature(Base):
-    """文献主表，绑定到原始模板（type=1 或 type=2）"""
+    """文献主表，独立存在，通过 TemplateLiterature 关联表绑定到模板"""
     __tablename__ = "literature"
 
     literature_id   = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    template_id     = Column(UUID(as_uuid=True), ForeignKey("templates.template_id", ondelete="CASCADE"), nullable=False)
+    literature_key  = Column(String(20), nullable=False, unique=True)
+    # literature_key: 系统生成的业务标识符，格式 lit_xxxxxxxx，用于跨系统导入导出匹配
     title           = Column(String(500), nullable=True)
     authors         = Column(Text, nullable=True)
     journal         = Column(String(200), nullable=True)
@@ -313,10 +315,26 @@ class Literature(Base):
     upload_status   = Column(String(20), nullable=False, default="pending")
     # upload_status: pending / processing / ready / failed
     error_message   = Column(Text, nullable=True)
+    scope           = Column(String(20), nullable=False, default="private")
+    # scope: 'public'=admin/editor 维护的公共文献, 'private'=用户私有文献
+    user_id         = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=True)
     created_at      = Column(TIMESTAMP, server_default=func.now())
 
     chunks          = relationship("LiteratureChunk", back_populates="literature", cascade="all, delete-orphan")
     citations       = relationship("DocumentCitation", back_populates="literature", cascade="all, delete-orphan")
+    template_links  = relationship("TemplateLiterature", back_populates="literature", cascade="all, delete-orphan")
+
+
+class TemplateLiterature(Base):
+    """模板-文献关联表（多对多），文献可复用到多个模板"""
+    __tablename__ = "template_literature"
+
+    id              = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    template_id     = Column(UUID(as_uuid=True), ForeignKey("templates.template_id", ondelete="CASCADE"), nullable=False)
+    literature_id   = Column(UUID(as_uuid=True), ForeignKey("literature.literature_id", ondelete="CASCADE"), nullable=False)
+    created_at      = Column(TIMESTAMP, server_default=func.now())
+
+    literature      = relationship("Literature", back_populates="template_links")
 
 
 class LiteratureChunk(Base):

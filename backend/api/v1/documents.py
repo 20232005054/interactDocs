@@ -280,4 +280,41 @@ async def export_template(
     ))
 
 
+@router.post(
+    "/{document_id}/sync-template",
+    summary="同步文档模板到原始模板最新版本",
+    response_model=ResponseModel[TemplateDetailResponse],
+)
+async def sync_template(
+    document_id: UUID,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    将文档的 type=0 私有副本同步到原始模板（type=1/2）的最新版本。
+
+    同步内容：
+    - 三类子模板（核心信息/摘要/结构）全量覆盖
+    - public 文献绑定关系全量覆盖
+    - 用户自己绑定的 private 文献保留不变
+
+    注意：此操作会覆盖用户对模板的自定义修改，请谨慎操作。
+    """
+    template = await DocumentService.sync_template(db, document_id, current_user.user_id)
+    return success_response(data=TemplateDetailResponse(
+        template_id=template.template_id,
+        group_id=template.group_id,
+        document_id=template.document_id,
+        purpose=template.purpose,
+        display_name=template.display_name,
+        content=template.content,
+        version=template.version,
+        template_type=template.template_type,
+        user_id=template.user_id,
+        is_active=template.is_active,
+        created_at=template.created_at,
+        updated_at=template.updated_at,
+    ))
+
+
 

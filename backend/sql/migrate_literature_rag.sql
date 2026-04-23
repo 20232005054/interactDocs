@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS literature_chunks (
     literature_id   UUID NOT NULL REFERENCES literature(literature_id) ON DELETE CASCADE,
     section_type    VARCHAR(30),
     content         TEXT NOT NULL,
-    embedding       vector(1536),
+    embedding       vector(1024),
     chunk_index     INTEGER NOT NULL,
     created_at      TIMESTAMP DEFAULT NOW()
 );

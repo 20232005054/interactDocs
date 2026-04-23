@@ -178,6 +178,23 @@ async def ai_assist_paragraph(
             else:
                 prompt = await _build_assist_prompt(db, paragraph, chapter, document, instruction)
 
+            # 注入文献 RAG 上下文
+            try:
+                from services.literature_rag_service import LiteratureRagService
+                if document.template_id and document.user_id:
+                    query = f"{chapter.title} {prompt}"[:500]
+                    literature_context, _ = await LiteratureRagService.retrieve_and_format(
+                        db=db,
+                        document_template_id=document.template_id,
+                        user_id=document.user_id,
+                        query=query,
+                    )
+                    if literature_context:
+                        prompt = f"{prompt}\n\n{literature_context}"
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning("段落帮填文献 RAG 注入失败，跳过: %s", e)
+
             ctx = _AssistContext(
                 prompt=prompt,
                 chapter_id=chapter.chapter_id,
@@ -362,6 +379,23 @@ async def assist_single_summary(db: AsyncSession, summary_id: UUID, downstream_p
     parts.append("请基于以上信息，重新生成该摘要的内容。要求语言专业简洁，直接输出摘要内容。")
 
     prompt = "\n\n".join(parts)
+
+    # 注入文献 RAG 上下文
+    try:
+        from services.literature_rag_service import LiteratureRagService
+        if document.template_id and document.user_id:
+            query = f"{summary.title} {prompt}"[:500]
+            literature_context, _ = await LiteratureRagService.retrieve_and_format(
+                db=db,
+                document_template_id=document.template_id,
+                user_id=document.user_id,
+                query=query,
+            )
+            if literature_context:
+                prompt = f"{prompt}\n\n{literature_context}"
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("摘要帮填文献 RAG 注入失败，跳过: %s", e)
 
     try:
         result = await call_qwen_once(SYSTEM_PROMPT_SUMMARY, [], prompt)

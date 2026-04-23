@@ -25,15 +25,19 @@ class LiteratureChunkMapper:
         )
 
     @staticmethod
-    async def search_by_group_id(
+    async def search_by_template_id(
         db: AsyncSession,
-        group_id: UUID,
+        template_id: UUID,
+        user_id: UUID,
         query_embedding: list[float],
         top_k: int = 5,
     ) -> list[dict]:
         """
         向量相似度检索。
-        通过 group_id 关联原始模板（type=1/2），只检索 ready 状态的文献分块。
+        直接通过 template_id（文档私有副本的 template_id）查关联表，
+        检索该模板绑定的文献分块：
+          - scope='public' 的文献对所有人可见
+          - scope='private' 的文献只对上传者（user_id）可见
         返回 top_k 个最相关片段，含 literature 主表信息。
         """
         embedding_str = "[" + ",".join(str(v) for v in query_embedding) + "]"
@@ -53,16 +57,20 @@ class LiteratureChunkMapper:
                 l.impact_factor
             FROM literature_chunks lc
             JOIN literature l ON lc.literature_id = l.literature_id
-            JOIN templates t ON l.template_id = t.template_id
-            WHERE t.group_id = :group_id
-              AND t.template_type IN (1, 2)
+            JOIN template_literature tl ON l.literature_id = tl.literature_id
+            WHERE tl.template_id = :template_id
+              AND (
+                  l.scope = 'public'
+                  OR (l.scope = 'private' AND l.user_id = :user_id)
+              )
               AND l.upload_status = 'ready'
             ORDER BY lc.embedding <=> :embedding ::vector
             LIMIT :top_k
         """)
         result = await db.execute(sql, {
             "embedding": embedding_str,
-            "group_id": str(group_id),
+            "template_id": str(template_id),
+            "user_id": str(user_id),
             "top_k": top_k,
         })
         rows = result.mappings().all()

@@ -8,7 +8,7 @@ import json
 from core.response import success_response, ResponseModel
 from db.session import get_db
 from services.template_service import TemplateService
-from schemas.response_schemas import TemplateResponse, TemplateDetailResponse, TemplateListResponse, TemplateSimpleListResponse, PurposeListResponse, TemplateDependenciesResponse, TemplateInfoResponse
+from schemas.response_schemas import TemplateResponse, TemplateDetailResponse, TemplateListResponse, TemplateSimpleListResponse, PurposeListResponse, TemplateDependenciesResponse, TemplateInfoResponse, TemplateImportResponse, UnmatchedLiteratureItem
 from schemas.template_schemas import TemplateContent, TemplateCreatePayload, TemplateUpdatePayload
 from schemas.document_schemas import ExportTemplatePayload
 from core.auth import get_editor_user, get_admin_user, get_current_user
@@ -78,7 +78,7 @@ async def export_template_json(template_id: UUID, db: AsyncSession = Depends(get
     )
 
 
-@router.post("/import", summary="从 JSON 文件导入模板", response_model=ResponseModel[TemplateDetailResponse])
+@router.post("/import", summary="从 JSON 文件导入模板", response_model=ResponseModel[TemplateImportResponse])
 async def import_template_json(
     file: UploadFile = File(...),
     as_system: bool = False,
@@ -89,6 +89,7 @@ async def import_template_json(
     上传由 /export 导出的 JSON 文件导入模板。
     - as_system=false（默认）：创建为当前用户的可复用模板（type=2），需要 editor 权限
     - as_system=true：创建为系统模板（type=1），需要 admin 权限
+    - 响应中 unmatched_literature 非空时，表示这些文献在知识库中未找到匹配，需手动上传并绑定
     """
     from core.constants import UserRole
     if current_user.role not in (UserRole.EDITOR, UserRole.ADMIN):
@@ -99,23 +100,25 @@ async def import_template_json(
     try:
         content = await file.read()
         raw = content.decode("utf-8")
-        # 修复 AI 生成 JSON 时常见的非法转义序列（如 \* \_ \[ \l \g 等）
         import re
         raw = re.sub(r'\\([*_\[\]()!#+\-.>`lgLG])', r'\1', raw)
         data = json.loads(raw)
     except Exception:
         raise HTTPException(status_code=400, detail="文件格式错误，请上传有效的 JSON 文件")
 
-    t = await TemplateService.import_template_json(
+    t, unmatched = await TemplateService.import_template_json(
         db, data,
         user_id=None if as_system else current_user.user_id,
         template_type=TemplateType.SYSTEM if as_system else TemplateType.USER_REUSABLE,
     )
-    return success_response(data=TemplateDetailResponse(
-        template_id=t.template_id, group_id=t.group_id, document_id=t.document_id,
-        purpose=t.purpose, display_name=t.display_name, content=t.content,
-        version=t.version, template_type=t.template_type, user_id=t.user_id,
-        is_active=t.is_active, created_at=t.created_at, updated_at=t.updated_at,
+    return success_response(data=TemplateImportResponse(
+        template=TemplateDetailResponse(
+            template_id=t.template_id, group_id=t.group_id, document_id=t.document_id,
+            purpose=t.purpose, display_name=t.display_name, content=t.content,
+            version=t.version, template_type=t.template_type, user_id=t.user_id,
+            is_active=t.is_active, created_at=t.created_at, updated_at=t.updated_at,
+        ),
+        unmatched_literature=[UnmatchedLiteratureItem(**u) for u in unmatched],
     ))
 
 

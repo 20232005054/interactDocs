@@ -37,6 +37,12 @@ temp/
 # 检索知识库
 reference/
 
+# 测试用文献文件
+literature/
+
 # 开发日志（本地私人记录，不提交）
 devlogs/
 .kiro/steering/devlog.md
+
+# 本地文件不上传
+backend/static

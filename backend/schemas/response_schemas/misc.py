@@ -38,7 +38,7 @@ class DependenciesResponse(BaseModel):
 
 class LiteratureResponse(BaseModel):
     literature_id: UUID
-    template_id: UUID
+    literature_key: str
     title: Optional[str] = None
     authors: Optional[str] = None
     journal: Optional[str] = None
@@ -48,6 +48,9 @@ class LiteratureResponse(BaseModel):
     source_file: Optional[str] = None
     upload_status: str
     error_message: Optional[str] = None
+    scope: str
+    # scope: 'public'=公共文献, 'private'=用户私有文献
+    user_id: Optional[UUID] = None
     created_at: datetime
 
 

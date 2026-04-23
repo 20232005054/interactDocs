@@ -235,3 +235,21 @@ class TemplateDependenciesResponse(BaseModel):
     core_info_templates: List[CoreInfoDependencyItem]
     summary_templates: List[SummaryDependencyItem]
     structure_templates: List[StructureDependencyItem]
+
+
+# ============================================================
+# 模板导入结果
+# ============================================================
+
+class UnmatchedLiteratureItem(BaseModel):
+    """导入时未能匹配到的文献条目"""
+    literature_key: Optional[str] = None
+    title: Optional[str] = None
+    doi: Optional[str] = None
+
+
+class TemplateImportResponse(BaseModel):
+    """模板导入结果，包含模板详情和未匹配文献列表"""
+    template: TemplateDetailResponse
+    unmatched_literature: List[UnmatchedLiteratureItem] = []
+    # unmatched_literature 非空时，表示这些文献在知识库中未找到匹配，需要手动上传并绑定

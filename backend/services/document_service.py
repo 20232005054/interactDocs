@@ -6,6 +6,7 @@ from db.mappers.template_mapper import TemplateMapper
 from db.mappers.core_info_template_mapper import CoreInfoTemplateMapper
 from db.mappers.summary_template_mapper import SummaryTemplateMapper
 from db.mappers.structure_template_mapper import StructureTemplateMapper
+from db.mappers.template_literature_mapper import TemplateLiteratureMapper
 from db.models import Document, DocumentCoreInfo, Template, CoreInfoTemplate, SummaryTemplate, StructureTemplate
 from schemas.document_schemas import DocumentCreate, DocumentUpdate, PaginationParams
 from uuid import UUID, uuid4
@@ -133,6 +134,12 @@ class DocumentService:
 
         # 6. 将新文档的 ID 回填到模板的冗余字段 document_id 中
         new_template.document_id = created_document.document_id
+
+        # 7. 拷贝原始模板的文献绑定关系到私有副本（只拷贝 public 文献）
+        await TemplateLiteratureMapper.copy_bindings(
+            db, system_template.template_id, new_template.template_id
+        )
+
         await db.commit()
         await db.refresh(created_document)
 
@@ -421,6 +428,141 @@ class DocumentService:
                     paragraphs=st.paragraphs,
                 ))
 
+        # 5. 拷贝文献绑定关系（包括 public 和用户自己的 private 文献）
+        await TemplateLiteratureMapper.copy_bindings(
+            db, source.template_id, new_template.template_id
+        )
+
         await db.commit()
         await db.refresh(new_template)
         return new_template
+
+    @staticmethod
+    async def sync_template(db: AsyncSession, document_id: UUID, user_id: UUID) -> Template:
+        """
+        将文档的 type=0 私有副本同步到原始模板（type=1/2）的最新版本。
+
+        同步内容：
+        1. 清空私有副本的三类子模板，从原始模板深拷贝
+        2. 清空私有副本的 public 文献绑定，从原始模板拷贝
+        3. 保留用户自己绑定的 private 文献（user_id=当前用户的不删）
+        """
+        document = await DocumentMapper.get_document_by_id(db, document_id)
+        if not document:
+            raise HTTPException(status_code=404, detail="文档不存在")
+        if not document.template_id:
+            raise HTTPException(status_code=400, detail="文档未关联模板")
+
+        private_tpl = await TemplateMapper.get_template(db, document.template_id)
+        if not private_tpl:
+            raise HTTPException(status_code=404, detail="文档模板不存在")
+
+        # 找到同 group_id 的原始模板（type=1 优先，其次 type=2）
+        from sqlalchemy.future import select as sa_select
+        result = await db.execute(
+            sa_select(Template)
+            .where(
+                Template.group_id == private_tpl.group_id,
+                Template.template_type.in_([TemplateType.SYSTEM, TemplateType.USER_REUSABLE]),
+            )
+            .order_by(Template.template_type.asc())  # type=1 排在 type=2 前面
+            .limit(1)
+        )
+        source = result.scalar_one_or_none()
+        if not source:
+            raise HTTPException(status_code=404, detail="找不到原始模板，无法同步")
+
+        # ── 1. 同步三类子模板 ──
+
+        await CoreInfoTemplateMapper.delete_by_template_id(db, private_tpl.template_id)
+        await SummaryTemplateMapper.delete_by_template_id(db, private_tpl.template_id)
+        await StructureTemplateMapper.delete_by_template_id(db, private_tpl.template_id)
+
+        old_core_infos = await CoreInfoTemplateMapper.get_by_template_id(db, source.template_id)
+        if old_core_infos:
+            id_mapping = {}
+            for ci in old_core_infos:
+                id_mapping[ci.core_template_id] = uuid4()
+
+            def get_level(ci):
+                level = 0
+                curr = ci
+                while curr.parent_id:
+                    level += 1
+                    curr = next((x for x in old_core_infos if x.core_template_id == curr.parent_id), None)
+                    if not curr:
+                        break
+                return level
+
+            for ci in sorted(old_core_infos, key=get_level):
+                db.add(CoreInfoTemplate(
+                    core_template_id=id_mapping[ci.core_template_id],
+                    template_id=private_tpl.template_id,
+                    parent_id=id_mapping.get(ci.parent_id) if ci.parent_id else None,
+                    field_name=ci.field_name,
+                    field_key=ci.field_key,
+                    field_type=ci.field_type,
+                    default_value=ci.default_value,
+                    options=ci.options,
+                    is_required=ci.is_required,
+                    order_index=ci.order_index,
+                ))
+
+        old_summaries = await SummaryTemplateMapper.get_by_template_id(db, source.template_id)
+        if old_summaries:
+            for s in old_summaries:
+                db.add(SummaryTemplate(
+                    template_id=private_tpl.template_id,
+                    field_key=s.field_key,
+                    title=s.title,
+                    generation_mode=s.generation_mode,
+                    content_template=s.content_template,
+                    sources=s.sources,
+                    default_prompt=s.default_prompt,
+                    custom_prompt=s.custom_prompt,
+                    order_index=s.order_index,
+                ))
+
+        old_structures = await StructureTemplateMapper.get_by_template_id(db, source.template_id)
+        if old_structures:
+            id_mapping = {}
+            for st in sorted(old_structures, key=lambda x: x.level):
+                new_id = uuid4()
+                id_mapping[st.structure_template_id] = new_id
+                db.add(StructureTemplate(
+                    structure_template_id=new_id,
+                    template_id=private_tpl.template_id,
+                    parent_id=id_mapping.get(st.parent_id) if st.parent_id else None,
+                    field_key=st.field_key,
+                    title=st.title,
+                    level=st.level,
+                    order_index=st.order_index,
+                    paragraphs=st.paragraphs,
+                ))
+
+        # ── 2. 同步文献绑定关系 ──
+        # 清空私有副本的 public 文献绑定，保留用户自己的 private 文献绑定
+        await TemplateLiteratureMapper.delete_public_by_template_id(
+            db, private_tpl.template_id, user_id
+        )
+        # 从原始模板拷贝文献绑定关系（只拷贝 public 文献，private 文献不跨用户传播）
+        from db.models import Literature
+        source_lit_ids = await TemplateLiteratureMapper.list_literature_ids_by_template_id(
+            db, source.template_id
+        )
+        for lit_id in source_lit_ids:
+            lit_result = await db.execute(
+                sa_select(Literature).where(Literature.literature_id == lit_id)
+            )
+            lit = lit_result.scalar_one_or_none()
+            if lit and lit.scope == "public":
+                await TemplateLiteratureMapper.bind(db, private_tpl.template_id, lit_id)
+
+        # 同步主表字段
+        private_tpl.purpose = source.purpose
+        private_tpl.display_name = source.display_name
+        private_tpl.content = source.content
+
+        await db.commit()
+        await db.refresh(private_tpl)
+        return private_tpl

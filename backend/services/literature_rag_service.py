@@ -2,7 +2,7 @@
 文献 RAG 检索服务
 
 职责：
-1. 根据 group_id 检索相关文献分块（pgvector 向量检索）
+1. 根据 document_template_id + user_id 检索相关文献分块（pgvector 向量检索）
 2. 格式化引用上下文注入 AI prompt
 3. 解析 AI 返回内容中的 [1][2] 标记，写入 document_citations 表
 """
@@ -26,12 +26,16 @@ class LiteratureRagService:
     @staticmethod
     async def retrieve_and_format(
         db: AsyncSession,
-        group_id: UUID,
+        document_template_id: UUID,
+        user_id: UUID,
         query: str,
         top_k: int = 5,
     ) -> tuple[str, list[dict]]:
         """
         向量检索 + 格式化引用上下文。
+
+        直接通过文档绑定的 template_id（type=0 私有副本）查关联表，
+        检索 public 文献 + 当前用户的 private 文献。
 
         Returns:
             (context_str, citations)
@@ -48,8 +52,8 @@ class LiteratureRagService:
             return "", []
 
         try:
-            chunks = await LiteratureChunkMapper.search_by_group_id(
-                db, group_id, query_embedding, top_k=top_k
+            chunks = await LiteratureChunkMapper.search_by_template_id(
+                db, document_template_id, user_id, query_embedding, top_k=top_k
             )
         except Exception as e:
             logger.warning("文献向量检索失败，跳过文献注入: %s", e)
@@ -77,7 +81,6 @@ class LiteratureRagService:
             year = publish_date.year if publish_date else ""
             doi = chunk.get("doi") or ""
 
-            # 引用标注行
             ref_line = f"[{i}] {title}"
             if journal:
                 ref_line += f"（{journal}"
@@ -137,15 +140,12 @@ class LiteratureRagService:
         if not citations or not ai_content:
             return
 
-        # 解析内容中出现的引用编号
         used_numbers = set(int(n) for n in re.findall(r'\[(\d+)\]', ai_content))
         if not used_numbers:
             return
 
-        # 清空旧引用
         await DocumentCitationMapper.delete_by_source(db, source_type, source_id)
 
-        # 写入新引用
         new_citations = []
         for c in citations:
             if c["number"] in used_numbers:
@@ -170,10 +170,7 @@ class LiteratureRagService:
         db: AsyncSession,
         document_id: UUID,
     ) -> list[dict]:
-        """
-        获取文档的完整参考文献列表（去重，按编号排序）。
-        用于导出时生成参考文献列表。
-        """
+        """获取文档的完整参考文献列表（去重，按编号排序），用于导出。"""
         return await DocumentCitationMapper.get_distinct_by_document_id(db, document_id)
 
     @staticmethod

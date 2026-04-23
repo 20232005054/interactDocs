@@ -25,10 +25,11 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from core.utils import log_task_exception
 from db.mappers.literature_mapper import LiteratureMapper
 from db.mappers.literature_chunk_mapper import LiteratureChunkMapper
+from db.mappers.template_literature_mapper import TemplateLiteratureMapper
 from db.models import Literature, LiteratureChunk
 from db.session import AsyncSessionLocal
 from services.ai_client import get_embedding
-from services.oss_service import build_url, upload_file, delete_file, read_file
+from services.oss_service import upload_file, delete_file, read_file
 
 logger = logging.getLogger(__name__)
 
@@ -74,18 +75,15 @@ async def _fetch_crossref_metadata(doi: str) -> dict:
             if resp.status_code != 200:
                 return {}
             data = resp.json().get("message", {})
-            # 提取作者
             authors_list = data.get("author", [])
             authors = ", ".join(
                 f"{a.get('family', '')} {a.get('given', '')}".strip()
-                for a in authors_list[:5]  # 最多取前5位作者
+                for a in authors_list[:5]
             )
-            # 提取期刊
             journal = ""
             container = data.get("container-title", [])
             if container:
                 journal = container[0]
-            # 提取发表日期
             publish_date = None
             date_parts = data.get("published", {}).get("date-parts", [[]])
             if date_parts and date_parts[0]:
@@ -98,7 +96,6 @@ async def _fetch_crossref_metadata(doi: str) -> dict:
                     publish_date = date(y, m, d)
                 except Exception:
                     pass
-            # 提取标题
             title = ""
             titles = data.get("title", [])
             if titles:
@@ -157,41 +154,56 @@ async def _process_literature_async(literature_id: UUID, file_path: str) -> None
                 literature_id=literature_id,
                 section_type=section_type,
                 content=content,
-                embedding=str(embedding),   # 暂存为字符串，写入时转换
+                embedding=embedding,
                 chunk_index=idx,
             ))
 
         # 批量写入（使用原生 SQL 写入 vector 类型）
+        # asyncpg 使用 $n 位置参数，不支持 :name 命名参数风格
+        # embedding 通过 Python 字符串拼接直接嵌入 SQL，绕过参数绑定的类型限制
         async with AsyncSessionLocal() as db:
             for chunk in chunks:
                 from sqlalchemy import text
-                await db.execute(
-                    text("""
-                        INSERT INTO literature_chunks
-                            (chunk_id, literature_id, section_type, content, embedding, chunk_index)
-                        VALUES
-                            (:chunk_id, :literature_id, :section_type, :content, :embedding ::vector, :chunk_index)
-                    """),
-                    {
-                        "chunk_id": str(uuid4()),
-                        "literature_id": str(literature_id),
-                        "section_type": chunk.section_type,
-                        "content": chunk.content,
-                        "embedding": chunk.embedding,
-                        "chunk_index": chunk.chunk_index,
-                    }
-                )
+                embedding_str = chunk.embedding if isinstance(chunk.embedding, str) else str(chunk.embedding)
+                sql = text(f"""
+                    INSERT INTO literature_chunks
+                        (chunk_id, literature_id, section_type, content, embedding, chunk_index)
+                    VALUES
+                        (:chunk_id, :literature_id, :section_type, :content, '{embedding_str}'::vector, :chunk_index)
+                """)
+                await db.execute(sql, {
+                    "chunk_id": str(uuid4()),
+                    "literature_id": str(literature_id),
+                    "section_type": chunk.section_type,
+                    "content": chunk.content,
+                    "chunk_index": chunk.chunk_index,
+                })
             await db.commit()
         logger.info("[文献处理] 写入 %d 个分块 literature_id=%s", len(chunks), literature_id)
 
         # 4. 提取 DOI，补全 metadata
-        doi = _extract_doi(full_text)
+        # 如果上传时已手动填写 doi，跳过自动提取，只补全其他 metadata 字段
+        async with AsyncSessionLocal() as db_check:
+            existing_lit = await LiteratureMapper.get_by_id(db_check, literature_id)
+            existing_doi = existing_lit.doi if existing_lit else None
+
         metadata_update: dict = {}
-        if doi:
-            logger.info("[文献处理] 提取到 DOI=%s，调用 CrossRef", doi)
-            crossref_data = await _fetch_crossref_metadata(doi)
-            metadata_update = {k: v for k, v in crossref_data.items() if v is not None}
-            metadata_update["doi"] = doi
+        if existing_doi:
+            # 已有 doi，直接用已有的调 CrossRef 补全其他字段
+            logger.info("[文献处理] 已有 DOI=%s，跳过提取，直接补全 metadata", existing_doi)
+            crossref_data = await _fetch_crossref_metadata(existing_doi)
+            # 只补全空字段，不覆盖用户已填写的内容
+            for k, v in crossref_data.items():
+                if v is not None and not getattr(existing_lit, k, None):
+                    metadata_update[k] = v
+        else:
+            # 没有 doi，尝试从 PDF 全文提取
+            doi = _extract_doi(full_text)
+            if doi:
+                logger.info("[文献处理] 提取到 DOI=%s，调用 CrossRef", doi)
+                crossref_data = await _fetch_crossref_metadata(doi)
+                metadata_update = {k: v for k, v in crossref_data.items() if v is not None}
+                metadata_update["doi"] = doi
 
         async with AsyncSessionLocal() as db:
             if metadata_update:
@@ -199,7 +211,7 @@ async def _process_literature_async(literature_id: UUID, file_path: str) -> None
             await LiteratureMapper.update_status(db, literature_id, "ready")
             await db.commit()
 
-        logger.info("[文献处理] 完成 literature_id=%s doi=%s", literature_id, doi)
+        logger.info("[文献处理] 完成 literature_id=%s", literature_id)
 
     except Exception as e:
         logger.error("[文献处理] 失败 literature_id=%s: %s", literature_id, e, exc_info=True)
@@ -207,7 +219,6 @@ async def _process_literature_async(literature_id: UUID, file_path: str) -> None
             await LiteratureMapper.update_status(db, literature_id, "failed", str(e))
             await db.commit()
     finally:
-        # 清理临时文件
         try:
             os.remove(file_path)
         except Exception:
@@ -219,21 +230,23 @@ class LiteratureService:
     @staticmethod
     async def upload(
         db,
-        template_id: UUID,
         file_content: bytes,
         filename: str,
+        scope: str,
+        user_id: UUID,
+        literature_key: str | None = None,
     ) -> Literature:
         """
-        上传 PDF 文献：
+        上传 PDF 文献到知识库：
         1. 校验格式和大小
         2. 上传 OSS
-        3. 创建 literature 记录（pending）
-        4. 启动后台处理任务
-        5. 立即返回 literature 对象
+        3. 创建 literature 记录（pending），scope/user_id 由调用方传入
+        4. literature_key：传入则使用（跨系统迁移），不传则自动生成 lit_xxxxxxxx
+        5. 启动后台处理任务
+        6. 立即返回 literature 对象
         """
-        import tempfile, os
+        import tempfile
 
-        # 校验
         if not filename.lower().endswith(".pdf"):
             from fastapi import HTTPException
             raise HTTPException(status_code=400, detail="仅支持 PDF 格式")
@@ -241,36 +254,68 @@ class LiteratureService:
             from fastapi import HTTPException
             raise HTTPException(status_code=400, detail="文件大小不能超过 30MB")
 
-        # 上传文件
+        # 生成或使用传入的 literature_key
+        if not literature_key:
+            literature_key = "lit_" + uuid4().hex[:8]
+
         object_key = f"literature/{uuid4().hex}.pdf"
         file_url = await upload_file(file_content, object_key, "application/pdf")
 
-        # 创建记录
         literature = Literature(
-            template_id=template_id,
+            literature_key=literature_key,
             source_file=file_url,
             upload_status="pending",
+            scope=scope,
+            user_id=user_id,
         )
         result = await LiteratureMapper.create(db, literature)
         await db.commit()
 
-        # 写临时文件供 PyPDFLoader 使用（PyPDFLoader 需要文件路径）
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-        tmp.write(file_content)
-        tmp.close()
-
-        # 启动后台任务
-        task = asyncio.create_task(
-            _process_literature_async(result.literature_id, tmp.name),
-            name=f"literature_process_{result.literature_id}",
-        )
-        task.add_done_callback(log_task_exception)
+        try:
+            tmp.write(file_content)
+            tmp.close()
+            task = asyncio.create_task(
+                _process_literature_async(result.literature_id, tmp.name),
+                name=f"literature_process_{result.literature_id}",
+            )
+            task.add_done_callback(log_task_exception)
+        except Exception:
+            import os
+            try:
+                os.remove(tmp.name)
+            except Exception:
+                pass
+            raise
 
         return result
 
     @staticmethod
+    async def bind(db, template_id: UUID, literature_id: UUID) -> None:
+        """绑定文献到模板"""
+        await TemplateLiteratureMapper.bind(db, template_id, literature_id)
+        await db.commit()
+
+    @staticmethod
+    async def unbind(db, template_id: UUID, literature_id: UUID) -> None:
+        """解绑文献与模板"""
+        await TemplateLiteratureMapper.unbind(db, template_id, literature_id)
+        await db.commit()
+
+    @staticmethod
     async def list_by_template(db, template_id: UUID) -> list[Literature]:
+        """获取模板绑定的所有文献"""
         return await LiteratureMapper.list_by_template_id(db, template_id)
+
+    @staticmethod
+    async def list_by_user(db, user_id: UUID) -> list[Literature]:
+        """获取用户上传的所有私有文献"""
+        return await LiteratureMapper.list_by_user_id(db, user_id)
+
+    @staticmethod
+    async def list_public(db) -> list[Literature]:
+        """获取所有公共文献"""
+        return await LiteratureMapper.list_public(db)
 
     @staticmethod
     async def get_by_id(db, literature_id: UUID) -> Literature | None:
@@ -284,7 +329,6 @@ class LiteratureService:
         if not lit:
             raise HTTPException(status_code=404, detail="文献不存在")
 
-        # 异步清理文件
         if lit.source_file:
             async def _delete_storage():
                 try:
@@ -301,7 +345,7 @@ class LiteratureService:
     @staticmethod
     async def retry(db, literature_id: UUID) -> Literature:
         """重新处理失败的文献"""
-        import tempfile, asyncio
+        import tempfile
         from fastapi import HTTPException
         lit = await LiteratureMapper.get_by_id(db, literature_id)
         if not lit:
@@ -311,8 +355,6 @@ class LiteratureService:
         if not lit.source_file:
             raise HTTPException(status_code=400, detail="文献文件不存在，无法重试")
 
-        # 从存储读取文件
-        # 兼容本地路径（/static/literature/xxx.pdf）和 OSS URL，统一提取 object_key
         source = lit.source_file
         if "/literature/" in source:
             object_key = "literature/" + source.split("/literature/")[-1].lstrip("/")
@@ -320,23 +362,44 @@ class LiteratureService:
             raise HTTPException(status_code=400, detail="无法解析文献文件路径，无法重试")
         file_content = await read_file(object_key)
 
-        # 清空旧 chunks，并将状态重置为 pending（独立 session，避免与路由 session 混用）
         async with AsyncSessionLocal() as db2:
             await LiteratureChunkMapper.delete_by_literature_id(db2, literature_id)
             await LiteratureMapper.update_status(db2, literature_id, "pending", None)
             await db2.commit()
 
-        # 写临时文件
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-        tmp.write(file_content)
-        tmp.close()
+        try:
+            tmp.write(file_content)
+            tmp.close()
+            task = asyncio.create_task(
+                _process_literature_async(literature_id, tmp.name),
+                name=f"literature_retry_{literature_id}",
+            )
+            task.add_done_callback(log_task_exception)
+        except Exception:
+            import os
+            try:
+                os.remove(tmp.name)
+            except Exception:
+                pass
+            raise
 
-        task = asyncio.create_task(
-            _process_literature_async(literature_id, tmp.name),
-            name=f"literature_retry_{literature_id}",
-        )
-        task.add_done_callback(log_task_exception)
-
-        # 用独立 session 读取最新状态返回，避免路由 session 缓存旧数据
         async with AsyncSessionLocal() as db3:
             return await LiteratureMapper.get_by_id(db3, literature_id)
+
+    @staticmethod
+    async def list_orphans(db) -> list[Literature]:
+        """获取孤儿文献列表（admin 后台清理用）"""
+        return await LiteratureMapper.list_orphans(db)
+
+    @staticmethod
+    async def update(db, literature_id: UUID, data: dict) -> Literature:
+        """手动更新文献元数据（title/authors/journal/doi/impact_factor）"""
+        from fastapi import HTTPException
+        lit = await LiteratureMapper.get_by_id(db, literature_id)
+        if not lit:
+            raise HTTPException(status_code=404, detail="文献不存在")
+        await LiteratureMapper.update_metadata(db, literature_id, data)
+        await db.commit()
+        async with AsyncSessionLocal() as db2:
+            return await LiteratureMapper.get_by_id(db2, literature_id)

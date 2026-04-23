@@ -357,7 +357,14 @@ class TemplateService:
         source_template.purpose = official_template.purpose
         source_template.display_name = official_template.display_name
         source_template.content = official_template.content
-        
+
+        # 6. 同步文献绑定关系：清空 source_template 的所有绑定，从官方模板拷贝
+        from db.mappers.template_literature_mapper import TemplateLiteratureMapper
+        await TemplateLiteratureMapper.delete_by_template_id(db, source_template.template_id)
+        await TemplateLiteratureMapper.copy_bindings(
+            db, official_template.template_id, source_template.template_id
+        )
+
         await db.commit()
         await db.refresh(source_template)
         return source_template
@@ -470,13 +477,15 @@ class TemplateService:
     @staticmethod
     async def export_template_json(db: AsyncSession, template_id: UUID) -> dict:
         """
-        将模板主表 + 三类子表序列化为可移植的 dict。
+        将模板主表 + 三类子表 + 文献元数据序列化为可移植的 dict。
         - 不导出主键（template_id / core_template_id 等）
         - 保留 field_key（sources 引用依赖它）
+        - 保留 literature_key（跨系统导入时用于匹配文献）
         - CoreInfoTemplate / StructureTemplate 以嵌套 children 表示树形结构
         """
         from fastapi import HTTPException
         from datetime import datetime, timezone
+        from db.mappers.literature_mapper import LiteratureMapper
 
         template = await TemplateMapper.get_template(db, template_id)
         if not template:
@@ -485,6 +494,7 @@ class TemplateService:
         core_infos = await CoreInfoTemplateMapper.get_by_template_id(db, template_id)
         summaries = await SummaryTemplateMapper.get_by_template_id(db, template_id)
         structures = await StructureTemplateMapper.get_by_template_id(db, template_id)
+        literatures = await LiteratureMapper.list_by_template_id(db, template_id)
 
         # 构建 CoreInfoTemplate 嵌套树
         def _ci_node(ci) -> dict:
@@ -551,6 +561,18 @@ class TemplateService:
                 for s in sorted(summaries, key=lambda x: x.order_index)
             ],
             "structure_templates": st_tree,
+            "literature_references": [
+                {
+                    "literature_key": lit.literature_key,
+                    "title": lit.title,
+                    "authors": lit.authors,
+                    "journal": lit.journal,
+                    "doi": lit.doi,
+                    "impact_factor": lit.impact_factor,
+                    "scope": lit.scope,
+                }
+                for lit in literatures
+            ],
         }
 
     @staticmethod
@@ -647,6 +669,34 @@ class TemplateService:
 
         await _flush_and_recurse_st(data.get("structure_templates") or [])
 
+        # 5. 匹配并绑定文献
+        # 匹配优先级：literature_key → DOI → 标题归一化
+        from db.mappers.literature_mapper import LiteratureMapper
+        from db.mappers.template_literature_mapper import TemplateLiteratureMapper
+
+        unmatched_literature = []
+        for lit_ref in data.get("literature_references") or []:
+            lit = None
+            lit_key = lit_ref.get("literature_key")
+            doi = lit_ref.get("doi")
+            title = lit_ref.get("title")
+
+            if lit_key:
+                lit = await LiteratureMapper.find_by_key(db, lit_key)
+            if not lit and doi:
+                lit = await LiteratureMapper.find_by_doi(db, doi)
+            if not lit and title:
+                lit = await LiteratureMapper.find_by_title(db, title)
+
+            if lit:
+                await TemplateLiteratureMapper.bind(db, new_template.template_id, lit.literature_id)
+            else:
+                unmatched_literature.append({
+                    "literature_key": lit_key,
+                    "title": title,
+                    "doi": doi,
+                })
+
         await db.commit()
         await db.refresh(new_template)
-        return new_template
+        return new_template, unmatched_literature

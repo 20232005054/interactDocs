@@ -77,6 +77,8 @@ from schemas.response_schemas.template import (
     SummaryDependencyItem,
     StructureDependencyItem,
     TemplateDependenciesResponse,
+    UnmatchedLiteratureItem,
+    TemplateImportResponse,
 )
 
 from schemas.response_schemas.misc import (
@@ -117,6 +119,7 @@ __all__ = [
     "TemplateInfoResponse",
     "TemplateDependencyRef", "CoreInfoDependencyItem", "SummaryDependencyItem",
     "StructureDependencyItem", "TemplateDependenciesResponse",
+    "UnmatchedLiteratureItem", "TemplateImportResponse",
     # misc
     "OperationHistoryItem", "OperationHistoryListResponse",
     "DependencyEdgeItem", "DependenciesResponse",

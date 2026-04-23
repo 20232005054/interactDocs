@@ -196,7 +196,7 @@ CREATE TABLE IF NOT EXISTS summary_templates (
     field_key VARCHAR(50) NOT NULL,
     generation_mode INTEGER DEFAULT 0,
     content_template TEXT,
-    sources JSONB, -- 来源配置数组，结构：[{"source": {"value": "keyinfo", "label": "关键信息", "ui_type": "select"}, "match_keys": [{"value": "trial_name", "label": "试验名称"}], "target_field": "trial_name", "match_type": "关键信息匹配"}]
+    sources JSONB,
     default_prompt TEXT,
     custom_prompt TEXT,
     order_index INTEGER DEFAULT 0,
@@ -212,7 +212,7 @@ CREATE TABLE IF NOT EXISTS structure_templates (
     title VARCHAR(200) NOT NULL,
     field_key VARCHAR(50) NOT NULL,
     level INTEGER NOT NULL,
-    paragraphs JSONB,  -- 段落定义数组，每项含 para_type/content_template/generation_mode/sources/default_prompt/custom_prompt
+    paragraphs JSONB,
     order_index INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -233,6 +233,64 @@ CREATE TABLE IF NOT EXISTS dependency_edges (
     target_version INTEGER,
     relevance_score FLOAT DEFAULT 1.0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================
+-- 7. 文献 RAG 系统
+-- ============================================
+
+-- 7.1 文献主表（独立存在，通过关联表绑定到模板）
+-- scope: 'public'=admin/editor 维护的公共文献, 'private'=用户私有文献
+CREATE TABLE IF NOT EXISTS literature (
+    literature_id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    literature_key  VARCHAR(20) NOT NULL UNIQUE,
+    -- literature_key: 系统生成的业务标识符，格式 lit_xxxxxxxx，用于跨系统导入导出匹配
+    title           VARCHAR(500),
+    authors         TEXT,
+    journal         VARCHAR(200),
+    publish_date    TIMESTAMP,
+    doi             VARCHAR(100),
+    impact_factor   FLOAT,
+    source_file     VARCHAR(500),
+    -- upload_status: pending / processing / ready / failed
+    upload_status   VARCHAR(20) NOT NULL DEFAULT 'pending',
+    error_message   TEXT,
+    scope           VARCHAR(20) NOT NULL DEFAULT 'private',
+    user_id         UUID REFERENCES users(user_id),
+    created_at      TIMESTAMP DEFAULT NOW()
+);
+
+-- 7.2 模板-文献关联表（多对多，文献可复用）
+CREATE TABLE IF NOT EXISTS template_literature (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    template_id     UUID NOT NULL REFERENCES templates(template_id) ON DELETE CASCADE,
+    literature_id   UUID NOT NULL REFERENCES literature(literature_id) ON DELETE CASCADE,
+    created_at      TIMESTAMP DEFAULT NOW(),
+    UNIQUE (template_id, literature_id)
+);
+
+-- 7.3 文献分块向量表
+CREATE TABLE IF NOT EXISTS literature_chunks (
+    chunk_id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    literature_id   UUID NOT NULL REFERENCES literature(literature_id) ON DELETE CASCADE,
+    -- section_type: abstract / intro / method / result / conclusion / other
+    section_type    VARCHAR(30),
+    content         TEXT NOT NULL,
+    embedding       vector(1024),
+    chunk_index     INTEGER NOT NULL,
+    created_at      TIMESTAMP DEFAULT NOW()
+);
+
+-- 7.4 文档引用关联表
+CREATE TABLE IF NOT EXISTS document_citations (
+    citation_id     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    document_id     UUID NOT NULL REFERENCES documents(document_id) ON DELETE CASCADE,
+    -- source_type: paragraph / summary
+    source_type     VARCHAR(20) NOT NULL,
+    source_id       UUID NOT NULL,
+    literature_id   UUID NOT NULL REFERENCES literature(literature_id) ON DELETE CASCADE,
+    citation_number INTEGER NOT NULL,
+    created_at      TIMESTAMP DEFAULT NOW()
 );
 
 -- ============================================
@@ -285,54 +343,16 @@ CREATE INDEX IF NOT EXISTS idx_structure_templates_parent_id ON structure_templa
 CREATE INDEX IF NOT EXISTS idx_dependency_edges_source ON dependency_edges(source_type, source_id);
 CREATE INDEX IF NOT EXISTS idx_dependency_edges_target ON dependency_edges(target_type, target_id);
 
--- ============================================
--- 7. 文献 RAG 系统
--- ============================================
-
--- 7.1 文献主表（绑定原始模板 type=1/2）
-CREATE TABLE IF NOT EXISTS literature (
-    literature_id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    template_id     UUID NOT NULL REFERENCES templates(template_id) ON DELETE CASCADE,
-    title           VARCHAR(500),
-    authors         TEXT,
-    journal         VARCHAR(200),
-    publish_date    TIMESTAMP,
-    doi             VARCHAR(100),
-    impact_factor   FLOAT,
-    source_file     VARCHAR(500),
-    -- upload_status: pending / processing / ready / failed
-    upload_status   VARCHAR(20) NOT NULL DEFAULT 'pending',
-    error_message   TEXT,
-    created_at      TIMESTAMP DEFAULT NOW()
-);
-
--- 7.2 文献分块向量表
-CREATE TABLE IF NOT EXISTS literature_chunks (
-    chunk_id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    literature_id   UUID NOT NULL REFERENCES literature(literature_id) ON DELETE CASCADE,
-    -- section_type: abstract / intro / method / result / conclusion / other
-    section_type    VARCHAR(30),
-    content         TEXT NOT NULL,
-    embedding       vector(1536),
-    chunk_index     INTEGER NOT NULL,
-    created_at      TIMESTAMP DEFAULT NOW()
-);
-
--- 7.3 文档引用关联表
-CREATE TABLE IF NOT EXISTS document_citations (
-    citation_id     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    document_id     UUID NOT NULL REFERENCES documents(document_id) ON DELETE CASCADE,
-    -- source_type: paragraph / summary
-    source_type     VARCHAR(20) NOT NULL,
-    source_id       UUID NOT NULL,
-    literature_id   UUID NOT NULL REFERENCES literature(literature_id) ON DELETE CASCADE,
-    citation_number INTEGER NOT NULL,
-    created_at      TIMESTAMP DEFAULT NOW()
-);
-
--- 文献索引
-CREATE INDEX IF NOT EXISTS idx_literature_template_id ON literature(template_id);
+-- literature 索引
+CREATE INDEX IF NOT EXISTS idx_literature_scope ON literature(scope);
+CREATE INDEX IF NOT EXISTS idx_literature_user_id ON literature(user_id);
 CREATE INDEX IF NOT EXISTS idx_literature_upload_status ON literature(upload_status);
+CREATE INDEX IF NOT EXISTS idx_literature_key ON literature(literature_key);
+CREATE INDEX IF NOT EXISTS idx_literature_doi ON literature(doi);
+
+-- template_literature 索引
+CREATE INDEX IF NOT EXISTS idx_template_literature_template_id ON template_literature(template_id);
+CREATE INDEX IF NOT EXISTS idx_template_literature_literature_id ON template_literature(literature_id);
 
 -- 向量检索索引（ivfflat，适合中等规模，lists 建议为 sqrt(行数)，初始设 100）
 CREATE INDEX IF NOT EXISTS idx_literature_chunks_embedding

@@ -103,6 +103,7 @@ app.include_router(events.router, dependencies=_auth_dep)
 app.include_router(export.router, dependencies=_auth_dep)
 app.include_router(chat.router, dependencies=_auth_dep)
 app.include_router(literature.router, dependencies=_auth_dep)
+app.include_router(literature.template_router, dependencies=_auth_dep)
 # 用户认证（公开，不加 Bearer）
 app.include_router(auth.router)
 # 管理员（已有 get_admin_user Depends，不需要额外加）
