@@ -81,8 +81,7 @@ export default function ApplyTemplateModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl mx-4 flex flex-col"
-        style={{ height: "85vh" }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl mx-4 flex flex-col h-[85vh]">
 
         {/* 头部 */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">

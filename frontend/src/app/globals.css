@@ -46,6 +46,22 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* ── 模板编辑器专用色板 ── */
+  --color-template-bg: #f5f4ee;
+  --color-template-bg-header: #f8f6ef;
+  --color-template-card-header: #fdfbf5;
+  --color-template-hover: #f7f3ea;
+  --color-template-border: #d9d5c8;
+  --color-template-border-inner: #ece7d8;
+  --color-template-accent: #234d3b;
+  --color-template-accent-hover: #1b3a2d;
+  --color-template-accent-light: #edf5f1;
+  --color-template-summary: #8d5f23;
+  --color-template-structure: #5d3d72;
+  --color-template-handle-hover: #b7af97;
+  --color-template-handle-active: #8b8269;
+  /* ── 注：text-[11px] / text-[10px] 为 Tailwind 任意值，11px 无标准 token，保留现状 ── */
 }
 
 :root {

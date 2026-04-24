@@ -5,6 +5,7 @@ import { coreInfoService } from "@/services/coreInfoService"
 import { useDocumentStore } from "@/store/documentStore"
 import type { CoreInfo } from "@/types/api"
 import { cn } from "@/lib/utils"
+import { toastError } from "@/hooks/useToast"
 
 // ----------------------------------------------------------------
 // 单个核心信息节点
@@ -36,11 +37,12 @@ function CoreInfoNode({ node, depth, onChangeContent }: CoreInfoNodeProps) {
         updateCoreInfo(node.core_info_id, { is_locked: updated.is_locked })
       }
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "操作失败")
+      toastError(err instanceof Error ? err.message : "操作失败")
     }
   }
 
   return (
+    // 动态树形缩进，Tailwind 无法静态生成，保留内联 style
     <div style={{ paddingLeft: `${depth * 12}px` }}>
       {/* 节点头部 */}
       <div className="flex items-center gap-1 py-1 group">
@@ -251,7 +253,7 @@ export default function CoreInfoPanel({ onAfterSave }: CoreInfoPanelProps) {
         await onAfterSave()
       }
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "保存失败")
+      toastError(err instanceof Error ? err.message : "保存失败")
     } finally {
       setSaving(false)
     }

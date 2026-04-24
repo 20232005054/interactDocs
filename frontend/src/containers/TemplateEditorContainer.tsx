@@ -146,7 +146,7 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f5f4ee] flex items-center justify-center">
+      <div className="min-h-screen bg-template-bg flex items-center justify-center">
         <p className="text-sm text-gray-500">加载模板中...</p>
       </div>
     )
@@ -154,7 +154,7 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#f5f4ee] flex flex-col items-center justify-center gap-3">
+      <div className="min-h-screen bg-template-bg flex flex-col items-center justify-center gap-3">
         <p className="text-sm text-red-500">{error}</p>
         <button onClick={() => router.push("/admin/templates")} className="text-sm text-gray-600 hover:underline">
           返回模板列表
@@ -169,12 +169,12 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
         <button
           type="button"
           onClick={() => router.push("/admin/templates")}
-          className="inline-flex w-fit items-center rounded-md border border-[#d9d5c8] bg-white px-3 py-1.5 text-sm text-gray-600 transition hover:bg-[#f7f3ea]"
+          className="inline-flex w-fit items-center rounded-md border border-template-border bg-white px-3 py-1.5 text-sm text-gray-600 transition hover:bg-template-hover"
         >
           ← 返回模板列表
         </button>
-        <section className="rounded-2xl border border-[#d9d5c8] bg-white shadow-[0_8px_20px_rgba(90,80,60,0.08)]">
-          <div className="border-b border-[#ece7d8] bg-[#fdfbf5] px-4 py-3">
+        <section className="rounded-2xl border border-template-border bg-white shadow-[0_8px_20px_rgba(90,80,60,0.08)]">
+          <div className="border-b border-template-border-inner bg-template-card-header px-4 py-3">
             <h2 className="text-base font-semibold text-gray-800">新建模板</h2>
             <p className="mt-1 text-xs text-gray-500">先保存基础信息，随后进入三栏模板编辑页面。</p>
           </div>
@@ -195,7 +195,7 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
       key: "core-info",
       title: "核心信息模板",
       desc: "编辑模板的核心信息字段结构，并作为拖拽填充源。",
-      accentClass: "bg-[#234d3b]",
+      accentClass: "bg-template-accent",
       children: (
         <CoreInfoTemplateStep
           templateId={currentTemplateId}
@@ -208,7 +208,7 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
       key: "summary",
       title: "摘要模板",
       desc: "摘要卡片支持接收核心信息拖拽，快速填入来源、内容模板和提示词。",
-      accentClass: "bg-[#8d5f23]",
+      accentClass: "bg-template-summary",
       children: (
         <SummaryTemplateStep
           templateId={currentTemplateId}
@@ -220,7 +220,7 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
       key: "structure",
       title: "章节结构模板",
       desc: "桌面端保持更宽布局，方便横向拖拽核心信息到章节配置区。",
-      accentClass: "bg-[#5d3d72]",
+      accentClass: "bg-template-structure",
       children: (
         <StructureTemplateStep
           templateId={currentTemplateId}
@@ -232,14 +232,14 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
   ] as const
 
   return (
-    <div className="h-[calc(100vh-120px)] min-h-[680px] overflow-hidden rounded-2xl border border-[#d9d5c8] bg-[#f5f4ee] flex flex-col">
-      <header className="shrink-0 border-b border-[#d9d5c8] bg-[#f8f6ef]/95 backdrop-blur">
+    <div className="h-[calc(100vh-120px)] min-h-[680px] overflow-hidden rounded-2xl border border-template-border bg-template-bg flex flex-col">
+      <header className="shrink-0 border-b border-template-border bg-template-bg-header/95 backdrop-blur">
         <div className="mx-auto flex flex-col gap-4 px-4 py-4 lg:px-6 xl:flex-row xl:items-center xl:justify-between">
           <div className="min-w-0">
             <div className="flex items-center gap-3">
               <button
                 onClick={() => router.push("/admin/templates")}
-                className="rounded-full border border-[#d9d5c8] px-3 py-1 text-sm text-gray-600 hover:bg-white transition"
+                className="rounded-full border border-template-border px-3 py-1 text-sm text-gray-600 hover:bg-white transition"
               >
                 ← 返回模板列表
               </button>
@@ -256,7 +256,7 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
             <button
               type="button"
               onClick={() => setShowBasicEditor((prev) => !prev)}
-              className="h-10 rounded-full border border-[#234d3b] bg-white px-5 text-sm font-medium text-[#234d3b] hover:bg-[#edf5f1] transition"
+              className="h-10 rounded-full border border-template-accent bg-white px-5 text-sm font-medium text-template-accent hover:bg-template-accent-light transition"
             >
               {showBasicEditor ? "收起基础信息" : "编辑基础信息"}
             </button>
@@ -264,7 +264,7 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
               type="button"
               onClick={handleSaveTemplate}
               disabled={savingTemplate}
-              className="h-10 rounded-full bg-[#234d3b] px-5 text-sm font-medium text-white hover:bg-[#1b3a2d] disabled:opacity-50 transition"
+              className="h-10 rounded-full bg-template-accent px-5 text-sm font-medium text-white hover:bg-template-accent-hover disabled:opacity-50 transition"
             >
               {savingTemplate ? "保存中..." : "保存"}
             </button>
@@ -274,8 +274,8 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
 
       <main className="mx-auto flex min-h-0 w-full flex-1 flex-col overflow-hidden px-3 py-4 lg:px-4">
         {showBasicEditor && (
-          <section className="mb-3 rounded-2xl border border-[#d9d5c8] bg-white shadow-sm">
-            <div className="border-b border-[#ece7d8] px-4 py-3">
+          <section className="mb-3 rounded-2xl border border-template-border bg-white shadow-sm">
+            <div className="border-b border-template-border-inner px-4 py-3">
               <h3 className="text-sm font-semibold text-gray-700">基础信息</h3>
             </div>
             <div className="p-3">
@@ -348,8 +348,8 @@ function BoardShell({
   children: ReactNode
 }) {
   return (
-    <section className={cn("flex h-full min-h-0 flex-col overflow-hidden rounded-[20px] border border-[#d9d5c8] bg-white shadow-sm", className)}>
-      <div className="border-b border-[#ece7d8] px-4 py-3">
+    <section className={cn("flex h-full min-h-0 flex-col overflow-hidden rounded-[20px] border border-template-border bg-white shadow-sm", className)}>
+      <div className="border-b border-template-border-inner px-4 py-3">
         <div className="flex items-center gap-3">
           <span className={cn("h-3 w-3 rounded-full", accentClass)} />
           <h2 className="text-lg font-semibold text-gray-800">{title}</h2>
@@ -379,13 +379,13 @@ function ResizeHandle({
         }}
         className={cn(
           "group flex w-full cursor-col-resize items-center justify-center touch-none",
-          active && "bg-[#ece7d8]"
+          active && "bg-template-border-inner"
         )}
       >
         <span
           className={cn(
-            "h-20 w-1 rounded-full bg-[#d9d5c8] transition group-hover:bg-[#b7af97]",
-            active && "bg-[#8b8269]"
+            "h-20 w-1 rounded-full bg-template-border transition group-hover:bg-template-handle-hover",
+            active && "bg-template-handle-active"
           )}
         />
       </button>

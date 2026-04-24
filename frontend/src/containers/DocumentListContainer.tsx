@@ -6,6 +6,7 @@ import { documentService } from "@/services/documentService"
 import { templateService } from "@/services/templateService"
 import { useAuthStore } from "@/store/authStore"
 import type { DocumentListItem, Template } from "@/types/api"
+import { toastError } from "@/hooks/useToast"
 
 // ----------------------------------------------------------------
 // 新建文档弹窗
@@ -232,7 +233,7 @@ export default function DocumentListContainer() {
       setItems(prev => prev.filter(d => d.document_id !== id))
       setTotal(prev => prev - 1)
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "删除失败")
+      toastError(err instanceof Error ? err.message : "删除失败")
     } finally {
       setDeletingId(null)
     }

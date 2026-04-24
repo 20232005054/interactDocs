@@ -6,6 +6,7 @@ import { coreInfoTemplateService } from "@/services/templateService"
 import type { CoreInfoDependencyItem, CoreInfoTemplate, FieldType } from "@/types/api"
 import { cn } from "@/lib/utils"
 import { setCoreInfoDragData } from "@/lib/templateDrag"
+import { toastError } from "@/hooks/useToast"
 import DependencyHoverCard from "@/components/template/DependencyHoverCard"
 
 interface CoreInfoTemplateStepProps {
@@ -231,7 +232,7 @@ function TreeNode({
       await coreInfoTemplateService.delete(node.core_template_id)
       onRefresh()
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "删除失败")
+      toastError(err instanceof Error ? err.message : "删除失败")
     } finally {
       setDeleting(false)
     }
@@ -632,14 +633,13 @@ export default function CoreInfoTemplateStep({
     }
 
     try {
-      console.debug("[core-info-reorder] request", { parent_id: targetParentId, ordered_ids: next })
       await coreInfoTemplateService.reorder(templateId, {
         parent_id: targetParentId,
         ordered_ids: next,
       })
     } catch (err: unknown) {
       setItems(previousItems)
-      alert(err instanceof Error ? err.message : "排序失败")
+      toastError(err instanceof Error ? err.message : "排序失败")
     }
   }, [applySiblingOrder, getSiblingIds, items, templateId])
 

@@ -204,7 +204,7 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f5f4ee] flex items-center justify-center">
+      <div className="min-h-screen bg-template-bg flex items-center justify-center">
         <p className="text-sm text-gray-500">加载模板中...</p>
       </div>
     )
@@ -212,7 +212,7 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
 
   if (applyError && !templateId) {
     return (
-      <div className="min-h-screen bg-[#f5f4ee] flex flex-col items-center justify-center gap-3">
+      <div className="min-h-screen bg-template-bg flex flex-col items-center justify-center gap-3">
         <p className="text-sm text-red-500">{applyError}</p>
         <button onClick={() => router.back()} className="text-sm text-gray-600 hover:underline">
           返回
@@ -226,7 +226,7 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
       key: "core-info",
       title: "核心信息模板",
       desc: "编辑文档的核心信息字段结构，并作为拖拽填充源。",
-      accentClass: "bg-[#234d3b]",
+      accentClass: "bg-template-accent",
       children: (
         <CoreInfoTemplateStep
           templateId={templateId}
@@ -239,7 +239,7 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
       key: "summary",
       title: "摘要模板",
       desc: "摘要卡片支持接收核心信息拖拽，快速填入来源、内容模板和提示词。",
-      accentClass: "bg-[#8d5f23]",
+      accentClass: "bg-template-summary",
       children: (
         <SummaryTemplateStep
           templateId={templateId}
@@ -251,7 +251,7 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
       key: "structure",
       title: "章节结构模板",
       desc: "桌面端保持更宽布局，方便横向拖拽核心信息到章节配置区。",
-      accentClass: "bg-[#5d3d72]",
+      accentClass: "bg-template-structure",
       children: (
         <StructureTemplateStep
           templateId={templateId}
@@ -263,14 +263,14 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
   ] : []
 
   return (
-    <div className="h-screen overflow-hidden bg-[#f5f4ee] flex flex-col">
-      <header className="shrink-0 border-b border-[#d9d5c8] bg-[#f8f6ef]/95 backdrop-blur">
+    <div className="h-screen overflow-hidden bg-template-bg flex flex-col">
+      <header className="shrink-0 border-b border-template-border bg-template-bg-header/95 backdrop-blur">
         <div className="mx-auto flex max-w-[1800px] flex-col gap-4 px-4 py-4 lg:px-6 xl:flex-row xl:items-center xl:justify-between">
           <div className="min-w-0">
             <div className="flex items-center gap-3">
               <button
                 onClick={() => router.push(`/documents/${documentId}`)}
-                className="rounded-full border border-[#d9d5c8] px-3 py-1 text-sm text-gray-600 hover:bg-white transition"
+                className="rounded-full border border-template-border px-3 py-1 text-sm text-gray-600 hover:bg-white transition"
               >
                 ← 返回编辑器
               </button>
@@ -294,14 +294,14 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
               <button
                 onClick={handleSaveTemplate}
                 disabled={applying || savingTemplate || !templateId}
-                className="h-10 rounded-full border border-[#234d3b] bg-white px-5 text-sm font-medium text-[#234d3b] hover:bg-[#edf5f1] disabled:opacity-50 transition"
+                className="h-10 rounded-full border border-template-accent bg-white px-5 text-sm font-medium text-template-accent hover:bg-template-accent-light disabled:opacity-50 transition"
               >
                 {savingTemplate ? "保存中..." : "保存"}
               </button>
               <button
                 onClick={handleApply}
                 disabled={applying || savingTemplate || !templateId}
-                className="h-10 rounded-full bg-[#234d3b] px-5 text-sm font-medium text-white hover:bg-[#1b3a2d] disabled:opacity-50 transition"
+                className="h-10 rounded-full bg-template-accent px-5 text-sm font-medium text-white hover:bg-template-accent-hover disabled:opacity-50 transition"
               >
                 {applying ? "应用中..." : "应用"}
               </button>
@@ -370,8 +370,8 @@ function BoardShell({
   children: ReactNode
 }) {
   return (
-    <section className={cn("flex h-full min-h-0 flex-col overflow-hidden rounded-[20px] border border-[#d9d5c8] bg-white shadow-sm", className)}>
-      <div className="border-b border-[#ece7d8] px-4 py-3">
+    <section className={cn("flex h-full min-h-0 flex-col overflow-hidden rounded-[20px] border border-template-border bg-white shadow-sm", className)}>
+      <div className="border-b border-template-border-inner px-4 py-3">
         <div className="flex items-center gap-3">
           <span className={cn("h-3 w-3 rounded-full", accentClass)} />
           <h2 className="text-lg font-semibold text-gray-800">{title}</h2>
@@ -401,13 +401,13 @@ function ResizeHandle({
         }}
         className={cn(
           "group flex w-full cursor-col-resize items-center justify-center touch-none",
-          active && "bg-[#ece7d8]"
+          active && "bg-template-border-inner"
         )}
       >
         <span
           className={cn(
-            "h-20 w-1 rounded-full bg-[#d9d5c8] transition group-hover:bg-[#b7af97]",
-            active && "bg-[#8b8269]"
+            "h-20 w-1 rounded-full bg-template-border transition group-hover:bg-template-handle-hover",
+            active && "bg-template-handle-active"
           )}
         />
       </button>

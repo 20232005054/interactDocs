@@ -1,3 +1,4 @@
+import { fetchStream } from "@/lib/request"
 import type {
   AIChatAction,
   AIChatRequestPayload,
@@ -18,13 +19,9 @@ export const aiService = {
     payload: AIChatRequestPayload,
     options: AIChatStreamOptions = {}
   ): Promise<AIChatStreamResult> => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
-    const response = await fetch("/api/v1/ai/chat", {
+    const response = await fetchStream("/api/v1/ai/chat", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
       signal: options.signal,
     })
@@ -32,10 +29,7 @@ export const aiService = {
     const contentType = response.headers.get("content-type") ?? ""
     if (contentType.includes("application/json")) {
       const errorBody = await response.json().catch(() => null)
-      const message =
-        errorBody?.message ||
-        errorBody?.error ||
-        "请求失败，请重试"
+      const message = errorBody?.message || errorBody?.error || "请求失败，请重试"
       throw new Error(message)
     }
 

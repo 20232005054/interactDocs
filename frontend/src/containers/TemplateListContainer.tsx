@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { templateService } from "@/services/templateService"
+import ConfirmDialog from "@/components/ui/ConfirmDialog"
+import { toastError } from "@/hooks/useToast"
 import type { Template } from "@/types/api"
 import { cn } from "@/lib/utils"
 
@@ -43,6 +45,8 @@ export default function TemplateListContainer() {
 
   // 删除确认
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  // 回退确认
+  const [rollbackTarget, setRollbackTarget] = useState<Template | null>(null)
   // 导入状态
   const [importing, setImporting] = useState(false)
   const [importError, setImportError] = useState<string | null>(null)
@@ -82,9 +86,20 @@ export default function TemplateListContainer() {
       await templateService.delete(templateId)
       load()
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "删除失败")
+      toastError(err instanceof Error ? err.message : "删除失败")
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  const handleRollback = async (templateId: string) => {
+    try {
+      await templateService.rollback(templateId)
+      load()
+    } catch (err: unknown) {
+      toastError(err instanceof Error ? err.message : "回退失败")
+    } finally {
+      setRollbackTarget(null)
     }
   }
 
@@ -231,15 +246,7 @@ export default function TemplateListContainer() {
                     </button>
                     {t.template_type !== 1 && (
                       <button
-                        onClick={async () => {
-                          if (!confirm("确认回退到官方版本？")) return
-                          try {
-                            await templateService.rollback(t.template_id)
-                            load()
-                          } catch (err: unknown) {
-                            alert(err instanceof Error ? err.message : "回退失败")
-                          }
-                        }}
+                        onClick={() => setRollbackTarget(t)}
                         className="text-sm text-muted-foreground hover:text-foreground"
                       >
                         回退
@@ -299,6 +306,25 @@ export default function TemplateListContainer() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!deletingId}
+        title="确认删除模板？"
+        description="此操作不可撤销。"
+        confirmLabel="删除"
+        destructive
+        onConfirm={() => deletingId && handleDelete(deletingId)}
+        onCancel={() => setDeletingId(null)}
+      />
+
+      <ConfirmDialog
+        open={!!rollbackTarget}
+        title="确认回退到官方版本？"
+        description={`「${rollbackTarget?.display_name}」将被覆盖为最新官方版本，自定义修改会丢失。`}
+        confirmLabel="回退"
+        onConfirm={() => rollbackTarget && handleRollback(rollbackTarget.template_id)}
+        onCancel={() => setRollbackTarget(null)}
+      />
     </div>
   )
 }

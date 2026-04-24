@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { templateService } from "@/services/templateService"
 import type { Template } from "@/types/api"
 import { cn } from "@/lib/utils"
+import { toastError } from "@/hooks/useToast"
 
 // ----------------------------------------------------------------
 // 重命名弹窗
@@ -105,7 +106,7 @@ export default function MyTemplatesContainer() {
       await templateService.delete(templateId)
       setItems(prev => prev.filter(t => t.template_id !== templateId))
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "删除失败")
+      toastError(err instanceof Error ? err.message : "删除失败")
     } finally {
       setDeletingId(null)
     }

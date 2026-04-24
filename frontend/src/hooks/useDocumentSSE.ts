@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback } from "react"
 import { summaryService } from "@/services/summaryService"
 import { paragraphService } from "@/services/paragraphService"
+import { fetchStream } from "@/lib/request"
 import { useDocumentStore } from "@/store/documentStore"
 
 interface SSEEvent {
@@ -53,10 +54,7 @@ export function useDocumentSSE({ documentId, enabled = true }: UseDocumentSSEOpt
     const abort = new AbortController()
     abortRef.current = abort
 
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
-
-    fetch(`/api/v1/documents/${documentId}/events`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    fetchStream(`/api/v1/documents/${documentId}/events`, {
       signal: abort.signal,
     })
       .then(async res => {

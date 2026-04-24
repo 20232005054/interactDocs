@@ -22,6 +22,7 @@ import {
   pruneCoreInfoSourcesByKeys,
   upsertCoreInfoSource,
 } from "@/lib/templateDrag"
+import { toastError } from "@/hooks/useToast"
 
 interface StructureTemplateStepProps {
   templateId: string
@@ -877,7 +878,7 @@ export default function StructureTemplateStep({
       })
     } catch (err: unknown) {
       setTree(previousTree)
-      alert(err instanceof Error ? err.message : "重排失败")
+      toastError(err instanceof Error ? err.message : "重排失败")
     }
   }, [applySiblingOrder, getSiblingIds, templateId, tree])
 

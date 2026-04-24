@@ -8,6 +8,7 @@ import { useChatStore } from "@/store/chatStore"
 import type { ChapterTreeNode, Paragraph } from "@/types/api"
 import { cn } from "@/lib/utils"
 import ParagraphToolbar from "@/components/editor/ParagraphToolbar"
+import { toastError } from "@/hooks/useToast"
 
 interface DocumentBodyProps {
   onReload: () => void
@@ -91,7 +92,7 @@ function ParagraphRow({ paragraph, chapterId, chapterTitle, onReload }: Paragrap
       await paragraphService.insertAfter(paragraph.paragraph_id, { content: "" })
       onReload()
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "插入失败")
+      toastError(err instanceof Error ? err.message : "插入失败")
     }
   }
 
@@ -102,7 +103,7 @@ function ParagraphRow({ paragraph, chapterId, chapterTitle, onReload }: Paragrap
       removeParagraphContexts(paragraph.paragraph_id)
       onReload()
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "删除失败")
+      toastError(err instanceof Error ? err.message : "删除失败")
     }
   }
 
@@ -112,7 +113,7 @@ function ParagraphRow({ paragraph, chapterId, chapterTitle, onReload }: Paragrap
       await paragraphService.update(paragraph.paragraph_id, { para_type: paraType })
       onReload()
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "修改失败")
+      toastError(err instanceof Error ? err.message : "修改失败")
     }
   }
 

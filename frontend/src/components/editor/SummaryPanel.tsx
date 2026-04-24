@@ -5,6 +5,7 @@ import { summaryService } from "@/services/summaryService"
 import { useDocumentStore } from "@/store/documentStore"
 import type { Summary } from "@/types/api"
 import { cn } from "@/lib/utils"
+import { toastError } from "@/hooks/useToast"
 
 // ----------------------------------------------------------------
 // 单条摘要卡片
@@ -174,7 +175,7 @@ export default function SummaryPanel({ onAfterSave }: SummaryPanelProps) {
         await onAfterSave()
       }
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "保存失败")
+      toastError(err instanceof Error ? err.message : "保存失败")
     } finally {
       setSaving(false)
     }

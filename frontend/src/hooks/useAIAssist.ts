@@ -21,46 +21,10 @@ export function useAIAssist() {
     setAiAssistingParagraphId(paragraphId)
     clearAiAssistPreview()
 
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
-
     try {
-      const res = await fetch(`/api/v1/paragraphs/${paragraphId}/ai/assist`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ instruction: instruction?.trim() || undefined }),
+      await paragraphService.assistAI(paragraphId, instruction, {
+        onChunk: (chunk) => appendAiAssistPreview(chunk),
       })
-
-      if (!res.ok || !res.body) throw new Error("请求失败")
-
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ""
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split("\n")
-        buffer = lines.pop() ?? ""
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue
-          const raw = line.slice(6).trim()
-          if (!raw || raw === "[DONE]") continue
-          let parsed: { error?: string; content?: string } | null = null
-          try {
-            parsed = JSON.parse(raw)
-          } catch {
-            continue
-          }
-          if (parsed?.error) throw new Error(String(parsed.error))
-          if (parsed?.content) appendAiAssistPreview(parsed.content)
-        }
-      }
     } catch (err) {
       clearAiAssistPreview()
       setAiAssistingParagraphId(null)

@@ -1,4 +1,4 @@
-import request from "@/lib/request"
+import request, { fetchStream, getAuthHeaders } from "@/lib/request"
 import type {
   DocumentExportFormat,
   DocumentListItem,
@@ -11,11 +11,6 @@ import type {
   TemplateInfoResponse,
   UpdateDocumentPayload,
 } from "@/types/api"
-
-function getAuthHeaders(): HeadersInit {
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
-  return token ? { Authorization: `Bearer ${token}` } : {}
-}
 
 export const documentService = {
   list: (params?: { page?: number; page_size?: number }): Promise<DocumentListResponse> =>
@@ -51,10 +46,12 @@ export const documentService = {
       payload?.display_name ? { display_name: payload.display_name } : {}
     ),
 
+  syncTemplate: (documentId: string): Promise<TemplateDetail> =>
+    request.post(`/api/v1/documents/${documentId}/sync-template`),
+
   exportFile: async (documentId: string, format: DocumentExportFormat): Promise<Blob> => {
-    const response = await fetch(`/api/v1/documents/${documentId}/export/${format}`, {
-      headers: getAuthHeaders(),
-    })
+    // 返回二进制文件，不走 axios 响应拦截器，使用 fetchStream
+    const response = await fetchStream(`/api/v1/documents/${documentId}/export/${format}`)
 
     const contentType = response.headers.get("content-type") ?? ""
     if (contentType.includes("application/json")) {
@@ -72,14 +69,11 @@ export const documentService = {
   applyCoreInfoTemplate: (documentId: string): Promise<{ message: string; items: unknown[] }> =>
     request.post(`/api/v1/documents/${documentId}/apply-core-info-template`),
 
+  // AI 总结模式可能耗时较长，使用 fetchStream 绕过 axios 30s timeout
   applySummaryTemplate: async (documentId: string): Promise<{ message: string; items: unknown[] }> => {
-    // AI 总结模式可能耗时较长，使用原生 fetch 避免 axios timeout
-    const res = await fetch(`/api/v1/documents/${documentId}/apply-summary-template`, {
+    const res = await fetchStream(`/api/v1/documents/${documentId}/apply-summary-template`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...getAuthHeaders(),
-      },
+      headers: { "Content-Type": "application/json" },
     })
     const data = await res.json()
     if (data.code !== 200) throw new Error(data.message || "应用摘要模板失败")
@@ -87,12 +81,9 @@ export const documentService = {
   },
 
   applyStructureTemplate: async (documentId: string): Promise<{ message: string; items: unknown[] }> => {
-    const res = await fetch(`/api/v1/documents/${documentId}/apply-structure-template`, {
+    const res = await fetchStream(`/api/v1/documents/${documentId}/apply-structure-template`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...getAuthHeaders(),
-      },
+      headers: { "Content-Type": "application/json" },
     })
     const data = await res.json()
     if (data.code !== 200) throw new Error(data.message || "应用章节结构模板失败")

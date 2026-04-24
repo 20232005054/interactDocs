@@ -4,6 +4,8 @@ import { useState, useCallback } from "react"
 import { chapterService } from "@/services/chapterService"
 import { useDocumentStore } from "@/store/documentStore"
 import { useEditorStore } from "@/store/editorStore"
+import ConfirmDialog from "@/components/ui/ConfirmDialog"
+import { toastError } from "@/hooks/useToast"
 import type { ChapterTreeNode } from "@/types/api"
 import { cn } from "@/lib/utils"
 
@@ -31,6 +33,7 @@ function TreeNode({ node, documentId, depth, onReload }: TreeNodeProps) {
   const [saving, setSaving] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   const isActive = activeChapterId === node.chapter_id
   const hasChildren = node.children.length > 0
@@ -64,7 +67,7 @@ function TreeNode({ node, documentId, depth, onReload }: TreeNodeProps) {
       await chapterService.createSub(documentId, node.chapter_id)
       onReload()
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "添加失败")
+      toastError(err instanceof Error ? err.message : "添加失败")
     }
   }
 
@@ -74,18 +77,18 @@ function TreeNode({ node, documentId, depth, onReload }: TreeNodeProps) {
       await chapterService.insertAfter(documentId, node.chapter_id)
       onReload()
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "添加失败")
+      toastError(err instanceof Error ? err.message : "添加失败")
     }
   }
 
   const handleDelete = async () => {
-    setMenuOpen(false)
-    if (!confirm(`确认删除章节「${node.title}」？`)) return
     try {
       await chapterService.delete(node.chapter_id)
       onReload()
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "删除失败")
+      toastError(err instanceof Error ? err.message : "删除失败")
+    } finally {
+      setConfirmDelete(false)
     }
   }
 
@@ -158,7 +161,7 @@ function TreeNode({ node, documentId, depth, onReload }: TreeNodeProps) {
                   <button onClick={handleAddSub}
                     className="w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700">添加子章节</button>
                   <div className="border-t border-gray-100 my-1" />
-                  <button onClick={handleDelete}
+                  <button onClick={() => { setMenuOpen(false); setConfirmDelete(true) }}
                     className="w-full text-left px-3 py-1.5 hover:bg-red-50 text-red-500">删除</button>
                 </div>
               </>
@@ -181,6 +184,16 @@ function TreeNode({ node, documentId, depth, onReload }: TreeNodeProps) {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title={`删除章节「${node.title}」？`}
+        description="此操作不可撤销，章节下的所有段落也会一并删除。"
+        confirmLabel="删除"
+        destructive
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </div>
   )
 }
@@ -198,7 +211,7 @@ export default function ChapterTree({ documentId, onReload }: ChapterTreeProps) 
       await chapterService.create(documentId)
       onReload()
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "添加失败")
+      toastError(err instanceof Error ? err.message : "添加失败")
     } finally {
       setAdding(false)
     }

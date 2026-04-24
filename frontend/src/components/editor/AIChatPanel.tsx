@@ -260,9 +260,9 @@ export default function AIChatPanel({ documentId }: AIChatPanelProps) {
               >
                 {message.content || (message.streaming && (
                   <span className="inline-flex gap-0.5">
-                    <span className="h-1 w-1 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: "0ms" }} />
-                    <span className="h-1 w-1 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: "150ms" }} />
-                    <span className="h-1 w-1 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: "300ms" }} />
+                    <span className="h-1 w-1 animate-bounce rounded-full bg-gray-400 [animation-delay:0ms]" />
+                    <span className="h-1 w-1 animate-bounce rounded-full bg-gray-400 [animation-delay:150ms]" />
+                    <span className="h-1 w-1 animate-bounce rounded-full bg-gray-400 [animation-delay:300ms]" />
                   </span>
                 ))}
                 {message.streaming && message.content && (
@@ -354,8 +354,7 @@ export default function AIChatPanel({ documentId }: AIChatPanelProps) {
             disabled={streaming}
             rows={1}
             placeholder="输入消息，Enter 发送，Shift+Enter 换行"
-            className="w-full resize-none rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 pr-11 text-xs leading-relaxed outline-none transition focus:border-blue-300 focus:bg-white disabled:opacity-50"
-            style={{ maxHeight: `${INPUT_MAX_HEIGHT}px`, overflowY: "hidden" }}
+            className="w-full resize-none rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 pr-11 text-xs leading-relaxed outline-none transition focus:border-blue-300 focus:bg-white disabled:opacity-50 max-h-[120px] overflow-y-hidden"
             onInput={(event) => adjustTextareaHeight(event.currentTarget)}
           />
 

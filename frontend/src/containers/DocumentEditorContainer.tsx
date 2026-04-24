@@ -8,6 +8,8 @@ import { coreInfoService } from "@/services/coreInfoService"
 import { documentService } from "@/services/documentService"
 import { useDocumentStore } from "@/store/documentStore"
 import { useEditorStore, type RightPanelTab } from "@/store/editorStore"
+import InputDialog from "@/components/ui/InputDialog"
+import { toastError, toastSuccess } from "@/hooks/useToast"
 import { useChatStore } from "@/store/chatStore"
 import { useAuthStore } from "@/store/authStore"
 import { cn } from "@/lib/utils"
@@ -62,19 +64,23 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
     const snapshotBefore = JSON.stringify(tree)
     const retryDelaysMs = [150, 450, 900, 1500, 2200]
 
-    for (let index = 0; index < retryDelaysMs.length; index += 1) {
-      if (index > 0) {
-        await new Promise((resolve) => setTimeout(resolve, retryDelaysMs[index]))
-      }
+    try {
+      for (let index = 0; index < retryDelaysMs.length; index += 1) {
+        if (index > 0) {
+          await new Promise((resolve) => setTimeout(resolve, retryDelaysMs[index]))
+        }
 
-      const fullContent = await chapterService.getFullContent(documentId)
-      const nextSnapshot = JSON.stringify(fullContent.tree)
-      setFullContent(documentId, documentTitle ?? "", fullContent.tree)
+        const fullContent = await chapterService.getFullContent(documentId)
+        const nextSnapshot = JSON.stringify(fullContent.tree)
+        setFullContent(documentId, documentTitle ?? "", fullContent.tree)
 
-      // 后端核心信息/摘要保存后会异步联动正文，轮询直到检测到内容变化。
-      if (nextSnapshot !== snapshotBefore) {
-        return
+        // 后端核心信息/摘要保存后会异步联动正文，轮询直到检测到内容变化。
+        if (nextSnapshot !== snapshotBefore) {
+          return
+        }
       }
+    } catch {
+      // 静默失败：SSE 事件会兜底同步最新内容，不阻断用户操作
     }
   }, [documentId, documentTitle, setFullContent, tree])
 
@@ -247,41 +253,44 @@ function EditorHeader({ title, onBack, userName, onApplyTemplate, documentId }: 
 // ----------------------------------------------------------------
 function ExportTemplateButton({ documentId, documentTitle }: { documentId: string; documentTitle: string }) {
   const [exporting, setExporting] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
+  const [showInput, setShowInput] = useState(false)
 
-  const handleExportTemplate = async () => {
-    const input = window.prompt("导出到个人模板库的名称，可留空使用当前模板名", `${documentTitle} 模板`)
-    if (input === null) return
-
+  const handleConfirm = async (name: string) => {
+    setShowInput(false)
     setExporting(true)
-    setMessage(null)
     try {
       const exported = await documentService.exportTemplate(documentId, {
-        display_name: input.trim() || undefined,
+        display_name: name.trim() || undefined,
       })
-      setMessage(`已导出模板：${exported.display_name}`)
-      window.setTimeout(() => {
-        setMessage((current) => (current === `已导出模板：${exported.display_name}` ? null : current))
-      }, 2500)
+      toastSuccess(`已导出模板：${exported.display_name}`)
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "导出模板失败")
+      toastError(err instanceof Error ? err.message : "导出模板失败")
     } finally {
       setExporting(false)
     }
   }
 
   return (
-    <div className="flex items-center gap-2 shrink-0">
-      {message && <span className="text-xs text-green-600">{message}</span>}
+    <>
       <button
         type="button"
-        onClick={handleExportTemplate}
+        onClick={() => setShowInput(true)}
         disabled={exporting}
-        className="h-7 px-3 rounded border border-amber-300 text-amber-700 text-xs font-medium hover:bg-amber-50 disabled:opacity-50 transition"
+        className="h-7 px-3 rounded border border-amber-300 text-amber-700 text-xs font-medium hover:bg-amber-50 disabled:opacity-50 transition shrink-0"
       >
         {exporting ? "导出中..." : "导出模板"}
       </button>
-    </div>
+      <InputDialog
+        open={showInput}
+        title="导出到个人模板库"
+        description="可留空使用当前模板名"
+        placeholder={`${documentTitle} 模板`}
+        defaultValue={`${documentTitle} 模板`}
+        confirmLabel="导出"
+        onConfirm={handleConfirm}
+        onCancel={() => setShowInput(false)}
+      />
+    </>
   )
 }
 
@@ -320,7 +329,7 @@ function ExportMenu({ documentId, documentTitle }: ExportMenuProps) {
       a.click()
       URL.revokeObjectURL(url)
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "导出失败")
+      toastError(err instanceof Error ? err.message : "导出失败")
     } finally {
       setExporting(null)
     }

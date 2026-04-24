@@ -3,6 +3,7 @@
 import { useRef, useState } from "react"
 import { useAIAssist } from "@/hooks/useAIAssist"
 import { useChatStore } from "@/store/chatStore"
+import { paragraphService, type EvaluateAIResult } from "@/services/paragraphService"
 import { cn } from "@/lib/utils"
 import type { ParaType } from "@/types/api"
 
@@ -32,7 +33,7 @@ export default function ParagraphToolbar({
   )))
 
   const [evaluating, setEvaluating] = useState(false)
-  const [evalResult, setEvalResult] = useState<{ evaluation: string; suggestions: string[] } | null>(null)
+  const [evalResult, setEvalResult] = useState<EvaluateAIResult | null>(null)
   const [evalPreview, setEvalPreview] = useState("")
   const [showEval, setShowEval] = useState(false)
   const [showAssistInput, setShowAssistInput] = useState(false)
@@ -72,46 +73,15 @@ export default function ParagraphToolbar({
     setEvalResult(null)
     setShowEval(true)
 
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
     const abort = new AbortController()
     evalAbortRef.current = abort
 
     try {
-      const res = await fetch(`/api/v1/paragraphs/${paragraphId}/ai/evaluate`, {
-        method: "POST",
-        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      await paragraphService.evaluateAI(paragraphId, {
         signal: abort.signal,
+        onChunk: (chunk) => setEvalPreview((prev) => prev + chunk),
+        onResult: (result) => setEvalResult(result),
       })
-
-      if (!res.ok || !res.body) throw new Error("请求失败")
-
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ""
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split("\n")
-        buffer = lines.pop() ?? ""
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue
-          const raw = line.slice(6).trim()
-          if (!raw || raw === "[DONE]") continue
-          try {
-            const parsed = JSON.parse(raw)
-            if (parsed.content) setEvalPreview(prev => prev + parsed.content)
-            if (parsed.evaluation !== undefined) {
-              setEvalResult({ evaluation: parsed.evaluation, suggestions: parsed.suggestions ?? [] })
-            }
-          } catch {
-            // 忽略
-          }
-        }
-      }
     } catch (err: unknown) {
       if ((err as Error)?.name !== "AbortError") {
         setEvalPreview("评估失败，请重试")
