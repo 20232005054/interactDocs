@@ -1,10 +1,12 @@
 "use client"
 
-import { useEffect, useState, useCallback, useMemo } from "react"
+import { useEffect, useState, useCallback, useMemo, useRef } from "react"
+import { ChevronDown, CornerDownRight, Plus, Trash2 } from "lucide-react"
 import { coreInfoTemplateService } from "@/services/templateService"
 import type { CoreInfoDependencyItem, CoreInfoTemplate, FieldType } from "@/types/api"
 import { cn } from "@/lib/utils"
 import { setCoreInfoDragData } from "@/lib/templateDrag"
+import DependencyHoverCard from "@/components/template/DependencyHoverCard"
 
 interface CoreInfoTemplateStepProps {
   templateId: string
@@ -19,12 +21,13 @@ interface CoreInfoTemplateStepProps {
 interface RowFormProps {
   templateId: string
   parentId: string | null
+  afterId?: string | null
   initial?: CoreInfoTemplate
   onDone: () => void
   onCancel: () => void
 }
 
-function RowForm({ templateId, parentId, initial, onDone, onCancel }: RowFormProps) {
+function RowForm({ templateId, parentId, afterId = null, initial, onDone, onCancel }: RowFormProps) {
   const [fieldName, setFieldName] = useState(initial?.field_name ?? "")
   const [fieldType, setFieldType] = useState<FieldType>(initial?.field_type ?? "text")
   const [defaultValue, setDefaultValue] = useState(initial?.default_value ?? "")
@@ -45,6 +48,15 @@ function RowForm({ templateId, parentId, initial, onDone, onCancel }: RowFormPro
 
       if (initial) {
         await coreInfoTemplateService.update(initial.core_template_id, {
+          field_name: fieldName.trim(),
+          field_type: fieldType,
+          default_value: defaultValue.trim() || null,
+          options,
+          is_required: isRequired,
+        })
+      } else if (afterId) {
+        await coreInfoTemplateService.insertAfter(templateId, {
+          after_id: afterId,
           field_name: fieldName.trim(),
           field_type: fieldType,
           default_value: defaultValue.trim() || null,
@@ -152,14 +164,67 @@ interface TreeNodeProps {
   templateId: string
   depth: number
   onRefresh: () => void
+  editingNodeId: string | null
+  onStartEdit: (nodeId: string) => void
+  onStopEdit: (nodeId: string) => void
   enableDrag: boolean
   dependencyMap: Map<string, CoreInfoDependencyItem>
+  sortDragging: { id: string; parentId: string | null } | null
+  sortOver: { id: string; parentId: string | null } | null
+  onSortDragStart: (id: string, parentId: string | null) => void
+  onSortDragEnd: () => void | Promise<void>
+  onSortDragEnter: (targetId: string, targetParentId: string | null) => void
 }
 
-function TreeNode({ node, templateId, depth, onRefresh, enableDrag, dependencyMap }: TreeNodeProps) {
-  const [editing, setEditing] = useState(false)
+function collectNonGroupChildren(node: CoreInfoTemplate): Array<{ value: string; label: string }> {
+  const result: Array<{ value: string; label: string }> = []
+
+  const walk = (list: CoreInfoTemplate[]) => {
+    for (const item of list) {
+      if (item.field_type === "group") {
+        if (item.children?.length) walk(item.children)
+        continue
+      }
+      result.push({ value: item.field_key, label: item.field_name })
+      if (item.children?.length) walk(item.children)
+    }
+  }
+
+  if (node.children?.length) walk(node.children)
+  return result
+}
+
+function TreeNode({
+  node,
+  templateId,
+  depth,
+  onRefresh,
+  editingNodeId,
+  onStartEdit,
+  onStopEdit,
+  enableDrag,
+  dependencyMap,
+  sortDragging,
+  sortOver,
+  onSortDragStart,
+  onSortDragEnd,
+  onSortDragEnter,
+}: TreeNodeProps) {
+  const [addingSibling, setAddingSibling] = useState(false)
   const [addingChild, setAddingChild] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [addMenuOpen, setAddMenuOpen] = useState(false)
+  const addMenuRef = useRef<HTMLDivElement | null>(null)
+  const editing = editingNodeId === node.core_template_id
+  // 排序能力在模板编辑页和应用模板页都开启，支持整行拖拽。
+  const rowSortEnabled = true
+  const canDropSort = !!sortDragging
+    && sortDragging.parentId === node.parent_id
+    && sortDragging.id !== node.core_template_id
+  const isSortOver = canDropSort
+    && !!sortOver
+    && sortOver.id === node.core_template_id
+    && sortOver.parentId === node.parent_id
 
   const handleDelete = async () => {
     try {
@@ -179,6 +244,17 @@ function TreeNode({ node, templateId, depth, onRefresh, enableDrag, dependencyMa
   }
   const dependencyItem = dependencyMap.get(node.field_key)
 
+  useEffect(() => {
+    if (!addMenuOpen) return
+    const handleOutside = (event: MouseEvent) => {
+      if (addMenuRef.current && !addMenuRef.current.contains(event.target as Node)) {
+        setAddMenuOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handleOutside)
+    return () => document.removeEventListener("mousedown", handleOutside)
+  }, [addMenuOpen])
+
   return (
     <div className={cn("flex flex-col gap-1", depth > 0 && "ml-6 border-l border-border pl-3")}>
       {editing ? (
@@ -186,83 +262,193 @@ function TreeNode({ node, templateId, depth, onRefresh, enableDrag, dependencyMa
           templateId={templateId}
           parentId={node.parent_id}
           initial={node}
-          onDone={() => { setEditing(false); onRefresh() }}
-          onCancel={() => setEditing(false)}
+          onDone={() => { onStopEdit(node.core_template_id); onRefresh() }}
+          onCancel={() => onStopEdit(node.core_template_id)}
         />
       ) : (
         <div
-          draggable={enableDrag && node.field_type !== "group"}
+          draggable={rowSortEnabled || enableDrag}
+          onClick={() => {
+            if (deleting) return
+            onStartEdit(node.core_template_id)
+          }}
           onDragStart={(event) => {
-            if (!enableDrag || node.field_type === "group") return
-            setCoreInfoDragData(event, { fieldKey: node.field_key, label: node.field_name })
+            if (rowSortEnabled) {
+              event.dataTransfer.effectAllowed = enableDrag ? "copyMove" : "move"
+              const payload = JSON.stringify({ id: node.core_template_id, parentId: node.parent_id })
+              event.dataTransfer.setData(
+                "application/x-coreinfo-sort",
+                payload
+              )
+              // 应用模板页同时保留“拖到其他板块填充变量”的能力
+              if (enableDrag) {
+                setCoreInfoDragData(event, {
+                  fieldKey: node.field_key,
+                  label: node.field_name,
+                  isGroup: node.field_type === "group",
+                  groupChildren: node.field_type === "group" ? collectNonGroupChildren(node) : undefined,
+                })
+              }
+              onSortDragStart(node.core_template_id, node.parent_id)
+              return
+            }
+            setCoreInfoDragData(event, {
+              fieldKey: node.field_key,
+              label: node.field_name,
+              isGroup: node.field_type === "group",
+              groupChildren: node.field_type === "group" ? collectNonGroupChildren(node) : undefined,
+            })
+          }}
+          onDragEnd={() => {
+            if (rowSortEnabled) onSortDragEnd()
+          }}
+          onDragOver={(event) => {
+            if (!canDropSort) return
+            event.preventDefault()
+            event.dataTransfer.dropEffect = "move"
+            onSortDragEnter(node.core_template_id, node.parent_id)
+          }}
+          onDragEnter={(event) => {
+            if (!canDropSort) return
+            event.preventDefault()
+            onSortDragEnter(node.core_template_id, node.parent_id)
+          }}
+          onDrop={async (event) => {
+            if (!canDropSort) return
+            event.preventDefault()
+            event.stopPropagation()
+            onSortDragEnter(node.core_template_id, node.parent_id)
+            await onSortDragEnd()
           }}
           className={cn(
             "group rounded px-2 py-1.5 hover:bg-muted/40",
-            enableDrag && node.field_type !== "group" && "cursor-grab active:cursor-grabbing"
+            (rowSortEnabled || enableDrag) && "cursor-grab active:cursor-grabbing",
+            isSortOver && "ring-1 ring-primary/40 bg-primary/5"
           )}
-          title={enableDrag && node.field_type !== "group" ? "拖拽到摘要模板或章节结构模板中自动填入" : undefined}
+          title={
+            enableDrag
+              ? "点击进入编辑；支持拖拽排序，也可拖到摘要模板或章节结构模板中自动填入"
+              : "点击进入编辑；支持拖拽调整同级顺序"
+          }
         >
           <div className="flex items-center gap-2">
+            {node.is_required && (
+              <span className="text-sm font-semibold leading-none text-destructive">*</span>
+            )}
             <span className="text-sm font-medium text-foreground flex-1">{node.field_name}</span>
             <span className="text-xs text-muted-foreground px-1.5 py-0.5 rounded bg-muted">
               {fieldTypeLabel[node.field_type]}
             </span>
-            {node.is_required && (
-              <span className="text-xs text-destructive">必填</span>
-            )}
             {node.default_value && (
               <span className="text-xs text-muted-foreground truncate max-w-24">默认: {node.default_value}</span>
             )}
 
             {/* 操作按钮（hover 显示） */}
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
-              {node.field_type === "group" && (
+              <div ref={addMenuRef} className="relative">
                 <button
-                  onClick={() => setAddingChild(true)}
-                  className="text-xs text-primary hover:underline"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setAddMenuOpen((prev) => !prev)
+                  }}
+                  className="inline-flex h-6 items-center gap-1 rounded border border-border px-2 text-muted-foreground hover:border-primary/40 hover:text-primary transition"
+                  title="添加节点"
+                  aria-label="添加节点"
                 >
-                  + 子字段
+                  <Plus className="h-3.5 w-3.5" />
+                  <ChevronDown className={cn("h-3 w-3 transition-transform", addMenuOpen && "rotate-180")} />
                 </button>
-              )}
-              <button
-                onClick={() => setEditing(true)}
-                className="text-xs text-muted-foreground hover:text-foreground"
-              >
-                编辑
-              </button>
+
+                {addMenuOpen && (
+                  <div
+                    className="absolute right-0 top-7 z-20 min-w-28 rounded-md border border-border bg-background p-1 shadow-md"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAddingSibling(true)
+                        setAddingChild(false)
+                        setAddMenuOpen(false)
+                      }}
+                      className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs text-foreground hover:bg-muted"
+                    >
+                      <Plus className="h-3.5 w-3.5 text-muted-foreground" />
+                      插入同级节点
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAddingChild(true)
+                        setAddingSibling(false)
+                        setAddMenuOpen(false)
+                      }}
+                      className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs text-foreground hover:bg-muted"
+                    >
+                      <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground" />
+                      插入子级节点
+                    </button>
+                  </div>
+                )}
+              </div>
               {deleting ? (
                 <>
-                  <button onClick={handleDelete} className="text-xs text-destructive hover:underline">确认</button>
-                  <button onClick={() => setDeleting(false)} className="text-xs text-muted-foreground hover:underline">取消</button>
+                  <button
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      void handleDelete()
+                    }}
+                    className="text-xs text-destructive hover:underline"
+                  >
+                    确认
+                  </button>
+                  <button
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      setDeleting(false)
+                    }}
+                    className="text-xs text-muted-foreground hover:underline"
+                  >
+                    取消
+                  </button>
                 </>
               ) : (
-                <button onClick={() => setDeleting(true)} className="text-xs text-muted-foreground hover:text-destructive">删除</button>
+                <button
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setDeleting(true)
+                  }}
+                  className="inline-flex h-6 w-6 items-center justify-center rounded border border-border text-muted-foreground hover:border-destructive/40 hover:text-destructive transition"
+                  title="删除节点"
+                  aria-label="删除节点"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
               )}
             </div>
           </div>
 
           <div className="mt-1 pl-1 text-[11px] text-muted-foreground">
             <span className="mr-1">被引用:</span>
-            {dependencyItem?.referenced_by?.length ? (
-              <span className="inline-flex flex-wrap gap-1 align-middle">
-                {dependencyItem.referenced_by.slice(0, 4).map((ref) => (
-                  <span
-                    key={`${node.field_key}-${ref.type}-${ref.field_key}`}
-                    className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700"
-                    title={`${ref.type}/${ref.field_key}`}
-                  >
-                    {ref.label || ref.field_key}
-                  </span>
-                ))}
-                {dependencyItem.referenced_by.length > 4 && (
-                  <span className="text-muted-foreground">{`+${dependencyItem.referenced_by.length - 4}`}</span>
-                )}
-              </span>
-            ) : (
-              <span>暂无</span>
-            )}
+            <DependencyHoverCard
+              title="被引用详情"
+              items={dependencyItem?.referenced_by ?? []}
+              emptyText="暂无"
+              tone="emerald"
+            />
           </div>
         </div>
+      )}
+
+      {/* 插入同级节点表单（在当前节点后） */}
+      {addingSibling && (
+        <RowForm
+          templateId={templateId}
+          parentId={node.parent_id}
+          afterId={node.core_template_id}
+          onDone={() => { setAddingSibling(false); onRefresh() }}
+          onCancel={() => setAddingSibling(false)}
+        />
       )}
 
       {/* 添加子字段表单 */}
@@ -285,8 +471,16 @@ function TreeNode({ node, templateId, depth, onRefresh, enableDrag, dependencyMa
           templateId={templateId}
           depth={depth + 1}
           onRefresh={onRefresh}
+          editingNodeId={editingNodeId}
+          onStartEdit={onStartEdit}
+          onStopEdit={onStopEdit}
           enableDrag={enableDrag}
           dependencyMap={dependencyMap}
+          sortDragging={sortDragging}
+          sortOver={sortOver}
+          onSortDragStart={onSortDragStart}
+          onSortDragEnd={onSortDragEnd}
+          onSortDragEnter={onSortDragEnter}
         />
       ))}
     </div>
@@ -306,6 +500,11 @@ export default function CoreInfoTemplateStep({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [addingRoot, setAddingRoot] = useState(false)
+  const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
+  const [sortDragging, setSortDragging] = useState<{ id: string; parentId: string | null } | null>(null)
+  const [sortOver, setSortOver] = useState<{ id: string; parentId: string | null } | null>(null)
+  const sortDraggingRef = useRef<{ id: string; parentId: string | null } | null>(null)
+  const sortOverRef = useRef<{ id: string; parentId: string | null } | null>(null)
   const dependencyMap = useMemo(
     () => new Map(dependencyItems.map((item) => [item.field_key, item])),
     [dependencyItems]
@@ -314,12 +513,71 @@ export default function CoreInfoTemplateStep({
   const countAll = useCallback((nodes: CoreInfoTemplate[]): number =>
     nodes.reduce((acc, n) => acc + 1 + countAll(n.children ?? []), 0), [])
 
+  const reorderSiblings = useCallback((siblings: CoreInfoTemplate[], orderedIds: string[]): CoreInfoTemplate[] => {
+    if (!siblings.length) return siblings
+    const idToNode = new Map(siblings.map((node) => [node.core_template_id, node]))
+    const orderedSet = new Set(orderedIds)
+    const next: CoreInfoTemplate[] = []
+
+    for (const id of orderedIds) {
+      const node = idToNode.get(id)
+      if (node) next.push(node)
+    }
+    for (const node of siblings) {
+      if (!orderedSet.has(node.core_template_id)) next.push(node)
+    }
+
+    const unchanged = next.length === siblings.length && next.every((node, index) => node === siblings[index])
+    return unchanged ? siblings : next
+  }, [])
+
+  const applySiblingOrder = useCallback((
+    nodes: CoreInfoTemplate[],
+    parentId: string | null,
+    orderedIds: string[]
+  ): CoreInfoTemplate[] => {
+    if (parentId === null) {
+      return reorderSiblings(nodes, orderedIds)
+    }
+
+    let changed = false
+    const nextNodes = nodes.map((node) => {
+      if (node.core_template_id === parentId) {
+        const children = reorderSiblings(node.children ?? [], orderedIds)
+        if (children !== (node.children ?? [])) {
+          changed = true
+          return { ...node, children }
+        }
+        return node
+      }
+
+      if (!node.children?.length) return node
+
+      const nextChildren = applySiblingOrder(node.children, parentId, orderedIds)
+      if (nextChildren !== node.children) {
+        changed = true
+        return { ...node, children: nextChildren }
+      }
+      return node
+    })
+
+    return changed ? nextNodes : nodes
+  }, [reorderSiblings])
+
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
       const res = await coreInfoTemplateService.getByTemplate(templateId)
       setItems(res.items ?? [])
+      setEditingNodeId((current) => {
+        if (!current) return current
+        const existsInTree = (nodes: CoreInfoTemplate[]): boolean =>
+          nodes.some((node) =>
+            node.core_template_id === current || existsInTree(node.children ?? [])
+          )
+        return existsInTree(res.items ?? []) ? current : null
+      })
       onCountChange?.(countAll(res.items ?? []))
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "加载失败")
@@ -329,6 +587,72 @@ export default function CoreInfoTemplateStep({
   }, [templateId, onCountChange, countAll])
 
   useEffect(() => { load() }, [load])
+
+  const getSiblingIds = useCallback((nodes: CoreInfoTemplate[], parentId: string | null): string[] => {
+    if (parentId === null) return nodes.map((node) => node.core_template_id)
+    for (const node of nodes) {
+      if (node.core_template_id === parentId) {
+        return (node.children ?? []).map((child) => child.core_template_id)
+      }
+      const found = getSiblingIds(node.children ?? [], parentId)
+      if (found.length) return found
+    }
+    return []
+  }, [])
+
+  const handleSortDrop = useCallback(async (
+    sourceId: string,
+    sourceParentId: string | null,
+    targetParentId: string | null,
+    targetId: string
+  ) => {
+    if (sourceParentId !== targetParentId) return
+    if (sourceId === targetId) return
+
+    const current = getSiblingIds(items, targetParentId)
+    if (!current.length) return
+
+    const dragIndex = current.indexOf(sourceId)
+    const targetIndex = current.indexOf(targetId)
+    if (dragIndex < 0 || targetIndex < 0) return
+
+    const next = [...current]
+    next.splice(dragIndex, 1)
+
+    // 向下拖时插到目标后，向上拖时插到目标前，避免“拖了没变化”
+    const targetIndexAfterRemove = next.indexOf(targetId)
+    if (targetIndexAfterRemove < 0) return
+    const insertIndex = dragIndex < targetIndex ? targetIndexAfterRemove + 1 : targetIndexAfterRemove
+    next.splice(insertIndex, 0, sourceId)
+
+    const previousItems = items
+    const optimisticItems = applySiblingOrder(previousItems, targetParentId, next)
+    if (optimisticItems !== previousItems) {
+      setItems(optimisticItems)
+    }
+
+    try {
+      console.debug("[core-info-reorder] request", { parent_id: targetParentId, ordered_ids: next })
+      await coreInfoTemplateService.reorder(templateId, {
+        parent_id: targetParentId,
+        ordered_ids: next,
+      })
+    } catch (err: unknown) {
+      setItems(previousItems)
+      alert(err instanceof Error ? err.message : "排序失败")
+    }
+  }, [applySiblingOrder, getSiblingIds, items, templateId])
+
+  const handleSortDragEnd = useCallback(async () => {
+    const source = sortDraggingRef.current
+    const target = sortOverRef.current
+    sortDraggingRef.current = null
+    sortOverRef.current = null
+    setSortDragging(null)
+    setSortOver(null)
+    if (!source || !target) return
+    await handleSortDrop(source.id, source.parentId, target.parentId, target.id)
+  }, [handleSortDrop])
 
   if (loading) {
     return (
@@ -353,12 +677,14 @@ export default function CoreInfoTemplateStep({
               : "定义文档的核心信息结构，支持文本、下拉选择和分组类型"}
           </p>
         </div>
-        <button
-          onClick={() => setAddingRoot(true)}
-          className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition"
-        >
-          + 添加字段
-        </button>
+        {items.length === 0 && (
+          <button
+            onClick={() => setAddingRoot(true)}
+            className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition"
+          >
+            + 添加字段
+          </button>
+        )}
       </div>
 
       {/* 添加根节点表单 */}
@@ -385,8 +711,32 @@ export default function CoreInfoTemplateStep({
               templateId={templateId}
               depth={0}
               onRefresh={load}
+              editingNodeId={editingNodeId}
+              onStartEdit={(nodeId) => setEditingNodeId(nodeId)}
+              onStopEdit={(nodeId) => {
+                setEditingNodeId((current) => (current === nodeId ? null : current))
+              }}
               enableDrag={enableDrag}
               dependencyMap={dependencyMap}
+              sortDragging={sortDragging}
+              sortOver={sortOver}
+              onSortDragStart={(id, parentId) => {
+                const next = { id, parentId }
+                sortDraggingRef.current = next
+                setSortDragging(next)
+                sortOverRef.current = null
+                setSortOver(null)
+              }}
+              onSortDragEnd={handleSortDragEnd}
+              onSortDragEnter={(targetId, targetParentId) => {
+                const source = sortDraggingRef.current
+                if (!source) return
+                if (source.parentId !== targetParentId) return
+                if (source.id === targetId) return
+                const next = { id: targetId, parentId: targetParentId }
+                sortOverRef.current = next
+                setSortOver(next)
+              }}
             />
           ))}
         </div>

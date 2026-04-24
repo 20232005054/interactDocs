@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useRef, useState } from "react"
 import { useAIAssist } from "@/hooks/useAIAssist"
 import { useChatStore } from "@/store/chatStore"
 import { cn } from "@/lib/utils"
@@ -13,6 +13,7 @@ interface ParagraphToolbarProps {
   paragraphContent: string
   paraType: ParaType
   hasContent: boolean
+  visible: boolean
 }
 
 export default function ParagraphToolbar({
@@ -22,6 +23,7 @@ export default function ParagraphToolbar({
   paragraphContent,
   paraType,
   hasContent,
+  visible,
 }: ParagraphToolbarProps) {
   const { aiAssistingParagraphId, aiAssistPreview, startAssist, applyAssist, discardAssist } = useAIAssist()
   const upsertManualParagraphContext = useChatStore((state) => state.upsertManualParagraphContext)
@@ -33,10 +35,24 @@ export default function ParagraphToolbar({
   const [evalResult, setEvalResult] = useState<{ evaluation: string; suggestions: string[] } | null>(null)
   const [evalPreview, setEvalPreview] = useState("")
   const [showEval, setShowEval] = useState(false)
+  const [showAssistInput, setShowAssistInput] = useState(false)
+  const [assistInstruction, setAssistInstruction] = useState("")
+  const [assistError, setAssistError] = useState<string | null>(null)
   const evalAbortRef = useRef<AbortController | null>(null)
 
   const isAssisting = aiAssistingParagraphId === paragraphId
   const hasPreview = isAssisting && aiAssistPreview.length > 0
+
+  const handleStartAssist = async () => {
+    if (isAssisting) return
+    setAssistError(null)
+    setShowAssistInput(false)
+    try {
+      await startAssist(paragraphId, chapterId, assistInstruction)
+    } catch (err) {
+      setAssistError(err instanceof Error ? err.message : "AI 帮填失败")
+    }
+  }
 
   const handleAddContext = () => {
     upsertManualParagraphContext({
@@ -110,44 +126,24 @@ export default function ParagraphToolbar({
       {/* 工具栏按钮 */}
       <div
         className={cn(
-          "absolute right-2 top-2 z-10 flex items-center gap-1 rounded-lg border border-gray-200 bg-white/95 px-2 py-1 shadow-sm transition",
-          "opacity-0 pointer-events-none group-hover/paragraph:opacity-100 group-hover/paragraph:pointer-events-auto",
-          "group-focus-within/paragraph:opacity-100 group-focus-within/paragraph:pointer-events-auto",
-          (isAssisting || showEval) && "opacity-100 pointer-events-auto"
+          "absolute right-2 top-2 z-10 flex items-center gap-1 rounded-lg border border-gray-200 bg-white/95 px-1.5 py-1 shadow-sm transition",
+          "opacity-0 pointer-events-none",
+          (visible || isAssisting || showEval || showAssistInput) && "opacity-100 pointer-events-auto"
         )}
       >
-        {!isAssisting ? (
-          <button
-            type="button"
-            onClick={() => startAssist(paragraphId, chapterId)}
-            className="h-6 px-2 rounded text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 transition font-medium"
-          >
-            AI 帮填
-          </button>
-        ) : (
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-blue-500 animate-pulse">生成中...</span>
-            {hasPreview && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => applyAssist(paragraphId, chapterId)}
-                  className="h-6 px-2 rounded text-xs bg-green-500 text-white hover:bg-green-600 transition"
-                >
-                  应用
-                </button>
-                <button
-                  type="button"
-                  onClick={discardAssist}
-                  className="h-6 px-2 rounded text-xs bg-gray-100 text-gray-500 hover:bg-gray-200 transition"
-                >
-                  丢弃
-                </button>
-              </>
-            )}
-          </div>
-        )}
-
+        <button
+          type="button"
+          onClick={() => setShowAssistInput((prev) => !prev)}
+          disabled={isAssisting}
+          className={cn(
+            "h-6 px-2 rounded text-xs transition font-medium",
+            isAssisting
+              ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+              : "bg-blue-50 text-blue-600 hover:bg-blue-100"
+          )}
+        >
+          {isAssisting ? "生成中..." : "AI 帮填"}
+        </button>
         <button
           type="button"
           onClick={handleAddContext}
@@ -160,10 +156,9 @@ export default function ParagraphToolbar({
         >
           {hasContext ? "已加上下文" : "添加上下文"}
         </button>
-
         <button
           type="button"
-          onClick={handleEvaluate}
+          onClick={() => { void handleEvaluate() }}
           disabled={evaluating || !hasContent}
           className={cn(
             "h-6 px-2 rounded text-xs transition font-medium",
@@ -177,9 +172,62 @@ export default function ParagraphToolbar({
       </div>
 
       {/* AI 帮填预览 */}
+      {showAssistInput && !isAssisting && (
+        <div className="absolute right-2 top-10 z-20 w-80 rounded-md border border-blue-200 bg-blue-50 p-2 shadow-md">
+          <div className="mb-1 text-xs font-medium text-blue-600">提示词</div>
+          <textarea
+            value={assistInstruction}
+            onChange={(event) => setAssistInstruction(event.target.value)}
+            rows={3}
+            placeholder="请输入本次 AI 帮填提示词（会保存到模板自定义提示词）"
+            className="w-full resize-none rounded border border-blue-200 bg-white px-2 py-1 text-xs text-gray-700 outline-none focus:border-blue-400"
+          />
+          {assistError && <p className="mt-1 text-xs text-red-500">{assistError}</p>}
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleStartAssist}
+              className="h-6 rounded bg-blue-600 px-2 text-xs text-white hover:bg-blue-700 transition"
+            >
+              生成
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowAssistInput(false)
+                setAssistError(null)
+              }}
+              className="h-6 rounded bg-white px-2 text-xs text-gray-500 hover:bg-gray-50 transition"
+            >
+              取消
+            </button>
+          </div>
+        </div>
+      )}
+
       {isAssisting && aiAssistPreview && (
         <div className="mt-8 p-2 rounded-md bg-blue-50 border border-blue-200 text-xs text-gray-700 leading-relaxed">
-          <div className="text-xs text-blue-500 mb-1 font-medium">AI 生成预览</div>
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <div className="text-xs font-medium text-blue-500">AI 生成预览</div>
+            {hasPreview && (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => applyAssist(paragraphId, chapterId)}
+                  className="h-6 rounded bg-green-500 px-2 text-[11px] text-white hover:bg-green-600 transition"
+                >
+                  应用
+                </button>
+                <button
+                  type="button"
+                  onClick={discardAssist}
+                  className="h-6 rounded bg-white px-2 text-[11px] text-gray-500 hover:bg-gray-50 transition"
+                >
+                  丢弃
+                </button>
+              </div>
+            )}
+          </div>
           <p className="whitespace-pre-wrap">{aiAssistPreview}</p>
           {!hasPreview && (
             <span className="inline-block w-0.5 h-3 bg-blue-400 ml-0.5 animate-pulse align-middle" />

@@ -55,6 +55,7 @@ export default function AIChatPanel({ documentId }: AIChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [streaming, setStreaming] = useState(false)
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -75,18 +76,9 @@ export default function AIChatPanel({ documentId }: AIChatPanelProps) {
     adjustTextareaHeight(textareaRef.current)
   }, [input, adjustTextareaHeight])
 
-  const handleSend = useCallback(async () => {
-    const text = input.trim()
-    if (!text || streaming) return
-
-    const userMsg: Message = { id: Date.now().toString(), role: "user", content: text }
-    const assistantId = (Date.now() + 1).toString()
-    const assistantMsg: Message = { id: assistantId, role: "assistant", content: "", streaming: true }
-
-    setMessages((prev) => [...prev, userMsg, assistantMsg])
-    setInput("")
+  const streamAssistantReply = useCallback(async (text: string, assistantId: string) => {
+    if (!text.trim()) return
     setStreaming(true)
-
     const selectedParagraphs = contextItems
       .filter((item) => item.kind === "paragraph")
       .map((item) => ({
@@ -148,7 +140,62 @@ export default function AIChatPanel({ documentId }: AIChatPanelProps) {
         message.id === assistantId ? { ...message, streaming: false } : message
       )))
     }
-  }, [activeChapterId, contextItems, documentId, input, streaming])
+  }, [activeChapterId, contextItems, documentId])
+
+  const handleSend = useCallback(async () => {
+    const text = input.trim()
+    if (!text || streaming) return
+
+    const userMsg: Message = { id: Date.now().toString(), role: "user", content: text }
+    const assistantId = (Date.now() + 1).toString()
+    const assistantMsg: Message = { id: assistantId, role: "assistant", content: "", streaming: true }
+
+    setMessages((prev) => [...prev, userMsg, assistantMsg])
+    setInput("")
+    await streamAssistantReply(text, assistantId)
+  }, [input, streaming, streamAssistantReply])
+
+  const handleRegenerate = useCallback(async (assistantId: string) => {
+    if (streaming) return
+
+    const assistantIndex = messages.findIndex((message) => message.id === assistantId && message.role === "assistant")
+    if (assistantIndex < 0) return
+
+    let prompt = ""
+    for (let index = assistantIndex - 1; index >= 0; index -= 1) {
+      if (messages[index].role === "user") {
+        prompt = messages[index].content
+        break
+      }
+    }
+    if (!prompt.trim()) return
+
+    setMessages((prev) => prev.map((message) => (
+      message.id === assistantId
+        ? { ...message, content: "", streaming: true }
+        : message
+    )))
+    await streamAssistantReply(prompt, assistantId)
+  }, [messages, streaming, streamAssistantReply])
+
+  const handleCopy = useCallback(async (message: Message) => {
+    if (!message.content.trim()) return
+    try {
+      await navigator.clipboard.writeText(message.content)
+      setCopiedMessageId(message.id)
+      window.setTimeout(() => {
+        setCopiedMessageId((current) => (current === message.id ? null : current))
+      }, 1500)
+    } catch {
+      // ignore clipboard errors
+    }
+  }, [])
+
+  const handleQuote = useCallback((message: Message) => {
+    if (!message.content.trim()) return
+    const quote = `引用内容：\n${message.content}\n\n`
+    setInput((prev) => (prev ? `${prev}\n${quote}` : quote))
+  }, [])
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
@@ -168,7 +215,7 @@ export default function AIChatPanel({ documentId }: AIChatPanelProps) {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 min-w-0 flex-col">
       <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-3 py-2">
         <span className="text-xs text-gray-500">
           {activeChapterId ? "当前章节上下文已加载" : "全文档上下文"}
@@ -181,7 +228,7 @@ export default function AIChatPanel({ documentId }: AIChatPanelProps) {
         </button>
       </div>
 
-      <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-3 py-3">
+      <div className="compact-scrollbar flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-3">
         {messages.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-gray-400">
             <p className="text-sm">AI 助手</p>
@@ -193,27 +240,59 @@ export default function AIChatPanel({ documentId }: AIChatPanelProps) {
           <div
             key={message.id}
             className={cn(
-              "flex",
+              "flex min-w-0",
               message.role === "user" ? "justify-end" : "justify-start"
             )}
           >
             <div
               className={cn(
-                "max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed",
-                message.role === "user"
-                  ? "rounded-br-sm bg-blue-500 text-white"
-                  : "rounded-bl-sm bg-gray-100 text-gray-800"
+                "flex min-w-0 max-w-[85%] flex-col",
+                message.role === "user" ? "items-end" : "items-start"
               )}
             >
-              {message.content || (message.streaming && (
-                <span className="inline-flex gap-0.5">
-                  <span className="h-1 w-1 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: "0ms" }} />
-                  <span className="h-1 w-1 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: "150ms" }} />
-                  <span className="h-1 w-1 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: "300ms" }} />
-                </span>
-              ))}
-              {message.streaming && message.content && (
-                <span className="ml-0.5 inline-block h-3 w-0.5 animate-pulse align-middle bg-gray-500" />
+              <div
+                className={cn(
+                  "w-fit max-w-full whitespace-pre-wrap break-words rounded-xl px-3 py-2 text-xs leading-relaxed",
+                  message.role === "user"
+                    ? "rounded-br-sm bg-blue-500 text-white"
+                    : "rounded-bl-sm bg-gray-100 text-gray-800"
+                )}
+              >
+                {message.content || (message.streaming && (
+                  <span className="inline-flex gap-0.5">
+                    <span className="h-1 w-1 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: "0ms" }} />
+                    <span className="h-1 w-1 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: "150ms" }} />
+                    <span className="h-1 w-1 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: "300ms" }} />
+                  </span>
+                ))}
+                {message.streaming && message.content && (
+                  <span className="ml-0.5 inline-block h-3 w-0.5 animate-pulse align-middle bg-gray-500" />
+                )}
+              </div>
+              {message.role === "assistant" && !message.streaming && !!message.content.trim() && (
+                <div className="mt-1 flex items-center gap-2 pl-1 text-[11px] text-gray-400">
+                  <button
+                    type="button"
+                    onClick={() => void handleCopy(message)}
+                    className="hover:text-gray-600 transition"
+                  >
+                    {copiedMessageId === message.id ? "已复制" : "复制"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleRegenerate(message.id)}
+                    className="hover:text-gray-600 transition"
+                  >
+                    重新生成
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuote(message)}
+                    className="hover:text-gray-600 transition"
+                  >
+                    引用
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -223,8 +302,8 @@ export default function AIChatPanel({ documentId }: AIChatPanelProps) {
 
       <div className="shrink-0 border-t border-gray-100 px-3 py-2">
         {contextItems.length > 0 && (
-          <div className="mb-2 flex items-start justify-between gap-2">
-            <div className="flex flex-wrap gap-2">
+          <div className="mb-2 flex min-w-0 items-start justify-between gap-2">
+            <div className="min-w-0 flex flex-wrap gap-2">
               {contextItems.map((item) => {
                 const meta = getContextMeta(item)
                 return (

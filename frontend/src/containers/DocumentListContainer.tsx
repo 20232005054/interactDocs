@@ -399,7 +399,7 @@ export default function DocumentListContainer() {
           onClose={() => setShowCreate(false)}
           onCreated={doc => {
             setShowCreate(false)
-            router.push(`/documents/${doc.document_id}`)
+            router.push(`/documents/${doc.document_id}/apply-template?autoApply=1`)
           }}
         />
       )}

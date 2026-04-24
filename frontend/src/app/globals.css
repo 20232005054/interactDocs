@@ -130,6 +130,32 @@
 }
 
 /* ============================================================
+   紧凑滚动条（用于大纲与右侧信息面板）
+   ============================================================ */
+.compact-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: oklch(0.82 0 0) transparent;
+}
+
+.compact-scrollbar::-webkit-scrollbar {
+  width: 2px;
+  height: 2px;
+}
+
+.compact-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.compact-scrollbar::-webkit-scrollbar-thumb {
+  background: oklch(0.82 0 0);
+  border-radius: 9999px;
+}
+
+.compact-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.72 0 0);
+}
+
+/* ============================================================
    Tiptap 富文本编辑器 - 表格样式
    ============================================================ */
 .ProseMirror table {

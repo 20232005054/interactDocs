@@ -3,6 +3,10 @@
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuthStore } from "@/store/authStore"
+import { ErrorTest, initFurryDevOverlay } from "react-furry-error"
+if (process.env.NODE_ENV === 'development') {
+  initFurryDevOverlay()
+}
 
 export default function RootPage() {
   const router = useRouter()
@@ -22,5 +26,5 @@ export default function RootPage() {
     }
   }, [token, user, router])
 
-  return null
+  return <ErrorTest />
 }

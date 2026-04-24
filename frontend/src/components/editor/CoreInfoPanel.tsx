@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { coreInfoService } from "@/services/coreInfoService"
 import { useDocumentStore } from "@/store/documentStore"
 import type { CoreInfo } from "@/types/api"
@@ -12,31 +12,18 @@ import { cn } from "@/lib/utils"
 interface CoreInfoNodeProps {
   node: CoreInfo
   depth: number
-  onReload: () => void
+  onChangeContent: (coreInfoId: string, content: string) => void
 }
 
-function CoreInfoNode({ node, depth, onReload }: CoreInfoNodeProps) {
+function CoreInfoNode({ node, depth, onChangeContent }: CoreInfoNodeProps) {
   const { updateCoreInfo } = useDocumentStore()
-  const [localContent, setLocalContent] = useState(node.content)
-  const [saving, setSaving] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const isGroup = node.field_type === "group"
   const hasChildren = node.children.length > 0
 
   const handleChange = (val: string) => {
-    setLocalContent(val)
-    updateCoreInfo(node.core_info_id, { content: val })
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(async () => {
-      setSaving(true)
-      try {
-        await coreInfoService.update(node.core_info_id, { content: val })
-      } finally {
-        setSaving(false)
-      }
-    }, 600)
+    onChangeContent(node.core_info_id, val)
   }
 
   const handleToggleLock = async () => {
@@ -97,7 +84,6 @@ function CoreInfoNode({ node, depth, onReload }: CoreInfoNodeProps) {
           </button>
         )}
 
-        {saving && <span className="ml-auto text-xs text-gray-300">…</span>}
       </div>
 
       {/* 内容编辑区（非 group 类型） */}
@@ -105,7 +91,7 @@ function CoreInfoNode({ node, depth, onReload }: CoreInfoNodeProps) {
         <div className="mb-2" style={{ paddingLeft: "14px" }}>
           {node.field_type === "select" && node.options?.length ? (
             <select
-              value={localContent}
+              value={node.content}
               onChange={e => handleChange(e.target.value)}
               disabled={node.is_locked}
               className={cn(
@@ -121,7 +107,7 @@ function CoreInfoNode({ node, depth, onReload }: CoreInfoNodeProps) {
           ) : node.field_type === "number" ? (
             <input
               type="number"
-              value={localContent}
+              value={node.content}
               onChange={e => handleChange(e.target.value)}
               disabled={node.is_locked}
               className={cn(
@@ -133,7 +119,7 @@ function CoreInfoNode({ node, depth, onReload }: CoreInfoNodeProps) {
             />
           ) : (
             <textarea
-              value={localContent}
+              value={node.content}
               onChange={e => handleChange(e.target.value)}
               disabled={node.is_locked}
               rows={1}
@@ -162,7 +148,7 @@ function CoreInfoNode({ node, depth, onReload }: CoreInfoNodeProps) {
               key={child.core_info_id}
               node={child}
               depth={0}
-              onReload={onReload}
+              onChangeContent={onChangeContent}
             />
           ))}
         </div>
@@ -171,11 +157,105 @@ function CoreInfoNode({ node, depth, onReload }: CoreInfoNodeProps) {
   )
 }
 
+interface CoreInfoPanelProps {
+  onAfterSave?: () => Promise<void>
+}
+
 // ----------------------------------------------------------------
 // 主组件
 // ----------------------------------------------------------------
-export default function CoreInfoPanel() {
-  const { coreInfoTree } = useDocumentStore()
+export default function CoreInfoPanel({ onAfterSave }: CoreInfoPanelProps) {
+  const { coreInfoTree, updateCoreInfo } = useDocumentStore()
+  const [originalContentMap, setOriginalContentMap] = useState<Record<string, string>>({})
+  const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set())
+  const [saving, setSaving] = useState(false)
+
+  const flattenCoreInfo = useCallback((tree: CoreInfo[]): CoreInfo[] => {
+    const result: CoreInfo[] = []
+    const visit = (nodes: CoreInfo[]) => {
+      nodes.forEach((node) => {
+        result.push(node)
+        if (node.children.length > 0) visit(node.children)
+      })
+    }
+    visit(tree)
+    return result
+  }, [])
+
+  const flatNodes = useMemo(() => flattenCoreInfo(coreInfoTree), [coreInfoTree, flattenCoreInfo])
+
+  useEffect(() => {
+    if (flatNodes.length === 0) {
+      setOriginalContentMap({})
+      setDirtyIds(new Set())
+      return
+    }
+
+    setOriginalContentMap((prev) => {
+      const next = { ...prev }
+      const liveIds = new Set(flatNodes.map((node) => node.core_info_id))
+
+      flatNodes.forEach((node) => {
+        if (!(node.core_info_id in next)) {
+          next[node.core_info_id] = node.content ?? ""
+        }
+      })
+
+      Object.keys(next).forEach((id) => {
+        if (!liveIds.has(id)) delete next[id]
+      })
+
+      return next
+    })
+  }, [flatNodes])
+
+  const handleNodeContentChange = useCallback((coreInfoId: string, content: string) => {
+    updateCoreInfo(coreInfoId, { content })
+    setDirtyIds((prev) => {
+      const next = new Set(prev)
+      const baseline = originalContentMap[coreInfoId] ?? ""
+      if ((content ?? "") === baseline) {
+        next.delete(coreInfoId)
+      } else {
+        next.add(coreInfoId)
+      }
+      return next
+    })
+  }, [originalContentMap, updateCoreInfo])
+
+  const handleSave = useCallback(async () => {
+    if (dirtyIds.size === 0 || saving) return
+
+    const contentMap = new Map(flatNodes.map((node) => [node.core_info_id, node.content ?? ""]))
+    const payload = Array.from(dirtyIds).map((id) => ({
+      id,
+      content: contentMap.get(id) ?? "",
+    }))
+
+    setSaving(true)
+    try {
+      await Promise.all(
+        payload.map((item) => coreInfoService.update(item.id, { content: item.content }))
+      )
+
+      setOriginalContentMap((prev) => {
+        const next = { ...prev }
+        payload.forEach((item) => {
+          next[item.id] = item.content
+        })
+        return next
+      })
+      setDirtyIds(new Set())
+
+      if (onAfterSave) {
+        await onAfterSave()
+      }
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "保存失败")
+    } finally {
+      setSaving(false)
+    }
+  }, [dirtyIds, flatNodes, onAfterSave, saving])
 
   if (coreInfoTree.length === 0) {
     return (
@@ -187,13 +267,26 @@ export default function CoreInfoPanel() {
 
   return (
     <div className="px-3 py-3">
+      {dirtyIds.size > 0 && (
+        <div className="mb-2 flex items-center justify-between rounded-md border border-blue-200 bg-blue-50 px-2 py-1.5">
+          <span className="text-xs text-blue-700">有 {dirtyIds.size} 项核心信息待保存</span>
+          <button
+            type="button"
+            onClick={() => void handleSave()}
+            disabled={saving}
+            className="h-7 rounded border border-blue-300 px-2.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100 disabled:opacity-50"
+          >
+            {saving ? "保存中..." : "保存"}
+          </button>
+        </div>
+      )}
       <div className="flex flex-col">
         {coreInfoTree.map(node => (
           <CoreInfoNode
             key={node.core_info_id}
             node={node}
             depth={0}
-            onReload={() => {}}
+            onChangeContent={handleNodeContentChange}
           />
         ))}
       </div>

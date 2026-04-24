@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { summaryService } from "@/services/summaryService"
 import { useDocumentStore } from "@/store/documentStore"
 import type { Summary } from "@/types/api"
@@ -11,27 +11,14 @@ import { cn } from "@/lib/utils"
 // ----------------------------------------------------------------
 interface SummaryCardProps {
   summary: Summary
+  onChangeContent: (summaryId: string, content: string) => void
 }
 
-function SummaryCard({ summary }: SummaryCardProps) {
-  const { updateSummary } = useDocumentStore()
-  const [localContent, setLocalContent] = useState(summary.content)
-  const [saving, setSaving] = useState(false)
+function SummaryCard({ summary, onChangeContent }: SummaryCardProps) {
   const [expanded, setExpanded] = useState(true)
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const handleChange = (val: string) => {
-    setLocalContent(val)
-    updateSummary(summary.summary_id, { content: val })
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(async () => {
-      setSaving(true)
-      try {
-        await summaryService.update(summary.summary_id, { content: val })
-      } finally {
-        setSaving(false)
-      }
-    }, 600)
+    onChangeContent(summary.summary_id, val)
   }
 
   const isChanged = summary.is_change === 1
@@ -70,16 +57,13 @@ function SummaryCard({ summary }: SummaryCardProps) {
           </span>
         )}
 
-        {saving && (
-          <span className="shrink-0 text-xs text-gray-300">…</span>
-        )}
       </div>
 
       {/* 内容编辑区 */}
       {expanded && (
         <div className="px-3 pb-3">
           <textarea
-            value={localContent}
+            value={summary.content}
             onChange={e => handleChange(e.target.value)}
             rows={4}
             className={cn(
@@ -105,11 +89,96 @@ function SummaryCard({ summary }: SummaryCardProps) {
   )
 }
 
+interface SummaryPanelProps {
+  onAfterSave?: () => Promise<void>
+}
+
 // ----------------------------------------------------------------
 // 主组件
 // ----------------------------------------------------------------
-export default function SummaryPanel() {
-  const { summaries } = useDocumentStore()
+export default function SummaryPanel({ onAfterSave }: SummaryPanelProps) {
+  const { summaries, updateSummary } = useDocumentStore()
+  const [originalContentMap, setOriginalContentMap] = useState<Record<string, string>>({})
+  const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set())
+  const [saving, setSaving] = useState(false)
+
+  const orderedSummaries = useMemo(
+    () => summaries.slice().sort((a, b) => a.order_index - b.order_index),
+    [summaries]
+  )
+
+  useEffect(() => {
+    if (orderedSummaries.length === 0) {
+      setOriginalContentMap({})
+      setDirtyIds(new Set())
+      return
+    }
+
+    setOriginalContentMap((prev) => {
+      const next = { ...prev }
+      const liveIds = new Set(orderedSummaries.map((summary) => summary.summary_id))
+
+      orderedSummaries.forEach((summary) => {
+        if (!(summary.summary_id in next)) {
+          next[summary.summary_id] = summary.content ?? ""
+        }
+      })
+
+      Object.keys(next).forEach((id) => {
+        if (!liveIds.has(id)) delete next[id]
+      })
+
+      return next
+    })
+  }, [orderedSummaries])
+
+  const handleSummaryContentChange = useCallback((summaryId: string, content: string) => {
+    updateSummary(summaryId, { content })
+    setDirtyIds((prev) => {
+      const next = new Set(prev)
+      const baseline = originalContentMap[summaryId] ?? ""
+      if ((content ?? "") === baseline) {
+        next.delete(summaryId)
+      } else {
+        next.add(summaryId)
+      }
+      return next
+    })
+  }, [originalContentMap, updateSummary])
+
+  const handleSave = useCallback(async () => {
+    if (dirtyIds.size === 0 || saving) return
+
+    const contentMap = new Map(orderedSummaries.map((summary) => [summary.summary_id, summary.content ?? ""]))
+    const payload = Array.from(dirtyIds).map((id) => ({
+      id,
+      content: contentMap.get(id) ?? "",
+    }))
+
+    setSaving(true)
+    try {
+      await Promise.all(
+        payload.map((item) => summaryService.update(item.id, { content: item.content }))
+      )
+
+      setOriginalContentMap((prev) => {
+        const next = { ...prev }
+        payload.forEach((item) => {
+          next[item.id] = item.content
+        })
+        return next
+      })
+      setDirtyIds(new Set())
+
+      if (onAfterSave) {
+        await onAfterSave()
+      }
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "保存失败")
+    } finally {
+      setSaving(false)
+    }
+  }, [dirtyIds, onAfterSave, orderedSummaries, saving])
 
   if (summaries.length === 0) {
     return (
@@ -123,6 +192,19 @@ export default function SummaryPanel() {
 
   return (
     <div className="px-3 py-3 flex flex-col gap-2">
+      {dirtyIds.size > 0 && (
+        <div className="flex items-center justify-between rounded-md border border-blue-200 bg-blue-50 px-2 py-1.5">
+          <span className="text-xs text-blue-700">有 {dirtyIds.size} 条摘要待保存</span>
+          <button
+            type="button"
+            onClick={() => void handleSave()}
+            disabled={saving}
+            className="h-7 rounded border border-blue-300 px-2.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100 disabled:opacity-50"
+          >
+            {saving ? "保存中..." : "保存"}
+          </button>
+        </div>
+      )}
       {/* 变更提示 */}
       {changedCount > 0 && (
         <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-orange-50 border border-orange-200">
@@ -132,11 +214,12 @@ export default function SummaryPanel() {
         </div>
       )}
 
-      {summaries
-        .slice()
-        .sort((a, b) => a.order_index - b.order_index)
-        .map(s => (
-          <SummaryCard key={s.summary_id} summary={s} />
+      {orderedSummaries.map(s => (
+          <SummaryCard
+            key={s.summary_id}
+            summary={s}
+            onChangeContent={handleSummaryContentChange}
+          />
         ))}
     </div>
   )

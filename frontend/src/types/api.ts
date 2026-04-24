@@ -320,6 +320,15 @@ export interface UpdateSummaryTemplatePayload {
 // ============================================================
 // 章节结构模板
 // ============================================================
+export interface StructureTemplateParagraphDef {
+  para_type?: ParaType
+  generation_mode?: GenerationMode
+  content_template?: string | null
+  sources?: SourceInfo[] | null
+  default_prompt?: string | null
+  custom_prompt?: string | null
+}
+
 export interface StructureTemplate {
   structure_template_id: string
   template_id: string
@@ -327,11 +336,12 @@ export interface StructureTemplate {
   title: string
   field_key: string
   level: number
-  generation_mode: GenerationMode
-  content_template: string | null
-  sources: SourceInfo[] | null
-  default_prompt: string | null
-  custom_prompt: string | null
+  generation_mode?: GenerationMode
+  content_template?: string | null
+  sources?: SourceInfo[] | null
+  default_prompt?: string | null
+  custom_prompt?: string | null
+  paragraphs?: StructureTemplateParagraphDef[] | null
   order_index: number
   created_at: string
   updated_at: string
@@ -356,6 +366,7 @@ export interface CreateStructureTemplatePayload {
   sources?: SourceInfo[] | null
   default_prompt?: string | null
   custom_prompt?: string | null
+  paragraphs?: StructureTemplateParagraphDef[] | null
   order_index?: number | null
 }
 
@@ -369,6 +380,7 @@ export interface UpdateStructureTemplatePayload {
   sources?: SourceInfo[] | null
   default_prompt?: string | null
   custom_prompt?: string | null
+  paragraphs?: StructureTemplateParagraphDef[] | null
   order_index?: number
 }
 

@@ -220,7 +220,7 @@ export default function ChapterTree({ documentId, onReload }: ChapterTreeProps) 
       </div>
 
       {/* 树列表 */}
-      <div className="flex-1 overflow-y-auto py-1">
+      <div className="compact-scrollbar flex-1 overflow-y-auto py-1">
         {tree.length === 0 ? (
           <p className="text-xs text-gray-400 text-center py-6">暂无章节</p>
         ) : (

@@ -9,14 +9,13 @@ export function useAIAssist() {
   const { updateParagraph } = useDocumentStore()
   const {
     setAiAssistingParagraphId,
-    setAiAssistPreview,
     appendAiAssistPreview,
     clearAiAssistPreview,
     aiAssistingParagraphId,
     aiAssistPreview,
   } = useEditorStore()
 
-  const startAssist = useCallback(async (paragraphId: string, chapterId: string) => {
+  const startAssist = useCallback(async (paragraphId: string, chapterId: string, instruction?: string) => {
     if (aiAssistingParagraphId) return // 已有进行中的帮填
 
     setAiAssistingParagraphId(paragraphId)
@@ -31,7 +30,7 @@ export function useAIAssist() {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ instruction: instruction?.trim() || undefined }),
       })
 
       if (!res.ok || !res.body) throw new Error("请求失败")
@@ -52,17 +51,20 @@ export function useAIAssist() {
           if (!line.startsWith("data: ")) continue
           const raw = line.slice(6).trim()
           if (!raw || raw === "[DONE]") continue
+          let parsed: { error?: string; content?: string } | null = null
           try {
-            const parsed = JSON.parse(raw)
-            if (parsed.content) appendAiAssistPreview(parsed.content)
+            parsed = JSON.parse(raw)
           } catch {
-            // 忽略
+            continue
           }
+          if (parsed?.error) throw new Error(String(parsed.error))
+          if (parsed?.content) appendAiAssistPreview(parsed.content)
         }
       }
-    } catch {
+    } catch (err) {
       clearAiAssistPreview()
       setAiAssistingParagraphId(null)
+      throw err
     }
   }, [aiAssistingParagraphId, setAiAssistingParagraphId, clearAiAssistPreview, appendAiAssistPreview])
 

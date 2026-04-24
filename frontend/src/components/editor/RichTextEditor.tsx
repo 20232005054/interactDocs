@@ -12,7 +12,7 @@ import { TableHeader } from "@tiptap/extension-table-header"
 import { Markdown } from "tiptap-markdown"
 import { VariablePlaceholderExtension } from "./VariablePlaceholderExtension"
 import { cn } from "@/lib/utils"
-import { useState, useCallback, useEffect, useRef } from "react"
+import { useState, useCallback, useEffect, useMemo, useRef } from "react"
 import { getCoreInfoDragData } from "@/lib/templateDrag"
 
 interface VariableOption {
@@ -59,7 +59,7 @@ function ToolbarButton({
       }}
       title={title}
       className={cn(
-        "h-7 w-7 flex items-center justify-center rounded text-sm transition",
+        "h-6 w-6 flex items-center justify-center rounded text-[11px] transition",
         active
           ? "bg-primary/15 text-primary"
           : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -79,13 +79,22 @@ export default function RichTextEditor({
   className,
   minHeight = "120px",
 }: RichTextEditorProps) {
-  const [showVarPicker, setShowVarPicker] = useState(false)
   const [dragActive, setDragActive] = useState(false)
+  const variableOptions = useMemo(() => {
+    const seen = new Set<string>()
+    const deduped: VariableOption[] = []
+    for (const item of variables) {
+      if (seen.has(item.fieldKey)) continue
+      seen.add(item.fieldKey)
+      deduped.push(item)
+    }
+    return deduped
+  }, [variables])
   const variablesRef = useRef(variables)
 
   useEffect(() => {
-    variablesRef.current = variables
-  }, [variables])
+    variablesRef.current = variableOptions
+  }, [variableOptions])
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -105,7 +114,7 @@ export default function RichTextEditor({
       TableCell,
       VariablePlaceholderExtension,
     ],
-    content: preprocessVariables(value, variables),
+    content: preprocessVariables(value, variableOptions),
     onUpdate: ({ editor }) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const md = ((editor.storage as any).markdown as import("tiptap-markdown").MarkdownStorage).getMarkdown()
@@ -128,7 +137,6 @@ export default function RichTextEditor({
   const insertVariable = useCallback(
     (fieldKey: string, label: string) => {
       editor?.chain().focus().insertVariable(fieldKey, label).run()
-      setShowVarPicker(false)
     },
     [editor]
   )
@@ -163,12 +171,35 @@ export default function RichTextEditor({
       {/* 工具栏 */}
       <div
         className={cn(
-          "absolute inset-x-0 top-0 z-10 flex items-center justify-end gap-0.5 border-b border-input bg-background/95 px-3 py-2 shadow-sm transition",
+          "absolute inset-x-0 top-0 z-10 flex items-center justify-end gap-0.5 border-b border-input bg-background/95 px-2 py-1 shadow-sm transition",
           "opacity-0 pointer-events-none group-hover/editor:opacity-100 group-hover/editor:pointer-events-auto",
           "group-focus-within/editor:opacity-100 group-focus-within/editor:pointer-events-auto",
-          showVarPicker && "opacity-100 pointer-events-auto"
         )}
       >
+        <ToolbarButton
+          onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+          active={editor.isActive("heading", { level: 1 })}
+          title="一级标题"
+        >
+          H1
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+          active={editor.isActive("heading", { level: 2 })}
+          title="二级标题"
+        >
+          H2
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+          active={editor.isActive("heading", { level: 3 })}
+          title="三级标题"
+        >
+          H3
+        </ToolbarButton>
+
+        <div className="w-px h-4 bg-border mx-1" />
+
         <ToolbarButton
           onClick={() => editor.chain().focus().toggleBold().run()}
           active={editor.isActive("bold")}
@@ -191,70 +222,10 @@ export default function RichTextEditor({
           <span className="underline">U</span>
         </ToolbarButton>
 
-        <div className="w-px h-4 bg-border mx-1" />
-
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-          active={editor.isActive("bulletList")}
-          title="无序列表"
-        >
-          ≡
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          active={editor.isActive("orderedList")}
-          title="有序列表"
-        >
-          ①
-        </ToolbarButton>
-
-        {/* 挖空变量插入（仅当有变量可选时显示） */}
-        {variables.length > 0 && (
-          <>
-            <div className="w-px h-4 bg-border mx-1" />
-            <div className="relative">
-              <button
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault()
-                  setShowVarPicker((v) => !v)
-                }}
-                className={cn(
-                  "h-7 px-2 flex items-center gap-1 rounded text-xs font-medium transition",
-                  showVarPicker
-                    ? "bg-primary/15 text-primary"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                )}
-                title="插入变量占位符"
-              >
-                <span>{"{ }"}</span>
-                <span>插入变量</span>
-              </button>
-
-              {showVarPicker && (
-                <div className="absolute right-0 top-full mt-2 z-50 bg-card border border-border rounded-md shadow-md min-w-40 py-1">
-                  {variables.map((v) => (
-                    <button
-                      key={v.fieldKey}
-                      type="button"
-                      onMouseDown={(e) => {
-                        e.preventDefault()
-                        insertVariable(v.fieldKey, v.label)
-                      }}
-                      className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition"
-                    >
-                      {v.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </>
-        )}
       </div>
 
       {/* 编辑区 */}
-      <div className="pt-14">
+      <div className="pt-10">
         <EditorContent editor={editor} />
       </div>
     </div>

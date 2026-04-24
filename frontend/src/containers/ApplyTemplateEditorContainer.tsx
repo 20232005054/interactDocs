@@ -1,7 +1,7 @@
 "use client"
 
-import { Fragment, useEffect, useRef, useState, useCallback, useMemo, type PointerEvent as ReactPointerEvent, type ReactNode } from "react"
-import { useRouter } from "next/navigation"
+import { Fragment, useEffect, useRef, useState, useCallback, type PointerEvent as ReactPointerEvent, type ReactNode } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { documentService } from "@/services/documentService"
 import { coreInfoService } from "@/services/coreInfoService"
 import { summaryService } from "@/services/summaryService"
@@ -12,7 +12,7 @@ import CoreInfoTemplateStep from "@/components/template/CoreInfoTemplateStep"
 import SummaryTemplateStep from "@/components/template/SummaryTemplateStep"
 import StructureTemplateStep from "@/components/template/StructureTemplateStep"
 import { cn } from "@/lib/utils"
-import type { TemplateDependenciesResponse, TemplateDependencyRef } from "@/types/api"
+import type { TemplateDependenciesResponse } from "@/types/api"
 
 type ApplyKey = "core-info" | "summary" | "structure"
 type ApplyStatus = "idle" | "applying" | "done" | "error"
@@ -24,18 +24,12 @@ interface ApplyTemplateEditorContainerProps {
   documentId: string
 }
 
-function uniqueRefs(refs: TemplateDependencyRef[]): TemplateDependencyRef[] {
-  const map = new Map<string, TemplateDependencyRef>()
-  for (const ref of refs) {
-    map.set(`${ref.type}:${ref.field_key}`, ref)
-  }
-  return Array.from(map.values())
-}
-
 export default function ApplyTemplateEditorContainer({ documentId }: ApplyTemplateEditorContainerProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { setFullContent, setSummaries, setCoreInfoTree, documentTitle } = useDocumentStore()
   const panelContainerRef = useRef<HTMLDivElement>(null)
+  const autoApplyTriggeredRef = useRef(false)
   const resizeStateRef = useRef<{
     handleIndex: number
     startX: number
@@ -50,8 +44,6 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
   const [savingTemplate, setSavingTemplate] = useState(false)
   const [applying, setApplying] = useState(false)
   const [dependencies, setDependencies] = useState<TemplateDependenciesResponse | null>(null)
-  const [dependenciesLoading, setDependenciesLoading] = useState(false)
-  const [dependenciesError, setDependenciesError] = useState<string | null>(null)
   const [applyStatus, setApplyStatus] = useState<Record<ApplyKey, ApplyStatus>>({
     "core-info": "idle",
     "summary": "idle",
@@ -59,17 +51,14 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
   })
   const [panelWidths, setPanelWidths] = useState<[number, number, number]>([24, 28, 48])
   const [activeHandle, setActiveHandle] = useState<number | null>(null)
+  const shouldAutoApply = searchParams.get("autoApply") === "1"
 
   const loadDependencies = useCallback(async (id: string) => {
-    setDependenciesLoading(true)
-    setDependenciesError(null)
     try {
       const data = await templateService.getDependencies(id)
       setDependencies(data)
-    } catch (err: unknown) {
-      setDependenciesError(err instanceof Error ? err.message : "依赖信息加载失败")
-    } finally {
-      setDependenciesLoading(false)
+    } catch {
+      setDependencies(null)
     }
   }, [])
 
@@ -90,19 +79,6 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
 
     load()
   }, [documentId, loadDependencies])
-
-  const dependencySummary = useMemo(() => {
-    if (!dependencies) return null
-    const upstream = uniqueRefs([
-      ...dependencies.summary_templates.flatMap((item) => item.references),
-      ...dependencies.structure_templates.flatMap((item) => item.references),
-    ])
-    const downstream = uniqueRefs([
-      ...dependencies.core_info_templates.flatMap((item) => item.referenced_by),
-      ...dependencies.summary_templates.flatMap((item) => item.referenced_by),
-    ])
-    return { upstream, downstream }
-  }, [dependencies])
 
   const setStatus = useCallback((key: ApplyKey, status: ApplyStatus) => {
     setApplyStatus((prev) => ({ ...prev, [key]: status }))
@@ -217,6 +193,15 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
     }
   }, [documentId, docTitle, documentTitle, router, setCoreInfoTree, setFullContent, setStatus, setSummaries])
 
+  useEffect(() => {
+    if (!shouldAutoApply) return
+    if (autoApplyTriggeredRef.current) return
+    if (loading || !templateId || applying) return
+
+    autoApplyTriggeredRef.current = true
+    void handleApply()
+  }, [applying, handleApply, loading, shouldAutoApply, templateId])
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#f5f4ee] flex items-center justify-center">
@@ -270,6 +255,7 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
       children: (
         <StructureTemplateStep
           templateId={templateId}
+          stickyOutline
           dependencyItems={dependencies?.structure_templates ?? []}
         />
       ),
@@ -324,67 +310,11 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
         </div>
       </header>
 
-      <main className="mx-auto flex min-h-0 w-full max-w-[1800px] flex-1 flex-col overflow-hidden px-4 py-6 lg:px-6">
-        <div className="mb-6 rounded-3xl border border-[#d9d5c8] bg-white/80 px-5 py-4 shadow-sm">
-          <p className="text-sm font-medium text-gray-700">拖拽说明</p>
-          <p className="mt-1 text-sm text-gray-500">
-            从“核心信息模板”中的字段拖出后，可放到另外两个板块的来源匹配框中自动建立映射，也可放入内容模板与提示词框中自动插入变量占位符。
-          </p>
-          <div className="mt-3 border-t border-[#ece7d8] pt-3">
-            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-              <span>{`引用来源 ${dependencySummary?.upstream.length ?? 0}`}</span>
-              <span>{`被引用 ${dependencySummary?.downstream.length ?? 0}`}</span>
-              {dependenciesLoading && <span>加载中...</span>}
-              {!dependenciesLoading && templateId && (
-                <button
-                  type="button"
-                  onClick={() => void loadDependencies(templateId)}
-                  className="text-xs text-[#234d3b] hover:underline"
-                >
-                  刷新
-                </button>
-              )}
-            </div>
-            {!dependenciesLoading && dependenciesError && (
-              <p className="mt-1 text-xs text-red-500">{dependenciesError}</p>
-            )}
-            {!dependenciesLoading && !dependenciesError && dependencySummary && (
-              <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
-                {dependencySummary.upstream.slice(0, 5).map((ref) => (
-                  <span
-                    key={`up-${ref.type}-${ref.field_key}`}
-                    className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-blue-700"
-                    title={`来源: ${ref.type}/${ref.field_key}`}
-                  >
-                    {`引:${ref.label || ref.field_key}`}
-                  </span>
-                ))}
-                {dependencySummary.downstream.slice(0, 5).map((ref) => (
-                  <span
-                    key={`down-${ref.type}-${ref.field_key}`}
-                    className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700"
-                    title={`被引用: ${ref.type}/${ref.field_key}`}
-                  >
-                    {`被引:${ref.label || ref.field_key}`}
-                  </span>
-                ))}
-                {dependencySummary.upstream.length + dependencySummary.downstream.length > 10 && (
-                  <span className="text-gray-400">
-                    {`+${dependencySummary.upstream.length + dependencySummary.downstream.length - 10} 条`}
-                  </span>
-                )}
-                {dependencySummary.upstream.length === 0 && dependencySummary.downstream.length === 0 && (
-                  <span className="text-gray-400">暂无引用关系</span>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
+      <main className="mx-auto flex min-h-0 w-full max-w-[1800px] flex-1 flex-col overflow-hidden px-3 py-4 lg:px-4">
         {templateId && (
           <div
             ref={panelContainerRef}
-            className="flex min-h-0 flex-1 flex-col gap-6 overflow-hidden xl:flex-row xl:gap-0"
+            className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden xl:flex-row xl:gap-0"
           >
             {panels.map((panel, index) => (
               <Fragment key={panel.key}>
@@ -440,15 +370,15 @@ function BoardShell({
   children: ReactNode
 }) {
   return (
-    <section className={cn("flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-[#d9d5c8] bg-white shadow-sm", className)}>
-      <div className="border-b border-[#ece7d8] px-5 py-4">
+    <section className={cn("flex h-full min-h-0 flex-col overflow-hidden rounded-[20px] border border-[#d9d5c8] bg-white shadow-sm", className)}>
+      <div className="border-b border-[#ece7d8] px-4 py-3">
         <div className="flex items-center gap-3">
           <span className={cn("h-3 w-3 rounded-full", accentClass)} />
           <h2 className="text-lg font-semibold text-gray-800">{title}</h2>
         </div>
-        <p className="mt-2 text-sm text-gray-500">{desc}</p>
+        <p className="mt-1 text-sm text-gray-500">{desc}</p>
       </div>
-      <div className={cn("p-5 xl:min-h-0 xl:flex-1 xl:overflow-y-auto", contentClassName)}>{children}</div>
+      <div className={cn("p-4 xl:min-h-0 xl:flex-1 xl:overflow-y-auto", contentClassName)}>{children}</div>
     </section>
   )
 }

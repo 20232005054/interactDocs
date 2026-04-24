@@ -50,6 +50,7 @@ function ParagraphRow({ paragraph, chapterId, chapterTitle, onReload }: Paragrap
   const [localContent, setLocalContent] = useState(paragraph.content)
   const [saving, setSaving] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [rowHovered, setRowHovered] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const isActive = activeParagraphId === paragraph.paragraph_id
@@ -62,6 +63,11 @@ function ParagraphRow({ paragraph, chapterId, chapterTitle, onReload }: Paragrap
       el.style.height = `${el.scrollHeight}px`
     }
   }, [localContent])
+
+  // 同步外部内容变更（如 AI 应用后更新了 store 中的 paragraph.content）
+  useEffect(() => {
+    setLocalContent(paragraph.content)
+  }, [paragraph.content, paragraph.paragraph_id])
 
   const handleChange = (val: string) => {
     setLocalContent(val)
@@ -142,6 +148,8 @@ function ParagraphRow({ paragraph, chapterId, chapterTitle, onReload }: Paragrap
         isActive && "bg-blue-50/40 rounded"
       )}
       onClick={() => setActiveParagraphId(paragraph.paragraph_id)}
+      onMouseEnter={() => setRowHovered(true)}
+      onMouseLeave={() => setRowHovered(false)}
     >
       {/* 左侧操作区 */}
       <div className="w-6 shrink-0 flex items-start justify-center pt-1.5 opacity-0 group-hover/paragraph:opacity-100 transition">
@@ -209,8 +217,8 @@ function ParagraphRow({ paragraph, chapterId, chapterTitle, onReload }: Paragrap
         {paragraph.ischange === 1 && (
           <span className="text-xs text-orange-400 ml-1">已变更</span>
         )}
-        {/* AI 工具栏（仅正文段落，且当前段落激活时显示） */}
-        {paragraph.para_type === "paragraph" && isActive && (
+        {/* AI 工具栏（仅正文段落，hover 即可显示） */}
+        {paragraph.para_type === "paragraph" && (
           <div className="mt-1">
             <ParagraphToolbar
               paragraphId={paragraph.paragraph_id}
@@ -219,6 +227,7 @@ function ParagraphRow({ paragraph, chapterId, chapterTitle, onReload }: Paragrap
               paragraphContent={localContent}
               paraType={paragraph.para_type}
               hasContent={localContent.trim().length > 0}
+              visible={rowHovered}
             />
           </div>
         )}

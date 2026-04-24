@@ -15,7 +15,7 @@ class UISelectOption(BaseModel):
 
 class SourceInfo(BaseModel):
     source: UISelectOption = Field(..., description="来源类型对象")
-    match_type: str = Field(..., description="匹配方式描述")
+    match_type: Optional[str] = Field(None, description="匹配方式描述")
     match_keys: List[UISelectOption] = Field(..., description="具体匹配的标识列表")
 
 

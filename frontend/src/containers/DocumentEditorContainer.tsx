@@ -25,13 +25,14 @@ interface DocumentEditorContainerProps {
 export default function DocumentEditorContainer({ documentId }: DocumentEditorContainerProps) {
   const router = useRouter()
   const { user } = useAuthStore()
-  const { setFullContent, setSummaries, setCoreInfoTree, reset, documentTitle } = useDocumentStore()
+  const { setFullContent, setSummaries, setCoreInfoTree, reset, documentTitle, tree } = useDocumentStore()
   const { rightPanelTab, setRightPanelTab } = useEditorStore()
   const resetChat = useChatStore((state) => state.reset)
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [templateId, setTemplateId] = useState<string | null>(null)
+  const [infoPanelCollapsed, setInfoPanelCollapsed] = useState(false)
 
   // SSE 订阅文档变更事件
   useDocumentSSE({ documentId, enabled: !loading && !error })
@@ -56,6 +57,26 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
       setLoading(false)
     }
   }, [documentId, setFullContent, setSummaries, setCoreInfoTree])
+
+  const refreshEditorContent = useCallback(async () => {
+    const snapshotBefore = JSON.stringify(tree)
+    const retryDelaysMs = [150, 450, 900, 1500, 2200]
+
+    for (let index = 0; index < retryDelaysMs.length; index += 1) {
+      if (index > 0) {
+        await new Promise((resolve) => setTimeout(resolve, retryDelaysMs[index]))
+      }
+
+      const fullContent = await chapterService.getFullContent(documentId)
+      const nextSnapshot = JSON.stringify(fullContent.tree)
+      setFullContent(documentId, documentTitle ?? "", fullContent.tree)
+
+      // 后端核心信息/摘要保存后会异步联动正文，轮询直到检测到内容变化。
+      if (nextSnapshot !== snapshotBefore) {
+        return
+      }
+    }
+  }, [documentId, documentTitle, setFullContent, tree])
 
   useEffect(() => {
     resetChat()
@@ -121,38 +142,62 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
           <ChapterTree documentId={documentId} onReload={load} />
         </aside>
 
-        {/* 中间：全文编辑区 */}
-        <main className="flex-1 overflow-y-auto bg-white">
-          <DocumentBody onReload={load} />
+        {/* 中间：信息面板（核心信息 / 摘要 / AI 对话） */}
+        {!infoPanelCollapsed && (
+          <aside className="w-80 shrink-0 border-r border-gray-200 bg-white flex flex-col overflow-hidden">
+            {/* Tab 切换 */}
+            <div className="flex border-b border-gray-200 shrink-0">
+              {tabs.map(tab => (
+                <button
+                  key={tab.key}
+                  onClick={() => setRightPanelTab(tab.key)}
+                  className={cn(
+                    "flex-1 py-2.5 text-xs font-medium transition border-b-2",
+                    rightPanelTab === tab.key
+                      ? "border-blue-500 text-blue-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700"
+                  )}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Tab 内容 */}
+            <div
+              className={cn(
+                "flex-1 min-h-0",
+                rightPanelTab === "chat" ? "overflow-hidden" : "compact-scrollbar overflow-y-auto"
+              )}
+            >
+              <div className={cn(rightPanelTab === "core-info" ? "block" : "hidden")}>
+                <CoreInfoPanel onAfterSave={refreshEditorContent} />
+              </div>
+              <div className={cn(rightPanelTab === "summary" ? "block" : "hidden")}>
+                <SummaryPanel onAfterSave={refreshEditorContent} />
+              </div>
+              <div className={cn("h-full min-h-0", rightPanelTab === "chat" ? "block" : "hidden")}>
+                <AIChatPanel documentId={documentId} />
+              </div>
+            </div>
+          </aside>
+        )}
+
+        {/* 右侧：全文编辑区 */}
+        <main className="relative flex-1 overflow-hidden bg-white">
+          <button
+            type="button"
+            onClick={() => setInfoPanelCollapsed((prev) => !prev)}
+            className="absolute left-2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-md border border-gray-300 bg-white px-1.5 py-0.5 text-xs text-gray-500 shadow-sm hover:bg-gray-50 hover:text-gray-700 transition"
+            title={infoPanelCollapsed ? "展开信息面板" : "收起信息面板"}
+            aria-label={infoPanelCollapsed ? "展开信息面板" : "收起信息面板"}
+          >
+            {infoPanelCollapsed ? "⟩" : "⟨"}
+          </button>
+          <div className="h-full overflow-y-auto">
+            <DocumentBody onReload={load} />
+          </div>
         </main>
-
-        {/* 右侧：信息面板 */}
-        <aside className="w-80 shrink-0 border-l border-gray-200 bg-white flex flex-col overflow-hidden">
-          {/* Tab 切换 */}
-          <div className="flex border-b border-gray-200 shrink-0">
-            {tabs.map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => setRightPanelTab(tab.key)}
-                className={cn(
-                  "flex-1 py-2.5 text-xs font-medium transition border-b-2",
-                  rightPanelTab === tab.key
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700"
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Tab 内容 */}
-          <div className="flex-1 overflow-y-auto">
-            {rightPanelTab === "core-info" && <CoreInfoPanel />}
-            {rightPanelTab === "summary" && <SummaryPanel />}
-            {rightPanelTab === "chat" && <AIChatPanel documentId={documentId} />}
-          </div>
-        </aside>
       </div>
     </div>
   )
@@ -258,10 +303,10 @@ function ExportMenu({ documentId, documentTitle }: ExportMenuProps) {
     mime: string
     ext: string
   }> = [
-    { key: "docx", label: "Word (.docx)", mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", ext: "docx" },
-    { key: "pdf",  label: "PDF (.pdf)",   mime: "application/pdf", ext: "pdf" },
-    { key: "md",   label: "Markdown (.md)", mime: "text/markdown", ext: "md" },
-  ]
+      { key: "docx", label: "Word (.docx)", mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", ext: "docx" },
+      { key: "pdf", label: "PDF (.pdf)", mime: "application/pdf", ext: "pdf" },
+      { key: "md", label: "Markdown (.md)", mime: "text/markdown", ext: "md" },
+    ]
 
   const handleExport = async (fmt: typeof formats[0]) => {
     setOpen(false)
