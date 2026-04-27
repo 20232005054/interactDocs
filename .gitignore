@@ -45,4 +45,5 @@ devlogs/
 .kiro/steering/devlog.md
 
 # 本地文件不上传
-backend/static
+backend/static/images/
+backend/static/literature/
