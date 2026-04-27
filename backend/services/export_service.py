@@ -3,10 +3,10 @@
 
 支持格式：Word (.docx)、PDF、Markdown
 
-内容解析器 parse_content 是唯一需要在前端确定富文本格式后修改的地方：
-- 当前：原样输出（占位）
-- 前端用 HTML 时：用 BeautifulSoup 提取纯文本
-- 前端用 Markdown 时：用 markdown 库转 HTML 再提取纯文本
+段落内容存储格式为纯 Markdown 字符串。
+- md_to_html：Markdown → HTML，供 PDF（weasyprint）使用
+- md_to_text：Markdown → 纯文本，供 Word（python-docx）使用
+- extract_image_urls_from_md：从 Markdown ![](url) 语法提取图片 URL
 """
 
 import io
@@ -21,22 +21,35 @@ from db.models import Chapter, Paragraph, DocumentSummary, Document
 
 
 # ---------------------------------------------------------------------------
-# 内容解析器（前端格式确定后替换此函数）
+# 内容处理工具函数（Markdown 为输入格式）
 # ---------------------------------------------------------------------------
 
-def parse_content(content: str) -> str:
-    """将 HTML 富文本内容转为纯文本，供 Word/Markdown 导出使用"""
+def md_to_html(content: str) -> str:
+    """Markdown → HTML，供 PDF 渲染使用"""
     if not content:
         return ""
+    import markdown as md_lib
+    return md_lib.markdown(
+        content,
+        extensions=["tables", "fenced_code", "nl2br"],
+    )
+
+
+def md_to_text(content: str) -> str:
+    """Markdown → 纯文本，去除所有标记符号，供 Word 段落文本使用"""
+    if not content:
+        return ""
+    # 先转 HTML，再用 BeautifulSoup 提取纯文本，保留换行结构
     from bs4 import BeautifulSoup
-    return BeautifulSoup(content, "html.parser").get_text("\n").strip()
+    html = md_to_html(content)
+    return BeautifulSoup(html, "html.parser").get_text("\n").strip()
 
 
-def extract_image_urls(content: str) -> list[str]:
-    """从 HTML 内容中提取图片 URL"""
+def extract_image_urls_from_md(content: str) -> list[str]:
+    """从 Markdown ![alt](url) 语法中提取图片 URL"""
     if not content:
         return []
-    return re.findall(r'<img[^>]+src=["\']([^"\']+)["\']', content)
+    return re.findall(r'!\[[^\]]*\]\(([^)]+)\)', content)
 
 
 # ---------------------------------------------------------------------------
@@ -153,7 +166,6 @@ def _set_run_font(run, font_name: str = "宋体"):
     from docx.oxml.ns import qn
     from lxml import etree
     run.font.name = font_name
-    # 必须同时设置 eastAsia 字体，python-docx 默认不设置
     rPr = run._r.get_or_add_rPr()
     rFonts = rPr.find(qn("w:rFonts"))
     if rFonts is None:
@@ -161,11 +173,149 @@ def _set_run_font(run, font_name: str = "宋体"):
     rFonts.set(qn("w:eastAsia"), font_name)
 
 
+def _render_inline(paragraph, node):
+    """递归渲染行内节点（加粗、斜体、普通文本）到 docx paragraph"""
+    from bs4 import NavigableString, Tag
+    if isinstance(node, NavigableString):
+        text = str(node)
+        if text:
+            _set_run_font(paragraph.add_run(text))
+        return
+    if not isinstance(node, Tag):
+        return
+    tag = node.name
+    for child in node.children:
+        if isinstance(child, NavigableString):
+            text = str(child)
+            if text:
+                run = paragraph.add_run(text)
+                if tag in ("strong", "b"):
+                    run.bold = True
+                elif tag in ("em", "i"):
+                    run.italic = True
+                _set_run_font(run)
+        else:
+            _render_inline(paragraph, child)
+
+
+def _add_md_table(doc, table_node):
+    """将 BeautifulSoup table 节点写入 docx Table"""
+    from docx.shared import Pt
+    rows = table_node.find_all("tr")
+    if not rows:
+        return
+    # 计算列数
+    col_count = max(len(r.find_all(["td", "th"])) for r in rows)
+    if col_count == 0:
+        return
+    tbl = doc.add_table(rows=len(rows), cols=col_count)
+    tbl.style = "Table Grid"
+    for r_idx, row in enumerate(rows):
+        cells = row.find_all(["td", "th"])
+        for c_idx, cell in enumerate(cells):
+            if c_idx >= col_count:
+                break
+            docx_cell = tbl.cell(r_idx, c_idx)
+            text = cell.get_text(strip=True)
+            p = docx_cell.paragraphs[0]
+            run = p.add_run(text)
+            if cell.name == "th":
+                run.bold = True
+            _set_run_font(run)
+
+
+async def _render_md_to_docx(doc, content: str):
+    """
+    将 Markdown 内容渲染到 docx Document。
+    流程：Markdown → HTML → BeautifulSoup → python-docx 对象
+    图片异步下载（asyncio.to_thread 包装）。
+    """
+    import asyncio
+    from bs4 import BeautifulSoup, NavigableString, Tag
+    from docx.shared import Inches
+
+    if not content or not content.strip():
+        return
+
+    html = md_to_html(content)
+    soup = BeautifulSoup(html, "html.parser")
+
+    for node in soup.children:
+        if isinstance(node, NavigableString):
+            text = str(node).strip()
+            if text:
+                p = doc.add_paragraph()
+                _set_run_font(p.add_run(text))
+            continue
+        if not isinstance(node, Tag):
+            continue
+
+        tag = node.name
+
+        # 标题
+        if tag in ("h1", "h2", "h3", "h4", "h5", "h6"):
+            level = int(tag[1])
+            h = doc.add_heading(node.get_text(strip=True), level=level)
+            for run in h.runs:
+                _set_run_font(run)
+
+        # 段落
+        elif tag == "p":
+            # 检查是否含图片
+            imgs = node.find_all("img")
+            if imgs:
+                for img in imgs:
+                    url = img.get("src", "")
+                    if url:
+                        try:
+                            import httpx
+                            resp = await asyncio.to_thread(
+                                lambda u=url: httpx.get(u, timeout=10, follow_redirects=True)
+                            )
+                            if resp.status_code == 200:
+                                doc.add_picture(io.BytesIO(resp.content), width=Inches(5))
+                        except Exception:
+                            pass
+                # 图片后的文字
+                text = node.get_text(strip=True)
+                if text:
+                    p = doc.add_paragraph()
+                    _render_inline(p, node)
+            else:
+                p = doc.add_paragraph()
+                _render_inline(p, node)
+
+        # 表格
+        elif tag == "table":
+            _add_md_table(doc, node)
+
+        # 无序列表
+        elif tag == "ul":
+            for li in node.find_all("li", recursive=False):
+                p = doc.add_paragraph(style="List Bullet")
+                _render_inline(p, li)
+
+        # 有序列表
+        elif tag == "ol":
+            for li in node.find_all("li", recursive=False):
+                p = doc.add_paragraph(style="List Number")
+                _render_inline(p, li)
+
+        # 代码块
+        elif tag == "pre":
+            code = node.get_text()
+            p = doc.add_paragraph()
+            run = p.add_run(code)
+            run.font.name = "Courier New"
+
+        # 水平线
+        elif tag == "hr":
+            doc.add_paragraph("─" * 40)
+
+
 async def export_docx(db: AsyncSession, document_id: UUID) -> bytes:
     """生成 Word 文档，返回二进制内容"""
     from docx import Document as DocxDocument
-    from docx.shared import Inches
-    import httpx
 
     data = await build_document_data(db, document_id)
     if not data:
@@ -180,20 +330,20 @@ async def export_docx(db: AsyncSession, document_id: UUID) -> bytes:
         p = doc.add_paragraph()
         _set_run_font(p.add_run(f"用途：{data['purpose']}"))
 
-    # 摘要部分
+    # 摘要
     if data["summaries"]:
         summary_heading = doc.add_heading("摘要信息", level=1)
         for run in summary_heading.runs:
             _set_run_font(run)
         for s in data["summaries"]:
-            p = doc.add_paragraph()
-            run_title = p.add_run(f"{s['title']}：")
+            title_p = doc.add_paragraph()
+            run_title = title_p.add_run(f"{s['title']}")
             run_title.bold = True
             _set_run_font(run_title)
-            _set_run_font(p.add_run(parse_content(s["content"])))
+            await _render_md_to_docx(doc, s["content"] or "")
 
     # 章节递归写入
-    def write_chapter(chapter: dict):
+    async def write_chapter(chapter: dict):
         level = min(chapter["level"], 9)
         heading = doc.add_heading(chapter["title"], level=level)
         for run in heading.runs:
@@ -205,37 +355,21 @@ async def export_docx(db: AsyncSession, document_id: UUID) -> bytes:
 
             if para_type in ("heading1", "heading2", "heading3"):
                 h_level = int(para_type[-1])
-                h = doc.add_heading(content, level=h_level)
+                # 内容可能已含 # 前缀，提取纯文本
+                text = content.lstrip("#").strip()
+                h = doc.add_heading(text, level=h_level)
                 for run in h.runs:
                     _set_run_font(run)
-                continue
-
-            # paragraph 类型
-            text = parse_content(content)
-            img_urls = extract_image_urls(content)
-            if img_urls:
-                for url in img_urls:
-                    try:
-                        resp = httpx.get(url, timeout=10)
-                        if resp.status_code == 200:
-                            doc.add_picture(io.BytesIO(resp.content), width=Inches(5))
-                    except Exception:
-                        pass
-                if text.strip():
-                    p = doc.add_paragraph()
-                    _set_run_font(p.add_run(text))
             else:
-                if text.strip():
-                    p = doc.add_paragraph()
-                    _set_run_font(p.add_run(text))
+                await _render_md_to_docx(doc, content)
 
         for child in chapter.get("children", []):
-            write_chapter(child)
+            await write_chapter(child)
 
     for chapter in data["chapters"]:
-        write_chapter(chapter)
+        await write_chapter(chapter)
 
-    # 参考文献列表
+    # 参考文献
     if data.get("references"):
         ref_heading = doc.add_heading("参考文献", level=1)
         for run in ref_heading.runs:
@@ -254,7 +388,7 @@ async def export_docx(db: AsyncSession, document_id: UUID) -> bytes:
 # ---------------------------------------------------------------------------
 
 async def export_pdf(db: AsyncSession, document_id: UUID) -> bytes:
-    """生成 PDF，返回二进制内容（weasyprint 自动处理图片 URL）"""
+    """生成 PDF，返回二进制内容（weasyprint 渲染 HTML）"""
     import weasyprint
 
     data = await build_document_data(db, document_id)
@@ -269,18 +403,22 @@ async def export_pdf(db: AsyncSession, document_id: UUID) -> bytes:
             para_type = para.get("para_type", "paragraph")
             if para_type in ("heading1", "heading2", "heading3"):
                 h_level = int(para_type[-1])
-                html += f"<h{h_level}>{content}</h{h_level}>\n"
+                # 内容本身是 Markdown，转 HTML 后直接输出
+                html += md_to_html(content) + "\n"
             else:
-                html += f"<p>{content}</p>\n"
+                # 正文段落：Markdown → HTML，直接输出（不套额外 <p>）
+                html += md_to_html(content) + "\n"
         for child in chapter.get("children", []):
             html += chapter_to_html(child)
         return html
 
+    # 摘要：内容是 Markdown，转 HTML 后放入表格
     summaries_html = ""
     if data["summaries"]:
-        summaries_html = "<h2>摘要信息</h2>\n<table border='1' cellpadding='6'>\n"
+        summaries_html = "<h2>摘要信息</h2>\n<table>\n"
         for s in data["summaries"]:
-            summaries_html += f"<tr><td><b>{s['title']}</b></td><td>{s['content']}</td></tr>\n"
+            content_html = md_to_html(s["content"] or "")
+            summaries_html += f"<tr><td class='summary-title'><b>{s['title']}</b></td><td>{content_html}</td></tr>\n"
         summaries_html += "</table>\n"
 
     chapters_html = "".join(chapter_to_html(c) for c in data["chapters"])
@@ -292,17 +430,31 @@ async def export_pdf(db: AsyncSession, document_id: UUID) -> bytes:
             references_html += f"<li>{ref['formatted']}</li>\n"
         references_html += "</ol>\n"
 
+    purpose_html = f"<p class='purpose'>用途：{data['purpose']}</p>" if data["purpose"] else ""
+
     full_html = f"""<!DOCTYPE html>
 <html><head>
 <meta charset="utf-8">
 <style>
-  body {{ font-family: 'SimSun', serif; font-size: 12pt; margin: 2cm; }}
-  h1 {{ font-size: 18pt; }} h2 {{ font-size: 15pt; }} h3 {{ font-size: 13pt; }}
-  table {{ border-collapse: collapse; width: 100%; }}
-  td {{ padding: 6px; }}
+  body {{ font-family: 'SimSun', serif; font-size: 12pt; margin: 2cm; line-height: 1.8; }}
+  h1 {{ font-size: 20pt; text-align: center; margin-bottom: 0.5em; }}
+  h2 {{ font-size: 15pt; margin-top: 1.5em; border-bottom: 1px solid #ccc; padding-bottom: 4px; }}
+  h3 {{ font-size: 13pt; margin-top: 1em; }}
+  h4, h5, h6 {{ font-size: 12pt; margin-top: 0.8em; }}
+  p {{ margin: 0.4em 0; text-indent: 2em; }}
+  table {{ border-collapse: collapse; width: 100%; margin: 0.8em 0; }}
+  td, th {{ border: 1px solid #999; padding: 6px 8px; vertical-align: top; }}
+  th {{ background: #f0f0f0; font-weight: bold; }}
+  .summary-title {{ width: 8em; white-space: nowrap; }}
+  .purpose {{ color: #666; font-style: italic; text-indent: 0; }}
+  ol, ul {{ margin: 0.4em 0; padding-left: 2em; }}
+  li {{ margin: 0.2em 0; }}
+  code {{ font-family: monospace; background: #f5f5f5; padding: 1px 4px; }}
+  pre {{ background: #f5f5f5; padding: 8px; overflow-x: auto; }}
 </style>
 </head><body>
 <h1>{data['title']}</h1>
+{purpose_html}
 {summaries_html}
 {chapters_html}
 {references_html}
@@ -327,30 +479,31 @@ async def export_markdown(db: AsyncSession, document_id: UUID) -> str:
     if data["purpose"]:
         lines.append(f"> 用途：{data['purpose']}\n")
 
+    # 摘要：内容本身已是 Markdown，直接输出
     if data["summaries"]:
         lines.append("## 摘要信息\n")
         for s in data["summaries"]:
-            content = s["content"] or ""
-            img_urls = extract_image_urls(content)
-            img_md = "".join(f"![image]({url})" for url in img_urls)
-            lines.append(f"**{s['title']}**：{parse_content(content)}{img_md}\n")
+            content = (s["content"] or "").strip()
+            lines.append(f"**{s['title']}**\n\n{content}\n")
 
     def chapter_to_md(chapter: dict) -> list[str]:
         prefix = "#" * min(chapter["level"] + 1, 6)
         result = [f"{prefix} {chapter['title']}\n"]
         for para in chapter["paragraphs"]:
-            content = para["content"] or ""
+            content = (para["content"] or "").strip()
             para_type = para.get("para_type", "paragraph")
             if para_type in ("heading1", "heading2", "heading3"):
+                # 段落内嵌标题：直接输出（内容本身可能已含 # 前缀，也可能是纯文本）
                 h_level = int(para_type[-1])
-                result.append(f"{'#' * h_level} {content}\n")
+                # 若内容已有 # 前缀则直接用，否则补上
+                if content.startswith("#"):
+                    result.append(f"{content}\n")
+                else:
+                    result.append(f"{'#' * h_level} {content}\n")
             else:
-                img_urls = extract_image_urls(content)
-                for url in img_urls:
-                    result.append(f"![image]({url})\n")
-                text = parse_content(content)
-                if text.strip():
-                    result.append(f"{text}\n")
+                # 正文段落：内容本身是 Markdown，直接输出
+                if content:
+                    result.append(f"{content}\n")
         for child in chapter.get("children", []):
             result.extend(chapter_to_md(child))
         return result
@@ -358,6 +511,7 @@ async def export_markdown(db: AsyncSession, document_id: UUID) -> str:
     for chapter in data["chapters"]:
         lines.extend(chapter_to_md(chapter))
 
+    # 参考文献
     if data.get("references"):
         lines.append("\n## 参考文献\n")
         for ref in data["references"]:

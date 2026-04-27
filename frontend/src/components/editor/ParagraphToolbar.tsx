@@ -1,11 +1,44 @@
 "use client"
 
 import { useRef, useState } from "react"
+import { useEditor, EditorContent } from "@tiptap/react"
+import StarterKit from "@tiptap/starter-kit"
+import { Markdown } from "tiptap-markdown"
 import { useAIAssist } from "@/hooks/useAIAssist"
 import { useChatStore } from "@/store/chatStore"
 import { paragraphService, type EvaluateAIResult } from "@/services/paragraphService"
 import { cn } from "@/lib/utils"
 import type { ParaType } from "@/types/api"
+
+// 只读 Markdown 渲染组件，用于 AI 预览
+function MarkdownPreview({ content, streaming }: { content: string; streaming?: boolean }) {
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Markdown.configure({ html: false, breaks: true }),
+    ],
+    content,
+    editable: false,
+    immediatelyRender: false,
+  })
+
+  // 流式更新内容
+  if (editor) {
+    const current = (editor.storage as { markdown?: { getMarkdown: () => string } }).markdown?.getMarkdown()
+    if (current !== content) {
+      editor.commands.setContent(content)
+    }
+  }
+
+  return (
+    <div className="prose prose-xs max-w-none text-gray-700 [&_.tiptap]:outline-none">
+      <EditorContent editor={editor} />
+      {streaming && (
+        <span className="inline-block w-0.5 h-3 bg-blue-400 ml-0.5 animate-pulse align-middle" />
+      )}
+    </div>
+  )
+}
 
 interface ParagraphToolbarProps {
   paragraphId: string
@@ -96,9 +129,9 @@ export default function ParagraphToolbar({
       {/* 工具栏按钮 */}
       <div
         className={cn(
-          "absolute right-2 top-2 z-10 flex items-center gap-1 rounded-lg border border-gray-200 bg-white/95 px-1.5 py-1 shadow-sm transition",
-          "opacity-0 pointer-events-none",
-          (visible || isAssisting || showEval || showAssistInput) && "opacity-100 pointer-events-auto"
+          "flex items-center gap-1 rounded-lg border border-gray-200 bg-white/95 px-1.5 py-1 shadow-sm transition w-fit",
+          "opacity-0 pointer-events-none h-0 overflow-hidden",
+          (visible || isAssisting || showEval || showAssistInput) && "opacity-100 pointer-events-auto h-auto overflow-visible"
         )}
       >
         <button
@@ -141,9 +174,9 @@ export default function ParagraphToolbar({
         </button>
       </div>
 
-      {/* AI 帮填预览 */}
+      {/* AI 帮填提示词输入 */}
       {showAssistInput && !isAssisting && (
-        <div className="absolute right-2 top-10 z-20 w-80 rounded-md border border-blue-200 bg-blue-50 p-2 shadow-md">
+        <div className="mt-1 w-full rounded-md border border-blue-200 bg-blue-50 p-2">
           <div className="mb-1 text-xs font-medium text-blue-600">提示词</div>
           <textarea
             value={assistInstruction}
@@ -176,7 +209,7 @@ export default function ParagraphToolbar({
       )}
 
       {isAssisting && aiAssistPreview && (
-        <div className="mt-8 p-2 rounded-md bg-blue-50 border border-blue-200 text-xs text-gray-700 leading-relaxed">
+        <div className="mt-1 p-2 rounded-md bg-blue-50 border border-blue-200 text-xs text-gray-700 leading-relaxed">
           <div className="mb-1 flex items-center justify-between gap-2">
             <div className="text-xs font-medium text-blue-500">AI 生成预览</div>
             {hasPreview && (
@@ -198,7 +231,7 @@ export default function ParagraphToolbar({
               </div>
             )}
           </div>
-          <p className="whitespace-pre-wrap">{aiAssistPreview}</p>
+          <MarkdownPreview content={aiAssistPreview} streaming={!hasPreview} />
           {!hasPreview && (
             <span className="inline-block w-0.5 h-3 bg-blue-400 ml-0.5 animate-pulse align-middle" />
           )}
@@ -207,7 +240,7 @@ export default function ParagraphToolbar({
 
       {/* AI 评估结果 */}
       {showEval && (evalPreview || evalResult) && (
-        <div className={cn("p-2 rounded-md bg-purple-50 border border-purple-200 text-xs leading-relaxed", isAssisting && aiAssistPreview ? "mt-2" : "mt-8")}>
+        <div className={cn("p-2 rounded-md bg-purple-50 border border-purple-200 text-xs leading-relaxed", isAssisting && aiAssistPreview ? "mt-2" : "mt-1")}>
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs text-purple-500 font-medium">AI 评估结果</span>
             <button

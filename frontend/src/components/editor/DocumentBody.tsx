@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState, useEffect } from "react"
+import { useRef, useState, useCallback } from "react"
 import { paragraphService } from "@/services/paragraphService"
 import { useDocumentStore } from "@/store/documentStore"
 import { useEditorStore } from "@/store/editorStore"
@@ -8,6 +8,7 @@ import { useChatStore } from "@/store/chatStore"
 import type { ChapterTreeNode, Paragraph } from "@/types/api"
 import { cn } from "@/lib/utils"
 import ParagraphToolbar from "@/components/editor/ParagraphToolbar"
+import ParagraphEditor, { type ParagraphEditorHandle } from "@/components/editor/ParagraphEditor"
 import { toastError } from "@/hooks/useToast"
 
 interface DocumentBodyProps {
@@ -38,10 +39,19 @@ interface ParagraphRowProps {
   paragraph: Paragraph
   chapterId: string
   chapterTitle: string
+  prevParagraphId?: string
   onReload: () => void
+  onRequestFocus?: (paragraphId: string, position: "start" | "end") => void
 }
 
-function ParagraphRow({ paragraph, chapterId, chapterTitle, onReload }: ParagraphRowProps) {
+function ParagraphRow({
+  paragraph,
+  chapterId,
+  chapterTitle,
+  prevParagraphId,
+  onReload,
+  onRequestFocus,
+}: ParagraphRowProps) {
   const { updateParagraph } = useDocumentStore()
   const { setActiveParagraphId, activeParagraphId } = useEditorStore()
   const upsertSelectionParagraphContext = useChatStore((state) => state.upsertSelectionParagraphContext)
@@ -53,28 +63,13 @@ function ParagraphRow({ paragraph, chapterId, chapterTitle, onReload }: Paragrap
   const [menuOpen, setMenuOpen] = useState(false)
   const [rowHovered, setRowHovered] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const editorRef = useRef<ParagraphEditorHandle>(null)
   const isActive = activeParagraphId === paragraph.paragraph_id
 
-  // 初始渲染后自动撑高 textarea
-  useEffect(() => {
-    const el = textareaRef.current
-    if (el) {
-      el.style.height = "auto"
-      el.style.height = `${el.scrollHeight}px`
-    }
-  }, [localContent])
-
-  // 同步外部内容变更（如 AI 应用后更新了 store 中的 paragraph.content）
-  useEffect(() => {
-    setLocalContent(paragraph.content)
-  }, [paragraph.content, paragraph.paragraph_id])
-
-  const handleChange = (val: string) => {
+  const handleChange = useCallback((val: string) => {
     setLocalContent(val)
     updateParagraph(chapterId, paragraph.paragraph_id, val)
     updateParagraphContextContent(paragraph.paragraph_id, val)
-    // 防抖保存
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(async () => {
       setSaving(true)
@@ -84,7 +79,7 @@ function ParagraphRow({ paragraph, chapterId, chapterTitle, onReload }: Paragrap
         setSaving(false)
       }
     }, 800)
-  }
+  }, [chapterId, paragraph.paragraph_id, updateParagraph, updateParagraphContextContent])
 
   const handleInsertAfter = async () => {
     setMenuOpen(false)
@@ -117,29 +112,43 @@ function ParagraphRow({ paragraph, chapterId, chapterTitle, onReload }: Paragrap
     }
   }
 
+  // Enter 在末尾：插入新段落
+  const handleEnterAtEnd = useCallback(async () => {
+    try {
+      const newPara = await paragraphService.insertAfter(paragraph.paragraph_id, { content: "" })
+      onReload()
+      // 等 DOM 更新后聚焦新段落
+      setTimeout(() => {
+        onRequestFocus?.(newPara.paragraph_id, "start")
+      }, 100)
+    } catch {
+      // 静默失败
+    }
+  }, [paragraph.paragraph_id, onReload, onRequestFocus])
+
+  // Backspace 在开头：聚焦上一段落末尾（内容为空时删除）
+  const handleBackspaceAtStart = useCallback(async () => {
+    if (localContent.trim() === "" && prevParagraphId) {
+      try {
+        await paragraphService.delete(paragraph.paragraph_id)
+        removeParagraphContexts(paragraph.paragraph_id)
+        onReload()
+        setTimeout(() => {
+          onRequestFocus?.(prevParagraphId, "end")
+        }, 100)
+      } catch {
+        // 静默失败
+      }
+    } else if (prevParagraphId) {
+      onRequestFocus?.(prevParagraphId, "end")
+    }
+  }, [localContent, prevParagraphId, paragraph.paragraph_id, removeParagraphContexts, onReload, onRequestFocus])
+
   const paraTypeLabel: Record<Paragraph["para_type"], string> = {
     paragraph: "正文",
     heading1: "一级标题",
     heading2: "二级标题",
     heading3: "三级标题",
-  }
-
-  const handleTextInteraction = (event: React.MouseEvent<HTMLTextAreaElement>) => {
-    const target = event.currentTarget
-    const selectionStart = target.selectionStart ?? 0
-    const selectionEnd = target.selectionEnd ?? 0
-    const selectedText = selectionStart !== selectionEnd
-      ? target.value.slice(selectionStart, selectionEnd).trim()
-      : undefined
-
-    upsertSelectionParagraphContext({
-      paragraph_id: paragraph.paragraph_id,
-      chapter_id: chapterId,
-      chapter_title: chapterTitle,
-      content: localContent,
-      para_type: paragraph.para_type,
-      selected_text: selectedText || undefined,
-    })
   }
 
   return (
@@ -188,37 +197,37 @@ function ParagraphRow({ paragraph, chapterId, chapterTitle, onReload }: Paragrap
       </div>
 
       {/* 编辑区 */}
-      <div className="relative flex-1 min-w-0">
-        <textarea
-          ref={textareaRef}
-          value={localContent}
-          onChange={e => handleChange(e.target.value)}
+      <div
+        className="relative flex-1 min-w-0"
+        onClick={() => {
+          // 点击编辑区时同步选中上下文
+          upsertSelectionParagraphContext({
+            paragraph_id: paragraph.paragraph_id,
+            chapter_id: chapterId,
+            chapter_title: chapterTitle,
+            content: localContent,
+            para_type: paragraph.para_type,
+          })
+        }}
+      >
+        <ParagraphEditor
+          ref={editorRef}
+          paragraphId={paragraph.paragraph_id}
+          content={localContent}
+          paraType={paragraph.para_type}
+          isChanged={paragraph.ischange === 1}
+          onChange={handleChange}
+          onEnterAtEnd={handleEnterAtEnd}
+          onBackspaceAtStart={handleBackspaceAtStart}
           onFocus={() => setActiveParagraphId(paragraph.paragraph_id)}
-          onMouseUp={handleTextInteraction}
-          rows={1}
-          className={cn(
-            "w-full resize-none bg-transparent outline-none leading-relaxed",
-            "overflow-hidden",
-            paragraph.para_type === "paragraph" && "pr-32",
-            paragraph.para_type === "heading1" && "text-xl font-bold text-gray-900",
-            paragraph.para_type === "heading2" && "text-lg font-semibold text-gray-800",
-            paragraph.para_type === "heading3" && "text-base font-medium text-gray-700",
-            paragraph.para_type === "paragraph" && "text-sm text-gray-700",
-            paragraph.ischange === 1 && "border-l-2 border-orange-400 pl-2"
-          )}
-          style={{ height: "auto" }}
-          onInput={e => {
-            const el = e.currentTarget
-            el.style.height = "auto"
-            el.style.height = `${el.scrollHeight}px`
-          }}
-          placeholder={paragraph.para_type === "paragraph" ? "输入正文内容..." : "输入标题..."}
         />
+
         {/* 变更标记 */}
         {paragraph.ischange === 1 && (
           <span className="text-xs text-orange-400 ml-1">已变更</span>
         )}
-        {/* AI 工具栏（仅正文段落，hover 即可显示） */}
+
+        {/* AI 工具栏（仅正文段落） */}
         {paragraph.para_type === "paragraph" && (
           <div className="mt-1">
             <ParagraphToolbar
@@ -236,7 +245,7 @@ function ParagraphRow({ paragraph, chapterId, chapterTitle, onReload }: Paragrap
 
       {/* 保存状态 */}
       {saving && (
-        <span className="absolute right-28 top-2 text-xs text-gray-300">保存中</span>
+        <span className="absolute right-2 top-2 text-xs text-gray-300">保存中</span>
       )}
     </div>
   )
@@ -256,6 +265,17 @@ function ChapterBlock({ flatChapter, onReload }: ChapterBlockProps) {
   const isActive = activeChapterId === node.chapter_id
   const [addingPara, setAddingPara] = useState(false)
 
+  // 段落 ref map，用于跨段落焦点控制
+  const editorRefs = useRef<Map<string, ParagraphEditorHandle>>(new Map())
+
+  const handleRequestFocus = useCallback((paragraphId: string, position: "start" | "end") => {
+    const handle = editorRefs.current.get(paragraphId)
+    if (handle) {
+      if (position === "end") handle.focusEnd()
+      else handle.focus()
+    }
+  }, [])
+
   const handleAddParagraph = async () => {
     setAddingPara(true)
     try {
@@ -266,13 +286,14 @@ function ChapterBlock({ flatChapter, onReload }: ChapterBlockProps) {
     }
   }
 
-  // 章节标题字号随层级变化
   const titleCls = cn(
     "font-semibold text-gray-900 leading-snug",
     depth === 0 && "text-xl",
     depth === 1 && "text-lg",
     depth >= 2 && "text-base",
   )
+
+  const sortedParagraphs = [...node.paragraphs].sort((a, b) => a.order_index - b.order_index)
 
   return (
     <div
@@ -302,7 +323,7 @@ function ChapterBlock({ flatChapter, onReload }: ChapterBlockProps) {
         className="flex flex-col gap-1"
         style={{ paddingLeft: `${depth * 8 + 4}px` }}
       >
-        {node.paragraphs.length === 0 ? (
+        {sortedParagraphs.length === 0 ? (
           <button
             onClick={handleAddParagraph}
             disabled={addingPara}
@@ -312,19 +333,17 @@ function ChapterBlock({ flatChapter, onReload }: ChapterBlockProps) {
           </button>
         ) : (
           <>
-            {node.paragraphs
-              .slice()
-              .sort((a, b) => a.order_index - b.order_index)
-              .map(p => (
-                <ParagraphRow
-                  key={p.paragraph_id}
-                  paragraph={p}
-                  chapterId={node.chapter_id}
-                  chapterTitle={node.title}
-                  onReload={onReload}
-                />
-              ))}
-            {/* 末尾添加段落 */}
+            {sortedParagraphs.map((p, idx) => (
+              <ParagraphRow
+                key={p.paragraph_id}
+                paragraph={p}
+                chapterId={node.chapter_id}
+                chapterTitle={node.title}
+                prevParagraphId={idx > 0 ? sortedParagraphs[idx - 1].paragraph_id : undefined}
+                onReload={onReload}
+                onRequestFocus={handleRequestFocus}
+              />
+            ))}
             <button
               onClick={handleAddParagraph}
               disabled={addingPara}
