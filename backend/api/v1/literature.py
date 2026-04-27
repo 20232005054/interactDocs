@@ -33,7 +33,7 @@ router = APIRouter(prefix="/api/v1/literature", tags=["文献管理"])
 template_router = APIRouter(prefix="/api/v1/templates", tags=["文献管理"])
 
 
-def _lit_response(lit) -> LiteratureResponse:
+def _lit_response(lit, user_name: str | None = None) -> LiteratureResponse:
     return LiteratureResponse(
         literature_id=lit.literature_id,
         literature_key=lit.literature_key,
@@ -48,6 +48,7 @@ def _lit_response(lit) -> LiteratureResponse:
         error_message=lit.error_message,
         scope=lit.scope,
         user_id=lit.user_id,
+        user_name=user_name,
         created_at=lit.created_at,
     )
 
@@ -144,12 +145,16 @@ async def list_literature(
     if scope == "public":
         items = await LiteratureService.list_public(db)
     elif scope == "private":
-        items = await LiteratureService.list_by_user(db, current_user.user_id)
+        if current_user.role in (UserRole.EDITOR, UserRole.ADMIN):
+            items = await LiteratureService.list_all_private(db)
+        else:
+            items = await LiteratureService.list_by_user(db, current_user.user_id)
     else:
-        # 无过滤：admin 看全部，普通用户看 public + 自己的 private
+        # 无过滤：admin/editor 看全部（public + 所有 private），普通用户看 public + 自己的 private
         public_items = await LiteratureService.list_public(db)
         if current_user.role in (UserRole.EDITOR, UserRole.ADMIN):
-            items = public_items
+            all_items = await LiteratureService.list_all(db)
+            items = all_items
         else:
             private_items = await LiteratureService.list_by_user(db, current_user.user_id)
             # 合并去重
@@ -159,8 +164,16 @@ async def list_literature(
                 if lit.literature_id not in seen:
                     items.append(lit)
 
+    # 批量查询 user_name（只查有 user_id 的文献，避免 N+1）
+    user_id_set = {lit.user_id for lit in items if lit.user_id is not None}
+    user_name_map: dict = {}
+    if user_id_set:
+        from db.mappers.user_mapper import UserMapper
+        users = await UserMapper.get_by_ids(db, list(user_id_set))
+        user_name_map = {u.user_id: u.name for u in users}
+
     return success_response(data=LiteratureListResponse(
-        items=[_lit_response(lit) for lit in items],
+        items=[_lit_response(lit, user_name_map.get(lit.user_id)) for lit in items],
         total=len(items),
     ))
 

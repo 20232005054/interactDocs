@@ -13,10 +13,12 @@ import { useRouter } from "next/navigation"
 import BasicInfoStep from "@/components/template/BasicInfoStep"
 import CoreInfoTemplateStep from "@/components/template/CoreInfoTemplateStep"
 import SummaryTemplateStep from "@/components/template/SummaryTemplateStep"
+import { toastError } from "@/hooks/useToast"
 import StructureTemplateStep from "@/components/template/StructureTemplateStep"
 import { templateService } from "@/services/templateService"
+import { literatureService } from "@/services/literatureService"
 import { cn } from "@/lib/utils"
-import type { TemplateDependenciesResponse, TemplateDetail } from "@/types/api"
+import type { Literature, TemplateDependenciesResponse, TemplateDetail } from "@/types/api"
 
 const PANEL_MIN_RATIOS = [18, 18, 24]
 const HANDLE_WIDTH_PX = 16
@@ -40,6 +42,11 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
   const [error, setError] = useState<string | null>(null)
   const [dependencies, setDependencies] = useState<TemplateDependenciesResponse | null>(null)
   const [showBasicEditor, setShowBasicEditor] = useState(!templateId)
+  const [showLiterature, setShowLiterature] = useState(false)
+  const [boundLiterature, setBoundLiterature] = useState<Literature[]>([])
+  const [allLiterature, setAllLiterature] = useState<Literature[]>([])
+  const [litLoading, setLitLoading] = useState(false)
+  const [litSearch, setLitSearch] = useState("")
   const [panelWidths, setPanelWidths] = useState<[number, number, number]>([24, 28, 48])
   const [activeHandle, setActiveHandle] = useState<number | null>(null)
   const [savingTemplate, setSavingTemplate] = useState(false)
@@ -77,6 +84,30 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
     if (!currentTemplateId) return
     void loadDependencies(currentTemplateId)
   }, [currentTemplateId, loadDependencies])
+
+  // 加载已绑定文献
+  const loadBoundLiterature = useCallback(async (id: string) => {
+    try {
+      const res = await literatureService.listByTemplate(id)
+      setBoundLiterature(res.items)
+    } catch {
+      setBoundLiterature([])
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!currentTemplateId) return
+    void loadBoundLiterature(currentTemplateId)
+  }, [currentTemplateId, loadBoundLiterature])
+
+  // 展开文献面板时懒加载知识库列表
+  useEffect(() => {
+    if (!showLiterature || allLiterature.length > 0) return
+    setLitLoading(true)
+    literatureService.list().then(res => {
+      setAllLiterature(res.items)
+    }).catch(() => {}).finally(() => setLitLoading(false))
+  }, [showLiterature, allLiterature.length])
 
   useEffect(() => {
     if (activeHandle === null) return
@@ -262,6 +293,28 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
             </button>
             <button
               type="button"
+              onClick={() => setShowLiterature((prev) => !prev)}
+              className="h-10 rounded-full border border-template-border bg-white px-5 text-sm font-medium text-gray-600 hover:bg-template-hover transition"
+            >
+              {showLiterature ? "收起文献" : "管理文献"}
+            </button>
+            {currentTemplateId && template && (
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await templateService.exportJson(currentTemplateId, template.display_name)
+                  } catch (err: unknown) {
+                    toastError(err instanceof Error ? err.message : "导出失败")
+                  }
+                }}
+                className="h-10 rounded-full border border-template-border bg-white px-5 text-sm font-medium text-gray-600 hover:bg-template-hover transition"
+              >
+                导出 JSON
+              </button>
+            )}
+            <button
+              type="button"
               onClick={handleSaveTemplate}
               disabled={savingTemplate}
               className="h-10 rounded-full bg-template-accent px-5 text-sm font-medium text-white hover:bg-template-accent-hover disabled:opacity-50 transition"
@@ -287,6 +340,113 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
                   setCurrentTemplateId(saved.template_id)
                 }}
               />
+            </div>
+          </section>
+        )}
+
+        {showLiterature && currentTemplateId && (
+          <section className="mb-3 rounded-2xl border border-template-border bg-white shadow-sm shrink-0">
+            <div className="border-b border-template-border-inner px-4 py-3 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700">文献绑定</h3>
+                <p className="mt-0.5 text-xs text-gray-400">绑定到此模板的文献将在 AI 生成时作为参考来源</p>
+              </div>
+              <span className="text-xs text-muted-foreground">{boundLiterature.length} 篇已绑定</span>
+            </div>
+            <div className="grid grid-cols-2 divide-x divide-template-border-inner">
+              {/* 左列：已绑定 */}
+              <div className="p-4">
+                <p className="mb-2 text-xs font-medium text-gray-500">已绑定文献</p>
+                {boundLiterature.length === 0 ? (
+                  <p className="text-xs text-gray-400 py-3 text-center">暂未绑定任何文献</p>
+                ) : (
+                  <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
+                    {boundLiterature.map(lit => (
+                      <div key={lit.literature_id} className="flex items-start justify-between gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-gray-700 truncate">{lit.title ?? "标题解析中..."}</p>
+                          {lit.authors && <p className="text-xs text-gray-400 truncate mt-0.5">{lit.authors}</p>}
+                          {lit.journal && <p className="text-xs text-gray-400 truncate">{lit.journal}</p>}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await literatureService.unbind(currentTemplateId, lit.literature_id)
+                              setBoundLiterature(prev => prev.filter(l => l.literature_id !== lit.literature_id))
+                            } catch (err: unknown) {
+                              toastError(err instanceof Error ? err.message : "解绑失败")
+                            }
+                          }}
+                          className="shrink-0 text-xs text-gray-400 hover:text-red-500 transition"
+                        >
+                          解绑
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 右列：知识库选择 */}
+              <div className="p-4">
+                <div className="mb-2 flex items-center gap-2">
+                  <p className="text-xs font-medium text-gray-500">知识库文献</p>
+                  <input
+                    type="text"
+                    value={litSearch}
+                    onChange={e => setLitSearch(e.target.value)}
+                    placeholder="搜索标题、作者..."
+                    className="ml-auto h-7 w-44 rounded border border-gray-200 px-2 text-xs outline-none focus:border-blue-300 transition"
+                  />
+                </div>
+                {litLoading ? (
+                  <p className="text-xs text-gray-400 py-3 text-center">加载中...</p>
+                ) : (
+                  <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
+                    {allLiterature
+                      .filter(lit => {
+                        if (!litSearch.trim()) return true
+                        const kw = litSearch.toLowerCase()
+                        return lit.title?.toLowerCase().includes(kw) || lit.authors?.toLowerCase().includes(kw)
+                      })
+                      .filter(lit => lit.upload_status === "ready")
+                      .map(lit => {
+                        const isBound = boundLiterature.some(b => b.literature_id === lit.literature_id)
+                        return (
+                          <div key={lit.literature_id} className="flex items-start justify-between gap-2 rounded-lg border border-gray-100 px-3 py-2 hover:bg-gray-50 transition">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-medium text-gray-700 truncate">{lit.title ?? "—"}</p>
+                              {lit.authors && <p className="text-xs text-gray-400 truncate mt-0.5">{lit.authors}</p>}
+                              {lit.journal && <p className="text-xs text-gray-400 truncate">{lit.journal}</p>}
+                            </div>
+                            {isBound ? (
+                              <span className="shrink-0 text-xs text-green-600 font-medium">已绑定</span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    await literatureService.bind(currentTemplateId, lit.literature_id)
+                                    setBoundLiterature(prev => [...prev, lit])
+                                  } catch (err: unknown) {
+                                    toastError(err instanceof Error ? err.message : "绑定失败")
+                                  }
+                                }}
+                                className="shrink-0 text-xs text-primary hover:underline"
+                              >
+                                绑定
+                              </button>
+                            )}
+                          </div>
+                        )
+                      })}
+                    {allLiterature.filter(l => l.upload_status === "ready").length === 0 && !litLoading && (
+                      <p className="text-xs text-gray-400 py-3 text-center">知识库暂无就绪文献</p>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </section>
         )}

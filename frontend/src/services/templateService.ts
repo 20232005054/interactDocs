@@ -1,4 +1,4 @@
-import request from "@/lib/request"
+import request, { fetchStream } from "@/lib/request"
 import type {
   Template,
   TemplateDetail,
@@ -51,9 +51,6 @@ export const templateService = {
   delete: (templateId: string): Promise<void> =>
     request.delete(`/api/v1/templates/${templateId}`),
 
-  rollback: (templateId: string): Promise<Template> =>
-    request.post(`/api/v1/templates/rollback/${templateId}`),
-
   getByPurpose: (
     purpose: string,
     params?: { template_type?: number; is_system?: boolean; is_active?: boolean }
@@ -79,6 +76,18 @@ export const templateService = {
     return request.post(`/api/v1/templates/import?as_system=${asSystem}`, form, {
       headers: { "Content-Type": "multipart/form-data" },
     })
+  },
+
+  exportJson: async (templateId: string, displayName: string): Promise<void> => {
+    const res = await fetchStream(`/api/v1/templates/${templateId}/export`)
+    if (!res.ok) throw new Error("导出失败")
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `${displayName}.json`
+    a.click()
+    URL.revokeObjectURL(url)
   },
 }
 

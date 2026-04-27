@@ -172,13 +172,12 @@ class TemplateRenderService:
         literature_citations = []
         try:
             from services.literature_rag_service import LiteratureRagService
-            from db.mappers.template_mapper import TemplateMapper
-            tpl = await TemplateMapper.get_template(db, document.template_id)
-            if tpl:
+            if document.template_id and document.user_id:
                 query = f"{title} {base_prompt}"[:500]
                 literature_context, literature_citations = await LiteratureRagService.retrieve_and_format(
                     db=db,
-                    group_id=tpl.group_id,
+                    document_template_id=document.template_id,
+                    user_id=document.user_id,
                     query=query,
                 )
         except Exception as e:

@@ -197,3 +197,30 @@ class StructureTemplateService:
             source_data_map=source_data_map,
             draft=draft,
         )
+
+    @staticmethod
+    async def render_ai_content_for_paragraph_with_citations(
+        db: AsyncSession,
+        document: Document,
+        chapter_title: str,
+        para_def: dict,
+        field_key: str,
+        template_id: str,
+        source_data_map: Dict[str, str] = None,
+    ) -> tuple:
+        """为单个段落定义调用 AI 生成内容，同时返回文献引用列表。
+        Returns: (content: str, citations: list)
+        """
+        prompt = para_def.get("custom_prompt") or para_def.get("default_prompt")
+        draft = para_def.get("content_template") if para_def.get("generation_mode") == 3 else None
+        return await TemplateRenderService.render_ai_content_with_citations(
+            db=db,
+            document=document,
+            title=chapter_title,
+            sources=para_def.get("sources"),
+            prompt=prompt,
+            field_key=field_key,
+            template_id=template_id,
+            source_data_map=source_data_map,
+            draft=draft,
+        )

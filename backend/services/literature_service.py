@@ -131,6 +131,7 @@ async def _process_literature_async(literature_id: UUID, file_path: str) -> None
             raise ValueError("PDF 解析结果为空")
 
         full_text = "\n".join(p.page_content for p in pages)
+        logger.info("[文献处理] 解析完成，共 %d 页，全文 %d 字符", len(pages), len(full_text))
 
         # 2. 分块
         splitter = RecursiveCharacterTextSplitter(
@@ -141,9 +142,11 @@ async def _process_literature_async(literature_id: UUID, file_path: str) -> None
         docs = splitter.create_documents([full_text])
         if not docs:
             raise ValueError("文本分块结果为空")
+        logger.info("[文献处理] 分块完成，共 %d 块", len(docs))
 
         # 3. 向量化 + 写入 chunks
         chunks: list[LiteratureChunk] = []
+        progress_step = max(1, len(docs) // 5)  # 每 20% 打一次进度
         for idx, doc in enumerate(docs):
             content = doc.page_content.strip()
             if not content:
@@ -157,10 +160,9 @@ async def _process_literature_async(literature_id: UUID, file_path: str) -> None
                 embedding=embedding,
                 chunk_index=idx,
             ))
+            if idx % progress_step == 0 or idx == len(docs) - 1:
+                logger.info("[文献处理] 向量化进度 %d/%d (%.0f%%)", idx + 1, len(docs), (idx + 1) / len(docs) * 100)
 
-        # 批量写入（使用原生 SQL 写入 vector 类型）
-        # asyncpg 使用 $n 位置参数，不支持 :name 命名参数风格
-        # embedding 通过 Python 字符串拼接直接嵌入 SQL，绕过参数绑定的类型限制
         async with AsyncSessionLocal() as db:
             for chunk in chunks:
                 from sqlalchemy import text
@@ -204,17 +206,20 @@ async def _process_literature_async(literature_id: UUID, file_path: str) -> None
                 crossref_data = await _fetch_crossref_metadata(doi)
                 metadata_update = {k: v for k, v in crossref_data.items() if v is not None}
                 metadata_update["doi"] = doi
+            else:
+                logger.info("[文献处理] 未提取到 DOI，跳过 CrossRef 补全")
 
         async with AsyncSessionLocal() as db:
             if metadata_update:
                 await LiteratureMapper.update_metadata(db, literature_id, metadata_update)
+                logger.info("[文献处理] metadata 补全字段: %s", list(metadata_update.keys()))
             await LiteratureMapper.update_status(db, literature_id, "ready")
             await db.commit()
 
-        logger.info("[文献处理] 完成 literature_id=%s", literature_id)
+        logger.info("[文献处理] ✅ 完成 literature_id=%s", literature_id)
 
     except Exception as e:
-        logger.error("[文献处理] 失败 literature_id=%s: %s", literature_id, e, exc_info=True)
+        logger.error("[文献处理] ❌ 失败 literature_id=%s: %s", literature_id, e, exc_info=True)
         async with AsyncSessionLocal() as db:
             await LiteratureMapper.update_status(db, literature_id, "failed", str(e))
             await db.commit()
@@ -316,6 +321,16 @@ class LiteratureService:
     async def list_public(db) -> list[Literature]:
         """获取所有公共文献"""
         return await LiteratureMapper.list_public(db)
+
+    @staticmethod
+    async def list_all(db) -> list[Literature]:
+        """获取所有文献（admin 用）"""
+        return await LiteratureMapper.list_all(db)
+
+    @staticmethod
+    async def list_all_private(db) -> list[Literature]:
+        """获取所有私有文献（admin 用）"""
+        return await LiteratureMapper.list_all_private(db)
 
     @staticmethod
     async def get_by_id(db, literature_id: UUID) -> Literature | None:

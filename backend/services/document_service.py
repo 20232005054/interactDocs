@@ -7,7 +7,7 @@ from db.mappers.core_info_template_mapper import CoreInfoTemplateMapper
 from db.mappers.summary_template_mapper import SummaryTemplateMapper
 from db.mappers.structure_template_mapper import StructureTemplateMapper
 from db.mappers.template_literature_mapper import TemplateLiteratureMapper
-from db.models import Document, DocumentCoreInfo, Template, CoreInfoTemplate, SummaryTemplate, StructureTemplate
+from db.models import Document, DocumentCoreInfo, Template, CoreInfoTemplate, SummaryTemplate, StructureTemplate, User
 from schemas.document_schemas import DocumentCreate, DocumentUpdate, PaginationParams
 from uuid import UUID, uuid4
 from fastapi import HTTPException
@@ -173,8 +173,9 @@ class DocumentService:
         total = (await db.execute(count_query)).scalar_one()
 
         query = (
-            select(Document, Template.purpose, Template.display_name)
+            select(Document, Template.purpose, Template.display_name, User.name)
             .outerjoin(Template, Document.template_id == Template.template_id)
+            .outerjoin(User, Document.user_id == User.user_id)
             .order_by(Document.updated_at.desc())
             .offset((page - 1) * page_size)
             .limit(page_size)
@@ -184,7 +185,7 @@ class DocumentService:
 
         rows = (await db.execute(query)).all()
         documents = [
-            {"doc": row[0], "purpose": row[1], "display_name": row[2]}
+            {"doc": row[0], "purpose": row[1], "display_name": row[2], "user_name": row[3]}
             for row in rows
         ]
         return total, documents

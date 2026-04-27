@@ -51,11 +51,28 @@ class LiteratureResponse(BaseModel):
     scope: str
     # scope: 'public'=公共文献, 'private'=用户私有文献
     user_id: Optional[UUID] = None
+    user_name: Optional[str] = None
     created_at: datetime
 
 
 class LiteratureListResponse(BaseModel):
     items: List[LiteratureResponse]
+    total: int
+
+
+class DocumentCitationItem(BaseModel):
+    citation_number: int
+    literature_id: UUID
+    title: Optional[str] = None
+    authors: Optional[str] = None
+    journal: Optional[str] = None
+    publish_date: Optional[datetime] = None
+    doi: Optional[str] = None
+    impact_factor: Optional[float] = None
+
+
+class DocumentCitationsResponse(BaseModel):
+    citations: List[DocumentCitationItem]
     total: int
 
 

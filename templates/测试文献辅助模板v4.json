@@ -1,0 +1,1088 @@
+{
+  "version": "1.0",
+  "template": {
+    "purpose": "临床试验方案",
+    "display_name": "I期临床试验方案模板",
+    "content": {
+      "description": "适用于首次人体试验、单次/多次给药剂量递增研究的I期临床试验方案，涵盖安全性与耐受性评估、药代动力学及初步疗效分析。"
+    }
+  },
+  "core_info_templates": [
+    {
+      "field_name": "试验基本信息",
+      "field_key": "core_basic_info_group",
+      "field_type": "group",
+      "default_value": null,
+      "options": null,
+      "is_required": true,
+      "order_index": 0,
+      "children": [
+        {
+          "field_name": "试验名称",
+          "field_key": "core_trial_name",
+          "field_type": "text",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 0,
+          "children": []
+        },
+        {
+          "field_name": "申办方",
+          "field_key": "core_sponsor",
+          "field_type": "text",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 1,
+          "children": []
+        },
+        {
+          "field_name": "方案编号",
+          "field_key": "core_protocol_id",
+          "field_type": "text",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 2,
+          "children": []
+        },
+        {
+          "field_name": "研究阶段",
+          "field_key": "core_phase",
+          "field_type": "select",
+          "default_value": "I期",
+          "options": ["I期"],
+          "is_required": true,
+          "order_index": 3,
+          "children": []
+        },
+        {
+          "field_name": "研究类型",
+          "field_key": "core_study_type",
+          "field_type": "select",
+          "default_value": null,
+          "options": ["首次人体试验", "单次递增给药", "多次递增给药", "单次与多次递增给药", "食物影响", "药物相互作用", "其他"],
+          "is_required": true,
+          "order_index": 4,
+          "children": []
+        }
+      ]
+    },
+    {
+      "field_name": "研究设计参数",
+      "field_key": "core_study_design_group",
+      "field_type": "group",
+      "default_value": null,
+      "options": null,
+      "is_required": true,
+      "order_index": 1,
+      "children": [
+        {
+          "field_name": "试验设计类型",
+          "field_key": "core_design_type",
+          "field_type": "select",
+          "default_value": null,
+          "options": ["开放、单臂", "开放、随机", "单盲", "双盲"],
+          "is_required": true,
+          "order_index": 0,
+          "children": []
+        },
+        {
+          "field_name": "是否剂量递增",
+          "field_key": "core_dose_escalation",
+          "field_type": "select",
+          "default_value": null,
+          "options": ["是", "否"],
+          "is_required": true,
+          "order_index": 1,
+          "children": []
+        },
+        {
+          "field_name": "计划样本量（例）",
+          "field_key": "core_sample_size",
+          "field_type": "number",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 2,
+          "children": []
+        },
+        {
+          "field_name": "研究中心数",
+          "field_key": "core_site_count",
+          "field_type": "number",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 3,
+          "children": []
+        },
+        {
+          "field_name": "随机化",
+          "field_key": "core_randomization",
+          "field_type": "select",
+          "default_value": null,
+          "options": ["是", "否"],
+          "is_required": true,
+          "order_index": 4,
+          "children": []
+        },
+        {
+          "field_name": "盲法",
+          "field_key": "core_blinding",
+          "field_type": "select",
+          "default_value": null,
+          "options": ["开放", "单盲", "双盲"],
+          "is_required": false,
+          "order_index": 5,
+          "children": []
+        }
+      ]
+    },
+    {
+      "field_name": "受试者信息",
+      "field_key": "core_subject_info_group",
+      "field_type": "group",
+      "default_value": null,
+      "options": null,
+      "is_required": true,
+      "order_index": 2,
+      "children": [
+        {
+          "field_name": "目标适应症",
+          "field_key": "core_indication",
+          "field_type": "text",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 0,
+          "children": []
+        },
+        {
+          "field_name": "受试者类型",
+          "field_key": "core_subject_type",
+          "field_type": "select",
+          "default_value": null,
+          "options": ["健康志愿者", "患者"],
+          "is_required": true,
+          "order_index": 1,
+          "children": []
+        },
+        {
+          "field_name": "最小年龄（岁）",
+          "field_key": "core_min_age",
+          "field_type": "number",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 2,
+          "children": []
+        },
+        {
+          "field_name": "最大年龄（岁）",
+          "field_key": "core_max_age",
+          "field_type": "number",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 3,
+          "children": []
+        },
+        {
+          "field_name": "性别要求",
+          "field_key": "core_gender",
+          "field_type": "select",
+          "default_value": null,
+          "options": ["男", "女", "不限"],
+          "is_required": true,
+          "order_index": 4,
+          "children": []
+        },
+        {
+          "field_name": "体重指数下限（kg/m²）",
+          "field_key": "core_bmi_lower",
+          "field_type": "number",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 5,
+          "children": []
+        },
+        {
+          "field_name": "体重指数上限（kg/m²）",
+          "field_key": "core_bmi_upper",
+          "field_type": "number",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 6,
+          "children": []
+        },
+        {
+          "field_name": "主要入选标准摘要",
+          "field_key": "core_inclusion_summary",
+          "field_type": "text",
+          "default_value": null,
+          "options": null,
+          "is_required": false,
+          "order_index": 7,
+          "children": []
+        },
+        {
+          "field_name": "主要排除标准摘要",
+          "field_key": "core_exclusion_summary",
+          "field_type": "text",
+          "default_value": null,
+          "options": null,
+          "is_required": false,
+          "order_index": 8,
+          "children": []
+        }
+      ]
+    },
+    {
+      "field_name": "给药方案",
+      "field_key": "core_dosing_regimen_group",
+      "field_type": "group",
+      "default_value": null,
+      "options": null,
+      "is_required": true,
+      "order_index": 3,
+      "children": [
+        {
+          "field_name": "试验药物名称",
+          "field_key": "core_drug_name",
+          "field_type": "text",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 0,
+          "children": []
+        },
+        {
+          "field_name": "剂型",
+          "field_key": "core_dosage_form",
+          "field_type": "select",
+          "default_value": null,
+          "options": ["片剂", "胶囊", "注射剂", "口服液", "吸入剂", "其他"],
+          "is_required": true,
+          "order_index": 1,
+          "children": []
+        },
+        {
+          "field_name": "给药途径",
+          "field_key": "core_admin_route",
+          "field_type": "select",
+          "default_value": null,
+          "options": ["口服", "静脉注射", "皮下注射", "肌肉注射", "其他"],
+          "is_required": true,
+          "order_index": 2,
+          "children": []
+        },
+        {
+          "field_name": "起始剂量（mg）",
+          "field_key": "core_start_dose",
+          "field_type": "number",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 3,
+          "children": []
+        },
+        {
+          "field_name": "最高剂量（mg）",
+          "field_key": "core_max_dose",
+          "field_type": "number",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 4,
+          "children": []
+        },
+        {
+          "field_name": "剂量递增方案",
+          "field_key": "core_escalation_scheme",
+          "field_type": "text",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 5,
+          "children": []
+        },
+        {
+          "field_name": "给药频率",
+          "field_key": "core_freq",
+          "field_type": "text",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 6,
+          "children": []
+        },
+        {
+          "field_name": "单次给药观察期（天）",
+          "field_key": "core_single_dose_period",
+          "field_type": "number",
+          "default_value": null,
+          "options": null,
+          "is_required": false,
+          "order_index": 7,
+          "children": []
+        },
+        {
+          "field_name": "多次给药周期（天）",
+          "field_key": "core_multiple_dose_period",
+          "field_type": "number",
+          "default_value": null,
+          "options": null,
+          "is_required": false,
+          "order_index": 8,
+          "children": []
+        },
+        {
+          "field_name": "随访期（周）",
+          "field_key": "core_follow_up_weeks",
+          "field_type": "number",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 9,
+          "children": []
+        },
+        {
+          "field_name": "预计受试者试验时长（周）",
+          "field_key": "core_total_duration_weeks",
+          "field_type": "number",
+          "default_value": null,
+          "options": null,
+          "is_required": false,
+          "order_index": 10,
+          "children": []
+        }
+      ]
+    }
+  ],
+  "summary_templates": [
+    {
+      "title": "研究概述",
+      "field_key": "summary_overview",
+      "generation_mode": 1,
+      "content_template": null,
+      "sources": [
+        {
+          "source": {"value": "keyinfo", "label": "关键信息"},
+          "match_type": "关键信息匹配",
+          "match_keys": [
+            {"value": "core_trial_name", "label": "试验名称"},
+            {"value": "core_indication", "label": "目标适应症"},
+            {"value": "core_drug_name", "label": "试验药物名称"},
+            {"value": "core_design_type", "label": "试验设计类型"},
+            {"value": "core_subject_type", "label": "受试者类型"},
+            {"value": "core_sample_size", "label": "计划样本量"}
+          ]
+        }
+      ],
+      "default_prompt": "根据提供的试验名称、药物名称、适应症、设计类型和受试者类型，撰写一段200字左右的研究概述，语言专业、精炼，涵盖试验阶段、目的和总体设计。",
+      "custom_prompt": null,
+      "order_index": 0
+    },
+    {
+      "title": "试验药物",
+      "field_key": "summary_drug",
+      "generation_mode": 0,
+      "content_template": "本研究评估药物为{{core_drug_name}}（{{core_dosage_form}}），拟定给药途径为{{core_admin_route}}。",
+      "sources": [
+        {
+          "source": {"value": "keyinfo", "label": "关键信息"},
+          "match_type": "关键信息匹配",
+          "match_keys": [
+            {"value": "core_drug_name", "label": "试验药物名称"},
+            {"value": "core_dosage_form", "label": "剂型"},
+            {"value": "core_admin_route", "label": "给药途径"}
+          ]
+        }
+      ],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 1
+    },
+    {
+      "title": "研究设计",
+      "field_key": "summary_design",
+      "generation_mode": 0,
+      "content_template": "本研究为{{core_phase}}、{{core_design_type}}、剂量递增试验，计划纳入{{core_sample_size}}例{{core_subject_type}}，在{{core_site_count}}个研究中心开展。",
+      "sources": [
+        {
+          "source": {"value": "keyinfo", "label": "关键信息"},
+          "match_type": "关键信息匹配",
+          "match_keys": [
+            {"value": "core_phase", "label": "研究阶段"},
+            {"value": "core_design_type", "label": "试验设计类型"},
+            {"value": "core_sample_size", "label": "计划样本量"},
+            {"value": "core_subject_type", "label": "受试者类型"},
+            {"value": "core_site_count", "label": "研究中心数"}
+          ]
+        }
+      ],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 2
+    },
+    {
+      "title": "受试者人群",
+      "field_key": "summary_subjects",
+      "generation_mode": 0,
+      "content_template": "受试者为{{core_indication}}的{{core_subject_type}}，年龄{{core_min_age}}~{{core_max_age}}岁，体重指数{{core_bmi_lower}}~{{core_bmi_upper}} kg/m²，性别要求：{{core_gender}}。",
+      "sources": [
+        {
+          "source": {"value": "keyinfo", "label": "关键信息"},
+          "match_type": "关键信息匹配",
+          "match_keys": [
+            {"value": "core_indication", "label": "目标适应症"},
+            {"value": "core_subject_type", "label": "受试者类型"},
+            {"value": "core_min_age", "label": "最小年龄"},
+            {"value": "core_max_age", "label": "最大年龄"},
+            {"value": "core_bmi_lower", "label": "BMI下限"},
+            {"value": "core_bmi_upper", "label": "BMI上限"},
+            {"value": "core_gender", "label": "性别要求"}
+          ]
+        }
+      ],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 3
+    },
+    {
+      "title": "给药方案摘要",
+      "field_key": "summary_dosing",
+      "generation_mode": 0,
+      "content_template": "起始剂量{{core_start_dose}} mg，最高剂量{{core_max_dose}} mg，采用{{core_escalation_scheme}}递增。{{core_freq}}给药，单次给药观察期{{core_single_dose_period}}天，多次给药共{{core_multiple_dose_period}}天，末次给药后随访{{core_follow_up_weeks}}周。",
+      "sources": [
+        {
+          "source": {"value": "keyinfo", "label": "关键信息"},
+          "match_type": "关键信息匹配",
+          "match_keys": [
+            {"value": "core_start_dose", "label": "起始剂量"},
+            {"value": "core_max_dose", "label": "最高剂量"},
+            {"value": "core_escalation_scheme", "label": "剂量递增方案"},
+            {"value": "core_freq", "label": "给药频率"},
+            {"value": "core_single_dose_period", "label": "单次给药观察期"},
+            {"value": "core_multiple_dose_period", "label": "多次给药周期"},
+            {"value": "core_follow_up_weeks", "label": "随访期"}
+          ]
+        }
+      ],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 4
+    },
+    {
+      "title": "主要终点",
+      "field_key": "summary_primary_endpoint",
+      "generation_mode": 0,
+      "content_template": "主要终点为评价{{core_drug_name}}的安全性和耐受性，包括剂量限制毒性（DLT）发生率、不良事件、实验室检查异常等。",
+      "sources": [
+        {
+          "source": {"value": "keyinfo", "label": "关键信息"},
+          "match_type": "关键信息匹配",
+          "match_keys": [
+            {"value": "core_drug_name", "label": "试验药物名称"}
+          ]
+        }
+      ],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 5
+    },
+    {
+      "title": "次要终点",
+      "field_key": "summary_secondary_endpoint",
+      "generation_mode": 0,
+      "content_template": "次要终点包括{{core_drug_name}}的药代动力学参数（Cmax、AUC、t1/2等）以及初步疗效指标。",
+      "sources": [
+        {
+          "source": {"value": "keyinfo", "label": "关键信息"},
+          "match_type": "关键信息匹配",
+          "match_keys": [
+            {"value": "core_drug_name", "label": "试验药物名称"}
+          ]
+        }
+      ],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 6
+    },
+    {
+      "title": "试验周期",
+      "field_key": "summary_duration",
+      "generation_mode": 0,
+      "content_template": "每例受试者参与研究的总时长预计约为{{core_total_duration_weeks}}周。",
+      "sources": [
+        {
+          "source": {"value": "keyinfo", "label": "关键信息"},
+          "match_type": "关键信息匹配",
+          "match_keys": [
+            {"value": "core_total_duration_weeks", "label": "预计受试者试验时长"}
+          ]
+        }
+      ],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 7
+    }
+  ],
+  "structure_templates": [
+    {
+      "title": "研究背景",
+      "field_key": "struct_background",
+      "level": 1,
+      "order_index": 0,
+      "paragraphs": [
+        {
+          "para_type": "heading2",
+          "content_template": "一、研究背景",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "paragraph",
+          "content_template": null,
+          "generation_mode": 1,
+          "sources": [
+            {
+              "source": {"value": "keyinfo", "label": "关键信息"},
+              "match_type": "关键信息匹配",
+              "match_keys": [
+                {"value": "core_trial_name", "label": "试验名称"},
+                {"value": "core_indication", "label": "目标适应症"},
+                {"value": "core_drug_name", "label": "试验药物名称"},
+                {"value": "core_subject_type", "label": "受试者类型"},
+                {"value": "core_study_type", "label": "研究类型"}
+              ]
+            }
+          ],
+          "default_prompt": "根据试验药物、适应症和研究类型，撰写研究背景。内容需包括：目标适应症的流行病学现状与疾病负担；现有治疗手段及其局限性；试验药物的作用机制、前期非临床研究或早期临床数据的简要总结；开展本项I期试验的科学依据与临床需求。全文要求800-1000字，语言严谨、专业，遵循综述风格。",
+          "custom_prompt": null
+        }
+      ],
+      "children": []
+    },
+    {
+      "title": "研究目的",
+      "field_key": "struct_objectives",
+      "level": 1,
+      "order_index": 1,
+      "paragraphs": [
+        {
+          "para_type": "heading2",
+          "content_template": "二、研究目的",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "paragraph",
+          "content_template": "本研究的主要目的是评价试验药物在目标受试者人群中的安全性和耐受性，确定剂量限制毒性（DLT）及最大耐受剂量（MTD），为后续临床试验的推荐剂量提供依据。次要目的包括：1）评价试验药物的药代动力学（PK）特征，计算主要PK参数如峰浓度（Cmax）、药时曲线下面积（AUC）、半衰期（t1/2）、表观分布容积（Vd/F）及清除率（CL/F）等；2）初步观察试验药物的药效学效应或抗肿瘤/治疗活性（如适用），通过生物标志物或影像学评估初步疗效信号；3）探索药物暴露与效应、毒性之间的关系，为剂量选择提供PK/PD模型支持。对于食物影响或药物相互作用子研究，还将评估进食或合并用药对PK参数的影响。以上目的将依据研究类型在具体方案中进一步细化。",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        }
+      ],
+      "children": []
+    },
+    {
+      "title": "总体研究设计",
+      "field_key": "struct_study_design",
+      "level": 1,
+      "order_index": 2,
+      "paragraphs": [
+        {
+          "para_type": "heading2",
+          "content_template": "三、总体研究设计",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "heading3",
+          "content_template": "3.1 设计概述",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "paragraph",
+          "content_template": "本研究为一项前瞻性、开放标签、剂量递增的I期临床试验，采用经典的“3+3”设计。试验分为筛选期（给药前最多14天）、治疗期（包括单次给药阶段和多次给药阶段，视具体方案）及随访期。剂量递增将在严格的安全性监测下进行，每个剂量组将入组3~6例受试者。起始剂量的确定基于动物毒理试验未见明显不良反应剂量（NOAEL），并利用体表面积换算或生理药代动力学模型（PBPK）推算人体等效剂量，同时结合安全因子确保首次人体给药的安全性。剂量递增幅度依据前期数据决定，通常在起始阶段不超过100%递增，随后逐步降低至50%或更低，直至达到MTD或预定最高剂量。DLT观察期为首次给药后28天（或根据药物半衰期适当延长），期间所有受试者需住院观察。若在某一剂量水平，3例受试者中0例出现DLT，则递增至下一剂量；若1例出现DLT，则追加3例，若追加后总共不超过1例DLT，仍可递增；若≥2例DLT，则前一剂量即为MTD。最高剂量水平如未观察到MTD，则描述为耐受性良好，并以最高给药剂量作为后续推荐剂量。根据具体情况，可能增加扩展队列以进一步确认安全性及PK特征。研究中心的选择遵循GCP规范，确保具备I期临床单位资质、急救设施及人员配备，能够完成密集的PK采血和安全性监测。",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "heading3",
+          "content_template": "3.2 研究终点",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "paragraph",
+          "content_template": "主要终点为安全性终点，包括DLT发生率、治疗期间出现的不良事件（TEAE）及严重不良事件（SAE）发生率、实验室检查异常、生命体征及心电图改变等。次要终点为PK参数（Cmax、AUC0-t、AUC0-inf、Tmax、t1/2等）以及初步疗效指标（客观缓解率、疾病控制率或生物标志物变化）。探索性终点可能包括药物基因组学变异与安全性/疗效的相关性、免疫原性等。所有终点数据均按预定时间点收集并记录在电子病例报告表（eCRF）中。",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        }
+      ],
+      "children": []
+    },
+    {
+      "title": "受试者选择与退出标准",
+      "field_key": "struct_eligibility",
+      "level": 1,
+      "order_index": 3,
+      "paragraphs": [
+        {
+          "para_type": "heading2",
+          "content_template": "四、受试者选择与退出标准",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "heading3",
+          "content_template": "4.1 入选标准",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "paragraph",
+          "content_template": "受试者必须满足以下全部条件方可入选本研究：\n\n| 序号 | 标准描述 |\n|------|----------|\n| 1 | 筛选时年龄在方案规定的范围内，性别不限或符合特定要求。 |\n| 2 | 体重指数（BMI）在方案规定范围内（通常18~28 kg/m² 或按研究人群调整）。 |\n| 3 | 根据受试者类型，健康志愿者需经详细病史、体格检查和实验室检查确认健康；患者需经病理组织学或细胞学确诊为目标适应症，且标准治疗失败或无标准治疗。 |\n| 4 | 东部肿瘤协作组体能状态评分（ECOG PS）0~1分（适用于患者）；或有足够的体力完成试验程序。 |\n| 5 | 充分的器官功能储备：绝对中性粒细胞计数 ≥1.5×10⁹/L，血小板计数 ≥100×10⁹/L，血红蛋白 ≥90 g/L；血清总胆红素 ≤1.5倍正常值上限（ULN），ALT和AST ≤2.5×ULN（肝转移者≤5×ULN）；肌酐清除率 ≥60 mL/min（Cockcroft-Gault公式）。 |\n| 6 | 育龄期女性受试者必须在筛选期妊娠试验阴性，且愿意在试验期间及末次给药后规定时间内采取医学认可的高效避孕措施；男性受试者同样需采取有效避孕手段。 |\n| 7 | 充分理解试验程序并自愿签署知情同意书。 |\n| 8 | 能够遵守访视计划及所有方案要求。 |",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "heading3",
+          "content_template": "4.2 排除标准",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "paragraph",
+          "content_template": "凡符合以下任一条件者不能入组：\n\n| 序号 | 标准描述 |\n|------|----------|\n| 1 | 已知对试验药物活性成分或任何辅料过敏。 |\n| 2 | 既往接受过同类靶点药物治疗且未经过充分的洗脱期（通常5个半衰期或4周以上）。 |\n| 3 | 存在未控制的或活动性的中枢神经系统转移。 |\n| 4 | 患有严重心血管疾病（如NYHA心功能分级III-IV级心力衰竭、未控制的高血压、6个月内急性心肌梗死或不稳定性心绞痛等）。 |\n| 5 | ECG显示QTc间期延长（男性>450 ms，女性>470 ms）或有长QT综合征家族史。 |\n| 6 | 患有活动性乙型肝炎（HBsAg阳性且HBV-DNA>检测下限）、丙型肝炎（HCV抗体阳性且HCV-RNA阳性）或人类免疫缺陷病毒（HIV）感染者。 |\n| 7 | 在首次给药前4周内参加其他任何临床试验并接受干预。 |\n| 8 | 妊娠或哺乳期女性。 |\n| 9 | 具有药物滥用史或筛选期药物滥用检测阳性。 |\n| 10 | 其他研究者认为不适合入组的严重、未控制的伴随疾病或精神、社会状况。 |",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "heading3",
+          "content_template": "4.3 退出标准",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "paragraph",
+          "content_template": "受试者可在任何时间以任何理由撤回知情同意并退出研究。研究者也可因安全性原因（包括DLT、疾病进展、不可耐受的毒性等）、重大方案违背或受试者不依从等原因决定终止其继续参与。所有退出受试者均需进行安全性随访，记录退出日期及原因，并尽可能完成终点访视。",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        }
+      ],
+      "children": []
+    },
+    {
+      "title": "试验药物",
+      "field_key": "struct_investigational_product",
+      "level": 1,
+      "order_index": 4,
+      "paragraphs": [
+        {
+          "para_type": "heading2",
+          "content_template": "五、试验药物",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "paragraph",
+          "content_template": "试验药物由申办方免费提供，符合现行《药品生产质量管理规范》（GMP）要求。提供药物的规格、批号、有效期及储存条件将在标签和临床试验药物管理手册中明确。药物需在规定的温度、湿度条件下储存于研究中心药房，仅授权研究人员凭处方调配。每批药物必须附有分析检验报告书，确认活性成分含量、纯度和微生物限度等质控指标合格。盲法设计中如涉及安慰剂，其外观、颜色、包装应与试验药物完全一致。试验药物将在给药日由研究护士按分配表直接发放并监督服用或注射，确保用药依从性。每次给药后必须详细记录给药时间、剂量及任何异常情况。未使用的药物和空包装应全部回收，并由监查员定期清点，进行药物清点与核对。",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        }
+      ],
+      "children": []
+    },
+    {
+      "title": "给药方案",
+      "field_key": "struct_dosing",
+      "level": 1,
+      "order_index": 5,
+      "paragraphs": [
+        {
+          "para_type": "heading2",
+          "content_template": "六、给药方案",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "heading3",
+          "content_template": "6.1 剂量选择与递增规则",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "paragraph",
+          "content_template": "起始剂量、递增系列及最高剂量根据非临床毒理学和药理学资料确定。按照ICH S9及国内相关指南，起始剂量采用NOAEL乘以体表面积换算系数并除以安全因子（通常≥10），以充分保证首次人体剂量安全性。剂量递增遵循改良Fibonacci递增方案或根据实际PK/PD模型调整，确保每级递增不超过100%，并在出现2级不良反应迹象时降低增幅。每个剂量组DLT观察期内，安全性监测委员会（SMC）将依据累积数据决定是否进入下一剂量水平、扩大当前剂量组或终止试验。一旦出现2例及以上DLT，即刻停止递增，并以低于该剂量水平的一个剂量组为MTD。若所有计划剂量组均未达到MTD，则以最高测试剂量作为Ⅱ期推荐剂量，但必须结合PK暴露和疗效潜力综合评价。",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "heading3",
+          "content_template": "6.2 合并用药与注意事项",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "paragraph",
+          "content_template": "试验期间原则上禁止使用任何已知影响CYP450酶系的强效诱导剂或抑制剂、可能影响QTc间期延长风险的药物，以及其他与试验药物存在潜在相互作用的药物。任何合并用药必须在eCRF中详细记录，包括药品名称、适应症、剂量、给药途径及起止日期。必要的支持治疗（如抗呕吐、利尿、镇痛等）在不干扰安全性评估的前提下允许使用。所有禁止和限制药物清单将作为附件提供，并在研究启动前对研究者进行培训。",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        }
+      ],
+      "children": []
+    },
+    {
+      "title": "有效性评估",
+      "field_key": "struct_efficacy",
+      "level": 1,
+      "order_index": 6,
+      "paragraphs": [
+        {
+          "para_type": "heading2",
+          "content_template": "七、有效性评估",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "paragraph",
+          "content_template": "作为I期研究，有效性评估属于次要或探索性终点。对于肿瘤试验，依据RECIST 1.1标准进行肿瘤影像学评估（CT或MRI），获取客观缓解率（ORR）、缓解持续时间（DoR）、疾病控制率（DCR）及无进展生存期（PFS）等初步指标。评估时间点通常为基线、每2个周期治疗后及退出时。对于非肿瘤适应症，则采用相应的疾病特异性评分或生物标志物变化来评估药效学效应。药效学生物标志物（包括外周血可溶性蛋白、细胞因子、靶点占据率等）的采集时间点将与PK采血点同步，以构建PK/PD模型，为指导后续给药方案提供证据。所有影像学资料及生物标本均由中心实验室或独立影像评审委员会进行统一评估，保证数据客观性。",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        }
+      ],
+      "children": []
+    },
+    {
+      "title": "安全性评估",
+      "field_key": "struct_safety",
+      "level": 1,
+      "order_index": 7,
+      "paragraphs": [
+        {
+          "para_type": "heading2",
+          "content_template": "八、安全性评估",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "heading3",
+          "content_template": "8.1 不良事件定义与分级",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "paragraph",
+          "content_template": "不良事件（AE）是指受试者在接受试验药物后发生的任何不良医学事件，但并不一定与治疗存在因果关系。所有AE将按照国家癌症研究所不良事件通用术语标准（CTCAE）5.0版进行严重程度分级，从1级（轻度）至5级（死亡）。DLT定义为在研究药物首次给药后（通常28天内）发生的、至少可能与药物相关、且满足方案预设标准的不良事件，包括但不限于4级血液学毒性持续≥7天、3级非血液学毒性（除3级恶心、呕吐、腹泻在最佳支持治疗下仍持续≥48小时外）、任何导致给药延迟＞14天的毒性等。研究者必须对每例不良事件进行因果关系评估，分为肯定有关、很可能有关、可能有关、可能无关和无关，其中前三类计入药物相关不良事件。",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "heading3",
+          "content_template": "8.2 安全观察项目与频率",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "paragraph",
+          "content_template": "安全性观察包括每次访视时的体格检查、生命体征（体温、脉搏、呼吸、血压）、血氧饱和度、体重、ECOG PS评分。实验室检查涵盖全血细胞计数、血生化（肝功能、肾功能、电解质、心肌酶谱、血糖等）、凝血功能、尿常规、便常规及潜血。心脏安全性通过12导联心电图监测，重点关注QTc间期变化。以上检查在筛选期、给药前、给药后多个预设时间点及退出时重复进行。此外，对于预期可能产生免疫相关不良反应的药物，将加测甲状腺功能、肾上腺皮质功能及特定免疫细胞亚群分析。所有有临床意义的异常结果将记录为AE并随访至恢复正常、回到基线水平或判定为临床稳定。",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        }
+      ],
+      "children": []
+    },
+    {
+      "title": "不良事件定义、记录与报告",
+      "field_key": "struct_ae_management",
+      "level": 1,
+      "order_index": 8,
+      "paragraphs": [
+        {
+          "para_type": "heading2",
+          "content_template": "九、不良事件定义、记录与报告",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "paragraph",
+          "content_template": "所有AE必须从知情同意签署之时开始收集，直至末次给药后30天或方案规定时间结束。研究者应对每个AE记录其名称、起止日期、严重程度、与药物的因果关系、处理措施及转归。严重不良事件（SAE）定义为导致死亡、危及生命、需要住院治疗或延长现有住院时间、导致永久或显著的残疾/功能丧失、导致先天畸形/出生缺陷、或者其他重要医学事件的AE。发现SAE后，研究者必须在获知后24小时内向申办方、伦理委员会及监管部门（若适用）提交书面初步报告，并随后提供详细随访报告。所有安全性信息将定期汇总为安全性更新报告（DSUR），由申办方提交管理部门。本研究设立独立的数据与安全监查委员会（DSMB）/安全性监测委员会（SMC），定期对累积安全性数据进行审查，对试验的继续、修改或提前终止提出建议。",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        }
+      ],
+      "children": []
+    },
+    {
+      "title": "统计分析方法",
+      "field_key": "struct_statistics",
+      "level": 1,
+      "order_index": 9,
+      "paragraphs": [
+        {
+          "para_type": "heading2",
+          "content_template": "十、统计分析方法",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "heading3",
+          "content_template": "10.1 样本量考虑",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "paragraph",
+          "content_template": "作为I期剂量探索研究，样本量不基于统计学功效计算，而是根据剂量递增设计的常规要求确定。根据3+3设计，每个剂量水平计划入组3~6例DLT可评价受试者。假设研究设置5~7个剂量水平，并考虑约10%~20%的脱落率，总样本量约为30~50例。若有扩展队列，额外入组10~20例以收集更多安全性、PK和初步疗效数据。整个入组过程将按照竞争入组方式在各剂量组间动态调整，直至达到预定剂量组数或提前终止规则生效。",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "heading3",
+          "content_template": "10.2 分析人群定义",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "paragraph",
+          "content_template": "全分析集（FAS）：所有至少接受一次研究药物并有至少一次安全性评估的受试者。安全性分析集（SS）：与FAS一致。DLT可评价集：在DLT观察期内完成规定剂量给药且完成安全性评估，或提前因DLT退出的受试者。PK分析集：所有接受至少一次研究药物且具有可评价PK血药浓度数据的受试者，PK参数的估算采用实际采血时间。分析时将按剂量组进行分层描述。",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "heading3",
+          "content_template": "10.3 分析计划",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "paragraph",
+          "content_template": "所有统计分析将使用SAS软件（9.4版或更高）或R语言进行。安全性数据将以描述性统计为主，计算AE、DLT的发生率及其95%置信区间（Clopper-Pearson法）。实验室检查、生命体征等连续变量将计算相对于基线的变化值，并以均数±标准差、中位数（范围）呈现。药代动力学参数通过非房室模型（NCA）使用WinNonlin或等效软件计算，并以几何均数与变异系数进行汇总；采用幂模型评估剂量比例化特征。暴露-反应关系将采用逻辑回归或Emax模型进行探索性分析，考察PK参数与DLT或疗效指标间的相关性。初步疗效数据仅做描述性展示，计算ORR及DCR，采用Fisher精确检验或Cochran-Armitage趋势检验做组间探索性比较。所有分析将产生列表、汇总表及图形。",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        }
+      ],
+      "children": []
+    },
+    {
+      "title": "数据管理",
+      "field_key": "struct_data_management",
+      "level": 1,
+      "order_index": 10,
+      "paragraphs": [
+        {
+          "para_type": "heading2",
+          "content_template": "十一、数据管理",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "paragraph",
+          "content_template": "所有试验数据将记录在预先设计并经过验证的电子病例报告表（eCRF）中，采用符合21 CFR Part 11的临床数据管理系统。研究者或其授权人员需在原始文档核实后及时、准确地录入数据。数据管理计划（DMP）将详细规定数据录入、清洗、质疑管理和外部数据（如实验室数据、心电图、影像评估）的整合流程。独立数据监查员将定期进行源数据核查，通过对源文件与eCRF的对比（SDV），确保数据的完整性和真实性。所有数据修改均保留稽查轨迹。数据库锁定前，将召开数据审核会，冻结合格数据。一旦锁定，仅允许在特殊情况下经申办方批准后解库并记录修改痕迹。档案保留期限将满足GCP及当地法规要求，一般为试验结束后至少5年。",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        }
+      ],
+      "children": []
+    },
+    {
+      "title": "伦理要求与知情同意",
+      "field_key": "struct_ethics",
+      "level": 1,
+      "order_index": 11,
+      "paragraphs": [
+        {
+          "para_type": "heading2",
+          "content_template": "十二、伦理要求与知情同意",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "paragraph",
+          "content_template": "本研究将严格遵守《赫尔辛基宣言》的伦理准则及我国《药物临床试验质量管理规范》和《涉及人的生物医学研究伦理审查办法》等法规。研究方案、知情同意书、招募广告及其他提供给受试者的书面材料，必须在启动任何试验特定程序前获得独立伦理委员会（EC）的书面批准。受试者参加研究前，研究者必须以通俗易懂的语言向受试者全面解释试验的性质、目的、程序、潜在获益与风险（包括尚未明确的胎毒性等）、替代治疗选择以及退出权利。受试者将被给予充分时间考虑，在理解所有信息后自愿签署知情同意书，并由研究者及见证人共同签名并注明日期。如果知情同意书有重要修订，必须再次提交伦理委员会审批，并重新取得在组受试者的继续同意。受试者的隐私及身份信息将严格保密，数据呈现仅使用受试者筛选编号。试验期间将设立独立的安全监察委员会和投诉通道，保障受试者权益。",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        }
+      ],
+      "children": []
+    },
+    {
+      "title": "访视计划与时间安排",
+      "field_key": "struct_visit_schedule",
+      "level": 1,
+      "order_index": 12,
+      "paragraphs": [
+        {
+          "para_type": "heading2",
+          "content_template": "十三、访视计划与时间安排",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "paragraph",
+          "content_template": "本试验的访视流程严格按照下表执行。筛选期（Day -14~-1）主要完成知情同意、基线评估和入排标准审核。治疗期以给药日为D1，住院观察期间密集采集安全性数据和PK血样，后续随访按照方案窗口完成。各时间窗允许合理偏差（窗口期±1天，特定访视除外）。若因不良事件需要延期访视，应详细记录原因并在CRF中备注。\n\n| 访视 | 时间窗 | 知情同意 | 体格检查 | 生命体征 | 实验室检查 | 12导联ECG | PK血样采集 | 不良事件评估 | 合并用药 |\n|------|--------|----------|----------|----------|------------|-----------|------------|--------------|----------|\n| 筛选期 | Day -14 ~ -1 | ✓ | ✓ | ✓ | ✓ | ✓ | | ✓ | ✓ |\n| 给药前 | D1 0h | | ✓ | ✓ | ✓ | ✓ | 给药前 | 基线 | ✓ |\n| 给药后 | D1 0.5h,1h,2h,4h,8h,12h,24h | | ✓ | ✓ | | ✓ | ✓ | ✓ | ✓ |\n| 住院观察 | D2~D7（每日） | | ✓ | ✓ | 定期 | 按需 | 密集 | ✓ | ✓ |\n| 随访1 | D14±1 | | ✓ | ✓ | ✓ | ✓ | 可能 | ✓ | ✓ |\n| 随访2 | D21±1 | | ✓ | ✓ | ✓ | ✓ | | ✓ | ✓ |\n| 随访3 | D28±2（DLT观察结束） | | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |\n| 扩展随访 | 按方案，如D42、D60 | | ✓ | ✓ | ✓ | ✓ | | ✓ | ✓ |\n| 退出访视 | 提前退出时 | | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |\n| 治疗后随访 | 末次给药后30天 | | ✓ | ✓ | ✓ | ✓ | | ✓ | ✓ |",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        }
+      ],
+      "children": []
+    },
+    {
+      "title": "讨论",
+      "field_key": "struct_discussion",
+      "level": 1,
+      "order_index": 13,
+      "paragraphs": [
+        {
+          "para_type": "heading2",
+          "content_template": "十四、讨论",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "paragraph",
+          "content_template": null,
+          "generation_mode": 1,
+          "sources": [
+            {
+              "source": {"value": "keyinfo", "label": "关键信息"},
+              "match_type": "关键信息匹配",
+              "match_keys": [
+                {"value": "core_drug_name", "label": "试验药物名称"},
+                {"value": "core_indication", "label": "目标适应症"},
+                {"value": "core_study_type", "label": "研究类型"},
+                {"value": "core_design_type", "label": "试验设计类型"},
+                {"value": "core_subject_type", "label": "受试者类型"}
+              ]
+            }
+          ],
+          "default_prompt": "根据试验药物、适应症和研究类型，撰写讨论部分。内容应包括：本研究设计的合理性与局限性；剂量递增策略的科学依据；安全性监测与剂量限制毒性的界定依据；PK/PD评价的价值；初步疗效信号的临床意义及对后续开发的启示；与同类药物早期试验的比较。全文800-1000字，专业性、逻辑性要强。",
+          "custom_prompt": null
+        }
+      ],
+      "children": []
+    },
+    {
+      "title": "参考文献",
+      "field_key": "struct_references",
+      "level": 1,
+      "order_index": 14,
+      "paragraphs": [
+        {
+          "para_type": "heading2",
+          "content_template": "十五、参考文献",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "paragraph",
+          "content_template": "方案中引用的所有文献均按照《生物医学期刊投稿统一要求》（温哥华格式）列出。包括但不限于：1) 试验药物非临床研究资料；2) 同类药物已发表的I期临床试验结果；3) 疾病流行病学及治疗指南；4) 剂量递增设计的方法学文献；5) CTCAE 5.0版；6) ICH E6(R2) GCP指南；7) 我国NMPA相关指导原则。详细文献清单见方案附录。",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        }
+      ],
+      "children": []
+    }
+  ]
+}

@@ -232,9 +232,4 @@ async def get_templates_by_purpose(
     return success_response(data=TemplateSimpleListResponse(items=[_template_response(t) for t in templates]))
 
 
-@router.post("/rollback/{template_id}", summary="回退官方模板", response_model=ResponseModel[TemplateResponse])
-async def rollback_template(template_id: UUID, admin=Depends(get_admin_user), db: AsyncSession = Depends(get_db)):
-    t = await TemplateService.rollback_template(db, template_id)
-    if not t:
-        raise HTTPException(status_code=404, detail="模板不存在")
-    return success_response(data=_template_response(t))
+

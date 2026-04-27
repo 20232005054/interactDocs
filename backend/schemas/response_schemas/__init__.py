@@ -88,6 +88,8 @@ from schemas.response_schemas.misc import (
     DependenciesResponse,
     LiteratureResponse,
     LiteratureListResponse,
+    DocumentCitationItem,
+    DocumentCitationsResponse,
     ChatRecordItem,
     ChatHistoryResponse,
 )
@@ -124,5 +126,6 @@ __all__ = [
     "OperationHistoryItem", "OperationHistoryListResponse",
     "DependencyEdgeItem", "DependenciesResponse",
     "LiteratureResponse", "LiteratureListResponse",
+    "DocumentCitationItem", "DocumentCitationsResponse",
     "ChatRecordItem", "ChatHistoryResponse",
 ]

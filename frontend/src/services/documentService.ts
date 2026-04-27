@@ -10,6 +10,7 @@ import type {
   TemplateDetail,
   TemplateInfoResponse,
   UpdateDocumentPayload,
+  DocumentCitationsResponse,
 } from "@/types/api"
 
 export const documentService = {
@@ -89,4 +90,7 @@ export const documentService = {
     if (data.code !== 200) throw new Error(data.message || "应用章节结构模板失败")
     return data.data
   },
+
+  getCitations: (documentId: string): Promise<DocumentCitationsResponse> =>
+    request.get(`/api/v1/documents/${documentId}/citations`),
 }

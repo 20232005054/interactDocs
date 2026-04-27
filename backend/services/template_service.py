@@ -65,51 +65,24 @@ class TemplateService:
     @staticmethod
     async def update_template(db: AsyncSession, template_id: UUID, **kwargs):
         """
-        更新模板
+        更新模板。
+        所有字段（含 content）均原地更新，version 在 content 变化时自增。
+        不再新建行，子表不受影响。
         """
         template = await TemplateService.get_template(db, template_id)
         if not template:
             return None
-        
-        # 检查是否需要更新版本（当content字段被修改时）
+
         if 'content' in kwargs:
-            # 获取当前group_id下的最大版本号
-            result = await db.execute(
-                select(Template.version)
-                .where(Template.group_id == template.group_id)
-                .order_by(Template.version.desc())
-                .limit(1)
-            )
-            max_version = result.scalar() or 0
-            
-            # 创建新版本，使用与当前版本相同的字段，除了content和version
-            new_template = Template(
-                group_id=template.group_id,
-                purpose=kwargs.get('purpose', template.purpose),
-                display_name=kwargs.get('display_name', template.display_name),
-                content=kwargs['content'],
-                version=max_version + 1,
-                template_type=kwargs.get('template_type', template.template_type),
-                user_id=template.user_id,
-                is_active=kwargs.get('is_active', template.is_active)
-            )
-            
-            # 将旧版本设为非活跃
-            template.is_active = False
-            
-            db.add(new_template)
-            await db.commit()
-            await db.refresh(new_template)
-            return new_template
-        else:
-            # 直接更新现有模板的其他字段
-            for key, value in kwargs.items():
-                if hasattr(template, key):
-                    setattr(template, key, value)
-            
-            await db.commit()
-            await db.refresh(template)
-            return template
+            template.version = (template.version or 0) + 1
+
+        for key, value in kwargs.items():
+            if hasattr(template, key):
+                setattr(template, key, value)
+
+        await db.commit()
+        await db.refresh(template)
+        return template
     
     @staticmethod
     async def delete_template(db: AsyncSession, template_id: UUID):
@@ -261,115 +234,6 @@ class TemplateService:
             structure_templates=structure_tree,
         )
     
-    @staticmethod
-    async def rollback_template(db: AsyncSession, template_id: UUID):
-        """
-        回退官方模板（根据模板id查找对应的官方模板并回退内容）
-        """
-        # 首先根据模板id获取模板信息
-        source_template = await TemplateService.get_template(db, template_id)
-        if not source_template:
-            return None
-        
-        # 查找同group_id的官方模板
-        result = await db.execute(
-            select(Template)
-            .where(Template.group_id == source_template.group_id)
-            .where(Template.template_type == TemplateType.SYSTEM)
-        )
-        official_template = result.scalar_one_or_none()
-        
-        if not official_template:
-            return None
-        
-        # 1. 清空当前用户模板的旧子表数据
-        await CoreInfoTemplateMapper.delete_by_template_id(db, source_template.template_id)
-        await SummaryTemplateMapper.delete_by_template_id(db, source_template.template_id)
-        await StructureTemplateMapper.delete_by_template_id(db, source_template.template_id)
-
-        # 2. 深拷贝官方模板的 CoreInfoTemplate
-        old_core_infos = await CoreInfoTemplateMapper.get_by_template_id(db, official_template.template_id)
-        if old_core_infos:
-            new_core_infos = []
-            for old_ci in old_core_infos:
-                new_ci = CoreInfoTemplate(
-                    template_id=source_template.template_id,
-                    field_name=old_ci.field_name,
-                    field_key=old_ci.field_key,
-                    field_type=old_ci.field_type,
-                    default_value=old_ci.default_value,
-                    options=old_ci.options,
-                    is_required=old_ci.is_required,
-                    order_index=old_ci.order_index
-                )
-                new_core_infos.append(new_ci)
-            await CoreInfoTemplateMapper.batch_create(db, new_core_infos)
-
-        # 3. 深拷贝官方模板的 SummaryTemplate
-        old_summaries = await SummaryTemplateMapper.get_by_template_id(db, official_template.template_id)
-        if old_summaries:
-            new_summaries = []
-            for old_sum in old_summaries:
-                new_sum = SummaryTemplate(
-                    template_id=source_template.template_id,
-                    title=old_sum.title,
-                    generation_mode=old_sum.generation_mode,
-                    content_template=old_sum.content_template,
-                    sources=old_sum.sources,
-                    default_prompt=old_sum.default_prompt,
-                    custom_prompt=old_sum.custom_prompt,
-                    order_index=old_sum.order_index
-                )
-                new_summaries.append(new_sum)
-            await SummaryTemplateMapper.batch_create(db, new_summaries)
-
-        # 4. 深拷贝官方模板的 StructureTemplate (处理树形结构)
-        old_structures = await StructureTemplateMapper.get_by_template_id(db, official_template.template_id)
-        if old_structures:
-            # 按层级排序，确保父节点先于子节点处理
-            sorted_old_structures = sorted(old_structures, key=lambda x: x.level)
-            
-            id_mapping = {}
-            new_structures = []
-            
-            for old_struct in sorted_old_structures:
-                new_struct_id = uuid4()
-                id_mapping[old_struct.structure_template_id] = new_struct_id
-                
-                new_parent_id = None
-                if old_struct.parent_id:
-                    new_parent_id = id_mapping.get(old_struct.parent_id)
-                
-                new_struct = StructureTemplate(
-                    structure_template_id=new_struct_id,
-                    template_id=source_template.template_id,
-                    parent_id=new_parent_id,
-                    title=old_struct.title,
-                    level=old_struct.level,
-                    order_index=old_struct.order_index,
-                    paragraphs=old_struct.paragraphs,
-                )
-                new_structures.append(new_struct)
-            
-            await StructureTemplateMapper.batch_create(db, new_structures)
-
-        # 5. 直接修改原模板的主表内容 (兜底字段覆盖)
-        source_template.purpose = official_template.purpose
-        source_template.display_name = official_template.display_name
-        source_template.content = official_template.content
-
-        # 6. 同步文献绑定关系：清空 source_template 的所有绑定，从官方模板拷贝
-        from db.mappers.template_literature_mapper import TemplateLiteratureMapper
-        await TemplateLiteratureMapper.delete_by_template_id(db, source_template.template_id)
-        await TemplateLiteratureMapper.copy_bindings(
-            db, official_template.template_id, source_template.template_id
-        )
-
-        await db.commit()
-        await db.refresh(source_template)
-        return source_template
-
-
     @staticmethod
     async def get_template_dependencies(db, template_id):
         """

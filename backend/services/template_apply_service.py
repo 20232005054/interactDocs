@@ -499,9 +499,10 @@ class TemplateApplyService:
                         )
 
                     content = ""
+                    ai_citations = []
                     if generation_error is None:
                         try:
-                            content = await StructureTemplateService.render_ai_content_for_paragraph(
+                            content, ai_citations = await StructureTemplateService.render_ai_content_for_paragraph_with_citations(
                                 db=db,
                                 document=document,
                                 chapter_title=chapter.title,
@@ -536,8 +537,9 @@ class TemplateApplyService:
                         content = SummaryTemplateService.generate_content_copy_mode(
                             para_def.get("content_template"), para_def.get("sources"), source_data_map
                         )
+                        ai_citations = []
 
-                    return paragraph_id, content, generation_error
+                    return paragraph_id, content, ai_citations, generation_error
 
             results = await asyncio.gather(
                 *[run_ai_para(*task) for task in paragraph_ai_tasks],
@@ -548,7 +550,7 @@ class TemplateApplyService:
             for result in results:
                 if isinstance(result, Exception):
                     continue
-                paragraph_id, content, generation_error = result
+                paragraph_id, content, ai_citations, generation_error = result
                 if content:
                     await db.execute(
                         sa_update(Paragraph)
@@ -558,6 +560,21 @@ class TemplateApplyService:
                             ai_generate=content if generation_error is None else None,
                         )
                     )
+                # 保存文献引用记录
+                if generation_error is None and content and ai_citations:
+                    try:
+                        from services.literature_rag_service import LiteratureRagService
+                        await LiteratureRagService.save_citations(
+                            db=db,
+                            document_id=document_id,
+                            source_type="paragraph",
+                            source_id=paragraph_id,
+                            ai_content=content,
+                            citations=ai_citations,
+                        )
+                    except Exception as e:
+                        import logging
+                        logging.getLogger(__name__).warning("保存段落引用记录失败: %s", e)
                 # 把 generation_error 写回对应章节
                 if generation_error:
                     for item in created_chapters:

@@ -156,8 +156,7 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
     })
 
     try {
-      setStatus("core-info", "applying")
-      await documentService.applyCoreInfoTemplate(documentId)
+      // 核心信息模板在创建文档时已应用，这里只应用摘要和章节结构
       setStatus("core-info", "done")
 
       setStatus("summary", "applying")

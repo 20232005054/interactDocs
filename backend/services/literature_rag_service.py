@@ -62,6 +62,11 @@ class LiteratureRagService:
         if not chunks:
             return "", []
 
+        logger.info(
+            "[RAG] 检索到 %d 个 chunk，template_id=%s query_len=%d",
+            len(chunks), document_template_id, len(query)
+        )
+
         # 去重：同一篇文献只取相似度最高的一个片段
         seen_literature_ids: set = set()
         deduped_chunks = []

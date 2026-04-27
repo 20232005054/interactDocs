@@ -35,6 +35,7 @@ async def list_all_documents(
             template_purpose=item["purpose"],
             template_name=item["display_name"],
             user_id=item["doc"].user_id,
+            user_name=item.get("user_name"),
             created_at=item["doc"].created_at,
             updated_at=item["doc"].updated_at,
         )

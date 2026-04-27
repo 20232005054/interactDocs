@@ -2,7 +2,7 @@
 
 import { create } from "zustand"
 
-export type RightPanelTab = "core-info" | "summary" | "chat"
+export type RightPanelTab = "core-info" | "summary" | "chat" | "citations"
 
 interface EditorStore {
   // 当前高亮/定位的章节 ID（左侧树高亮 + 中间区域滚动定位）

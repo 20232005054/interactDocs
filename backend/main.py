@@ -11,6 +11,7 @@ from core.response import http_exception_handler, validation_exception_handler, 
 from core.security import decode_token
 import os
 import uvicorn
+import logging
 from fastapi.middleware.cors import CORSMiddleware
 
 # 加载 .env 文件（开发环境）
@@ -19,6 +20,13 @@ try:
     load_dotenv()
 except ImportError:
     pass
+
+# 配置日志：INFO 级别输出到控制台，格式含时间和模块名
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
 
 # 全局 Bearer security scheme，让 Swagger 对所有业务接口显示锁图标
 # auto_error=False 表示不在这里报错，实际鉴权由 Middleware 处理

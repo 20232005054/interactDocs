@@ -57,6 +57,24 @@ class LiteratureMapper:
         return result.scalars().all()
 
     @staticmethod
+    async def list_all(db: AsyncSession) -> list[Literature]:
+        """获取所有文献（admin 用，不过滤 scope）"""
+        result = await db.execute(
+            select(Literature).order_by(Literature.created_at.desc())
+        )
+        return result.scalars().all()
+
+    @staticmethod
+    async def list_all_private(db: AsyncSession) -> list[Literature]:
+        """获取所有私有文献（admin 用）"""
+        result = await db.execute(
+            select(Literature)
+            .where(Literature.scope == "private")
+            .order_by(Literature.created_at.desc())
+        )
+        return result.scalars().all()
+
+    @staticmethod
     async def update_status(
         db: AsyncSession,
         literature_id: UUID,

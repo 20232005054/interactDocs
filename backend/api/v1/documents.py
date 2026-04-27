@@ -14,10 +14,13 @@ from schemas.response_schemas import (
     ApplySummaryItem, ApplyStructureItem,
     TemplateInfoResponse, FullContentResponse, FullContentChapter, FullContentParagraph,
     TemplateDetailResponse,
+    DocumentCitationItem, DocumentCitationsResponse,
 )
 from core.response import success_response, ResponseModel
 from core.auth import get_current_user
 from db.session import get_db
+from db.mappers.document_citation_mapper import DocumentCitationMapper
+from db.mappers.literature_mapper import LiteratureMapper
 
 
 router = APIRouter(prefix="/api/v1/documents", tags=["文档管理"])
@@ -318,3 +321,22 @@ async def sync_template(
 
 
 
+
+
+@router.get("/{document_id}/citations", summary="获取文档引用文献列表", response_model=ResponseModel[DocumentCitationsResponse])
+async def get_document_citations(document_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    rows = await DocumentCitationMapper.get_distinct_by_document_id(db, document_id)
+    items = [
+        DocumentCitationItem(
+            citation_number=r["citation_number"],
+            literature_id=r["literature_id"],
+            title=r.get("title"),
+            authors=r.get("authors"),
+            journal=r.get("journal"),
+            publish_date=r.get("publish_date"),
+            doi=r.get("doi"),
+            impact_factor=r.get("impact_factor"),
+        )
+        for r in rows
+    ]
+    return success_response(data=DocumentCitationsResponse(citations=items, total=len(items)))

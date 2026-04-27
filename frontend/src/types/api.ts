@@ -45,6 +45,8 @@ export interface DocumentListItem {
   purpose: string | null
   template_purpose: string | null
   template_name: string | null
+  user_id: string | null
+  user_name: string | null
   created_at: string
   updated_at: string
 }
@@ -548,4 +550,69 @@ export interface UpdateCoreInfoPayload {
   parent_id?: string | null
   is_locked?: boolean
   is_change?: number
+}
+
+// ============================================================
+// 文献
+// ============================================================
+export type LiteratureUploadStatus = "pending" | "processing" | "ready" | "failed"
+export type LiteratureScope = "public" | "private"
+
+export interface Literature {
+  literature_id: string
+  literature_key: string
+  title: string | null
+  authors: string | null
+  journal: string | null
+  publish_date: string | null
+  doi: string | null
+  impact_factor: number | null
+  source_file: string | null
+  upload_status: LiteratureUploadStatus
+  error_message: string | null
+  scope: LiteratureScope
+  user_id: string | null
+  user_name: string | null
+  created_at: string
+}
+
+export interface LiteratureListResponse {
+  items: Literature[]
+  total: number
+}
+
+export interface UploadLiteraturePayload {
+  file: File
+  title?: string
+  authors?: string
+  journal?: string
+  doi?: string
+  impact_factor?: number
+}
+
+export interface UpdateLiteraturePayload {
+  title?: string
+  authors?: string
+  journal?: string
+  doi?: string
+  impact_factor?: number
+}
+
+// ============================================================
+// 文献引用（文档实例）
+// ============================================================
+export interface DocumentCitationItem {
+  citation_number: number
+  literature_id: string
+  title: string | null
+  authors: string | null
+  journal: string | null
+  publish_date: string | null
+  doi: string | null
+  impact_factor: number | null
+}
+
+export interface DocumentCitationsResponse {
+  citations: DocumentCitationItem[]
+  total: number
 }

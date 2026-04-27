@@ -9,6 +9,7 @@ import { documentService } from "@/services/documentService"
 import { useDocumentStore } from "@/store/documentStore"
 import { useEditorStore, type RightPanelTab } from "@/store/editorStore"
 import InputDialog from "@/components/ui/InputDialog"
+import ConfirmDialog from "@/components/ui/ConfirmDialog"
 import { toastError, toastSuccess } from "@/hooks/useToast"
 import { useChatStore } from "@/store/chatStore"
 import { useAuthStore } from "@/store/authStore"
@@ -18,6 +19,7 @@ import DocumentBody from "@/components/editor/DocumentBody"
 import CoreInfoPanel from "@/components/editor/CoreInfoPanel"
 import SummaryPanel from "@/components/editor/SummaryPanel"
 import AIChatPanel from "@/components/editor/AIChatPanel"
+import CitationsPanel from "@/components/editor/CitationsPanel"
 import { useDocumentSSE } from "@/hooks/useDocumentSSE"
 
 interface DocumentEditorContainerProps {
@@ -97,12 +99,13 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
     { key: "core-info", label: "核心信息" },
     { key: "summary", label: "摘要" },
     { key: "chat", label: "AI 对话" },
+    { key: "citations", label: "参考文献" },
   ]
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col">
-        <EditorHeader title="加载中..." onBack={() => router.push("/documents")} userName={user?.name} documentId={documentId} />
+        <EditorHeader title="加载中..." onBack={() => router.push("/documents")} userName={user?.name} templateId={null} documentId={documentId} />
         <div className="flex flex-1 overflow-hidden">
           <div className="w-56 border-r border-gray-200 bg-white animate-pulse" />
           <div className="flex-1 bg-white animate-pulse" />
@@ -115,7 +118,7 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col">
-        <EditorHeader title="加载失败" onBack={() => router.push("/documents")} userName={user?.name} documentId={documentId} />
+        <EditorHeader title="加载失败" onBack={() => router.push("/documents")} userName={user?.name} templateId={null} documentId={documentId} />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <p className="text-red-500 mb-4">{error}</p>
@@ -138,6 +141,7 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
         onApplyTemplate={() => {
           if (templateId) router.push(`/documents/${documentId}/apply-template`)
         }}
+        templateId={templateId}
         documentId={documentId}
       />
 
@@ -185,6 +189,9 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
               <div className={cn("h-full min-h-0", rightPanelTab === "chat" ? "block" : "hidden")}>
                 <AIChatPanel documentId={documentId} />
               </div>
+              <div className={cn(rightPanelTab === "citations" ? "block" : "hidden")}>
+                <CitationsPanel documentId={documentId} />
+              </div>
             </div>
           </aside>
         )}
@@ -217,10 +224,11 @@ interface EditorHeaderProps {
   onBack: () => void
   userName?: string
   onApplyTemplate?: () => void
+  templateId: string | null
   documentId: string
 }
 
-function EditorHeader({ title, onBack, userName, onApplyTemplate, documentId }: EditorHeaderProps) {
+function EditorHeader({ title, onBack, userName, onApplyTemplate, templateId, documentId }: EditorHeaderProps) {
   return (
     <header className="h-12 shrink-0 bg-white border-b border-gray-200 flex items-center px-4 gap-3">
       <button
@@ -239,12 +247,55 @@ function EditorHeader({ title, onBack, userName, onApplyTemplate, documentId }: 
           应用模板
         </button>
       )}
+      {templateId && <SyncTemplateButton documentId={documentId} />}
       <ExportTemplateButton documentId={documentId} documentTitle={title} />
       <ExportMenu documentId={documentId} documentTitle={title} />
       {userName && (
         <span className="text-xs text-gray-400 shrink-0">{userName}</span>
       )}
     </header>
+  )
+}
+
+// ----------------------------------------------------------------
+// 同步模板到最新版本
+// ----------------------------------------------------------------
+function SyncTemplateButton({ documentId }: { documentId: string }) {
+  const [syncing, setSyncing] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+
+  const handleSync = async () => {
+    setSyncing(true)
+    try {
+      await documentService.syncTemplate(documentId)
+      toastSuccess("已同步到最新版本，请重新应用模板")
+    } catch (err: unknown) {
+      toastError(err instanceof Error ? err.message : "同步失败")
+    } finally {
+      setSyncing(false)
+      setConfirmOpen(false)
+    }
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setConfirmOpen(true)}
+        disabled={syncing}
+        className="h-7 px-3 rounded border border-gray-300 text-gray-600 text-xs font-medium hover:bg-gray-50 disabled:opacity-50 transition shrink-0"
+      >
+        {syncing ? "同步中..." : "同步模板"}
+      </button>
+      <ConfirmDialog
+        open={confirmOpen}
+        title="同步到最新版本？"
+        description="将用官方模板最新版本覆盖当前文档的模板配置，自定义修改会丢失。同步后需重新应用模板才能更新文档内容。"
+        confirmLabel="同步"
+        onConfirm={handleSync}
+        onCancel={() => setConfirmOpen(false)}
+      />
+    </>
   )
 }
 

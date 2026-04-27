@@ -87,3 +87,13 @@ class UserMapper:
         )
         users = result.scalars().all()
         return total, users
+
+    @staticmethod
+    async def get_by_ids(db: AsyncSession, user_ids: list) -> list[User]:
+        """批量查询用户（用于 N+1 优化）"""
+        if not user_ids:
+            return []
+        result = await db.execute(
+            select(User).where(User.user_id.in_(user_ids))
+        )
+        return result.scalars().all()

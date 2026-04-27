@@ -39,19 +39,28 @@ export default function TemplateListContainer() {
   const pageSize = 20
 
   const [keyword, setKeyword] = useState("")
-  const [isSystem, setIsSystem] = useState<boolean>(true)  // true=系统模板(type=1), false=用户模板(type!=1)
+  const [isSystem, setIsSystem] = useState<boolean>(true)
+  const [purpose, setPurpose] = useState<string>("")
+  const [isActive, setIsActive] = useState<"true" | "false" | "">("")
+  const [purposes, setPurposes] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // 删除确认
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  // 回退确认
-  const [rollbackTarget, setRollbackTarget] = useState<Template | null>(null)
   // 导入状态
   const [importing, setImporting] = useState(false)
   const [importError, setImportError] = useState<string | null>(null)
 
   const debouncedKeyword = useDebounce(keyword)
+
+  // 加载用途列表（跟随 isSystem 变化）
+  useEffect(() => {
+    templateService.getPurposes(isSystem ? 1 : 2).then(res => {
+      setPurposes(res.purposes)
+      setPurpose("")
+    }).catch(() => setPurposes([]))
+  }, [isSystem])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -60,7 +69,8 @@ export default function TemplateListContainer() {
       const res = await templateService.list({
         keyword: debouncedKeyword || undefined,
         template_type: isSystem ? 1 : undefined,
-        is_active: true,
+        purpose: purpose || undefined,
+        is_active: isActive === "" ? undefined : isActive === "true",
         page,
         page_size: pageSize,
       })
@@ -71,11 +81,11 @@ export default function TemplateListContainer() {
     } finally {
       setLoading(false)
     }
-  }, [debouncedKeyword, isSystem, page])
+  }, [debouncedKeyword, isSystem, purpose, isActive, page])
 
   useEffect(() => {
     setPage(1)
-  }, [debouncedKeyword, isSystem])
+  }, [debouncedKeyword, isSystem, purpose, isActive])
 
   useEffect(() => {
     load()
@@ -89,17 +99,6 @@ export default function TemplateListContainer() {
       toastError(err instanceof Error ? err.message : "删除失败")
     } finally {
       setDeletingId(null)
-    }
-  }
-
-  const handleRollback = async (templateId: string) => {
-    try {
-      await templateService.rollback(templateId)
-      load()
-    } catch (err: unknown) {
-      toastError(err instanceof Error ? err.message : "回退失败")
-    } finally {
-      setRollbackTarget(null)
     }
   }
 
@@ -154,6 +153,29 @@ export default function TemplateListContainer() {
             用户模板
           </button>
         </div>
+
+        {/* 用途筛选 */}
+        <select
+          value={purpose}
+          onChange={e => setPurpose(e.target.value)}
+          className="h-9 rounded-md border border-input bg-background px-2 text-sm outline-none focus:ring-2 focus:ring-ring transition"
+        >
+          <option value="">全部用途</option>
+          {purposes.map(p => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
+
+        {/* 启用状态筛选 */}
+        <select
+          value={isActive}
+          onChange={e => setIsActive(e.target.value as "true" | "false" | "")}
+          className="h-9 rounded-md border border-input bg-background px-2 text-sm outline-none focus:ring-2 focus:ring-ring transition"
+        >
+          <option value="true">已启用</option>
+          <option value="false">已停用</option>
+          <option value="">全部状态</option>
+        </select>
 
         <div className="ml-auto flex items-center gap-2">
           {/* 隐藏的文件选择器 */}
@@ -244,14 +266,18 @@ export default function TemplateListContainer() {
                     >
                       编辑
                     </button>
-                    {t.template_type !== 1 && (
-                      <button
-                        onClick={() => setRollbackTarget(t)}
-                        className="text-sm text-muted-foreground hover:text-foreground"
-                      >
-                        回退
-                      </button>
-                    )}
+                    <button
+                      onClick={async () => {
+                        try {
+                          await templateService.exportJson(t.template_id, t.display_name)
+                        } catch (err: unknown) {
+                          toastError(err instanceof Error ? err.message : "导出失败")
+                        }
+                      }}
+                      className="text-sm text-muted-foreground hover:text-foreground"
+                    >
+                      导出
+                    </button>
                     {deletingId === t.template_id ? (
                       <div className="flex gap-1.5 text-sm">
                         <button
@@ -315,15 +341,6 @@ export default function TemplateListContainer() {
         destructive
         onConfirm={() => deletingId && handleDelete(deletingId)}
         onCancel={() => setDeletingId(null)}
-      />
-
-      <ConfirmDialog
-        open={!!rollbackTarget}
-        title="确认回退到官方版本？"
-        description={`「${rollbackTarget?.display_name}」将被覆盖为最新官方版本，自定义修改会丢失。`}
-        confirmLabel="回退"
-        onConfirm={() => rollbackTarget && handleRollback(rollbackTarget.template_id)}
-        onCancel={() => setRollbackTarget(null)}
       />
     </div>
   )

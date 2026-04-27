@@ -23,8 +23,8 @@ export const adminService = {
     request.delete(`/api/v1/admin/users/${userId}`),
 
   // 文档管理
-  listDocuments: (page = 1, pageSize = 20): Promise<DocumentListResponse> =>
-    request.get("/api/v1/admin/documents", { params: { page, page_size: pageSize } }),
+  listDocuments: (page = 1, pageSize = 20, params?: { keyword?: string; purpose?: string; user_id?: string }): Promise<DocumentListResponse> =>
+    request.get("/api/v1/admin/documents", { params: { page, page_size: pageSize, ...params } }),
 
   deleteDocument: (documentId: string): Promise<void> =>
     request.delete(`/api/v1/admin/documents/${documentId}`),

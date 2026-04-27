@@ -183,7 +183,7 @@ async def ai_assist_paragraph(
                 from services.literature_rag_service import LiteratureRagService
                 if document.template_id and document.user_id:
                     query = f"{chapter.title} {prompt}"[:500]
-                    literature_context, _ = await LiteratureRagService.retrieve_and_format(
+                    literature_context, lit_citations = await LiteratureRagService.retrieve_and_format(
                         db=db,
                         document_template_id=document.template_id,
                         user_id=document.user_id,
@@ -191,6 +191,17 @@ async def ai_assist_paragraph(
                     )
                     if literature_context:
                         prompt = f"{prompt}\n\n{literature_context}"
+                        import logging as _log
+                        _log.getLogger(__name__).info(
+                            "[RAG] 段落帮填注入 %d 篇文献 paragraph_id=%s chapter=%r",
+                            len(lit_citations), paragraph_id, chapter.title
+                        )
+                    else:
+                        import logging as _log
+                        _log.getLogger(__name__).info(
+                            "[RAG] 段落帮填未检索到相关文献 paragraph_id=%s chapter=%r",
+                            paragraph_id, chapter.title
+                        )
             except Exception as e:
                 import logging
                 logging.getLogger(__name__).warning("段落帮填文献 RAG 注入失败，跳过: %s", e)
@@ -385,7 +396,7 @@ async def assist_single_summary(db: AsyncSession, summary_id: UUID, downstream_p
         from services.literature_rag_service import LiteratureRagService
         if document.template_id and document.user_id:
             query = f"{summary.title} {prompt}"[:500]
-            literature_context, _ = await LiteratureRagService.retrieve_and_format(
+            literature_context, lit_citations = await LiteratureRagService.retrieve_and_format(
                 db=db,
                 document_template_id=document.template_id,
                 user_id=document.user_id,
@@ -393,6 +404,17 @@ async def assist_single_summary(db: AsyncSession, summary_id: UUID, downstream_p
             )
             if literature_context:
                 prompt = f"{prompt}\n\n{literature_context}"
+                import logging as _log
+                _log.getLogger(__name__).info(
+                    "[RAG] 摘要帮填注入 %d 篇文献 summary_id=%s title=%r",
+                    len(lit_citations), summary_id, summary.title
+                )
+            else:
+                import logging as _log
+                _log.getLogger(__name__).info(
+                    "[RAG] 摘要帮填未检索到相关文献 summary_id=%s title=%r",
+                    summary_id, summary.title
+                )
     except Exception as e:
         import logging
         logging.getLogger(__name__).warning("摘要帮填文献 RAG 注入失败，跳过: %s", e)

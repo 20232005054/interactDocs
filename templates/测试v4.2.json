@@ -1,0 +1,213 @@
+{
+  "version": "1.0",
+  "template": {
+    "purpose": "临床试验方案",
+    "display_name": "I期剂量递增临床试验-AI生成测试模板",
+    "content": {
+      "description": "用于测试三种生成模式的最小I期临床试验方案模板。"
+    }
+  },
+  "core_info_templates": [
+    {
+      "field_name": "试验基本信息",
+      "field_key": "core_basic_group",
+      "field_type": "group",
+      "default_value": null,
+      "options": null,
+      "is_required": true,
+      "order_index": 0,
+      "children": [
+        {
+          "field_name": "试验药物名称",
+          "field_key": "core_drug_name",
+          "field_type": "text",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 0,
+          "children": []
+        },
+        {
+          "field_name": "目标适应症",
+          "field_key": "core_indication",
+          "field_type": "text",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 1,
+          "children": []
+        },
+        {
+          "field_name": "给药途径",
+          "field_key": "core_route",
+          "field_type": "select",
+          "default_value": null,
+          "options": ["静脉注射", "口服", "皮下注射", "肌肉注射"],
+          "is_required": true,
+          "order_index": 2,
+          "children": []
+        },
+        {
+          "field_name": "计划入组例数（例）",
+          "field_key": "core_sample_size",
+          "field_type": "number",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 3,
+          "children": []
+        },
+        {
+          "field_name": "起始剂量（mg）",
+          "field_key": "core_start_dose",
+          "field_type": "number",
+          "default_value": null,
+          "options": null,
+          "is_required": true,
+          "order_index": 4,
+          "children": []
+        }
+      ]
+    }
+  ],
+  "summary_templates": [
+    {
+      "title": "试验概述",
+      "field_key": "summary_overview",
+      "generation_mode": 1,
+      "content_template": null,
+      "sources": [
+        {
+          "source": {"value": "keyinfo", "label": "关键信息"},
+          "match_type": "关键信息匹配",
+          "match_keys": [
+            {"value": "core_drug_name", "label": "试验药物名称"},
+            {"value": "core_indication", "label": "目标适应症"},
+            {"value": "core_route", "label": "给药途径"}
+          ]
+        }
+      ],
+      "default_prompt": "根据试验药物名称、适应症和给药途径，撰写120-180字的I期临床试验概述，说明研究目的、设计类型和主要评价指标，语言专业简洁。",
+      "custom_prompt": null,
+      "order_index": 0
+    },
+    {
+      "title": "受试者规模",
+      "field_key": "summary_scale",
+      "generation_mode": 0,
+      "content_template": "本研究为 {{core_drug_name}} 治疗 {{core_indication}} 的I期剂量递增试验，采用 {{core_route}} 给药，起始剂量为 {{core_start_dose}} mg，计划入组 {{core_sample_size}} 例受试者。",
+      "sources": [
+        {
+          "source": {"value": "keyinfo", "label": "关键信息"},
+          "match_type": "关键信息匹配",
+          "match_keys": [
+            {"value": "core_drug_name", "label": "试验药物名称"},
+            {"value": "core_indication", "label": "目标适应症"},
+            {"value": "core_route", "label": "给药途径"},
+            {"value": "core_start_dose", "label": "起始剂量"},
+            {"value": "core_sample_size", "label": "计划入组例数"}
+          ]
+        }
+      ],
+      "default_prompt": null,
+      "custom_prompt": null,
+      "order_index": 1
+    }
+  ],
+  "structure_templates": [
+    {
+      "title": "研究背景",
+      "field_key": "struct_background",
+      "level": 1,
+      "order_index": 0,
+      "paragraphs": [
+        {
+          "para_type": "heading2",
+          "content_template": "一、研究背景",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "paragraph",
+          "content_template": null,
+          "generation_mode": 1,
+          "sources": [
+            {
+              "source": {"value": "keyinfo", "label": "关键信息"},
+              "match_type": "关键信息匹配",
+              "match_keys": [
+                {"value": "core_drug_name", "label": "试验药物名称"},
+                {"value": "core_indication", "label": "目标适应症"}
+              ]
+            }
+          ],
+          "default_prompt": "根据试验药物名称和目标适应症，撰写300-400字的研究背景，涵盖疾病流行病学现状、现有治疗局限性、该药物作用机制及开展I期研究的必要性。",
+          "custom_prompt": null
+        }
+      ],
+      "children": []
+    },
+    {
+      "title": "研究目的",
+      "field_key": "struct_objective",
+      "level": 1,
+      "order_index": 1,
+      "paragraphs": [
+        {
+          "para_type": "heading2",
+          "content_template": "二、研究目的",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "paragraph",
+          "content_template": "主要目的：评价 {{core_drug_name}} 单次及多次 {{core_route}} 给药在 {{core_indication}} 受试者中的安全性和耐受性，确定最大耐受剂量（MTD）及II期推荐剂量（RP2D）。\n\n次要目的：初步评价 {{core_drug_name}} 的药代动力学特征及初步抗肿瘤活性。",
+          "generation_mode": 0,
+          "sources": [
+            {
+              "source": {"value": "keyinfo", "label": "关键信息"},
+              "match_type": "关键信息匹配",
+              "match_keys": [
+                {"value": "core_drug_name", "label": "试验药物名称"},
+                {"value": "core_indication", "label": "目标适应症"},
+                {"value": "core_route", "label": "给药途径"}
+              ]
+            }
+          ],
+          "default_prompt": null,
+          "custom_prompt": null
+        }
+      ],
+      "children": []
+    },
+    {
+      "title": "伦理声明",
+      "field_key": "struct_ethics",
+      "level": 1,
+      "order_index": 2,
+      "paragraphs": [
+        {
+          "para_type": "heading2",
+          "content_template": "三、伦理声明",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        },
+        {
+          "para_type": "paragraph",
+          "content_template": "本研究将严格遵循《赫尔辛基宣言》、ICH E6(R2) GCP 指导原则及中国现行药物临床试验相关法规开展。研究启动前须获得伦理委员会书面批准，所有受试者入组前须签署知情同意书。研究过程中发生的任何方案修订均须重新提交伦理审查。",
+          "generation_mode": 2,
+          "sources": null,
+          "default_prompt": null,
+          "custom_prompt": null
+        }
+      ],
+      "children": []
+    }
+  ]
+}

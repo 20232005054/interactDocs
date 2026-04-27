@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { coreInfoService } from "@/services/coreInfoService"
 import { useDocumentStore } from "@/store/documentStore"
 import type { CoreInfo } from "@/types/api"
@@ -171,6 +171,10 @@ export default function CoreInfoPanel({ onAfterSave }: CoreInfoPanelProps) {
   const [originalContentMap, setOriginalContentMap] = useState<Record<string, string>>({})
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // 用 ref 保存最新值，避免 timer 回调里读到旧闭包
+  const dirtyIdsRef = useRef<Set<string>>(new Set())
+  const flatNodesRef = useRef<CoreInfo[]>([])
 
   const flattenCoreInfo = useCallback((tree: CoreInfo[]): CoreInfo[] => {
     const result: CoreInfo[] = []
@@ -185,6 +189,11 @@ export default function CoreInfoPanel({ onAfterSave }: CoreInfoPanelProps) {
   }, [])
 
   const flatNodes = useMemo(() => flattenCoreInfo(coreInfoTree), [coreInfoTree, flattenCoreInfo])
+
+  // 同步最新 flatNodes 到 ref
+  useEffect(() => {
+    flatNodesRef.current = flatNodes
+  }, [flatNodes])
 
   useEffect(() => {
     if (flatNodes.length === 0) {
@@ -211,25 +220,13 @@ export default function CoreInfoPanel({ onAfterSave }: CoreInfoPanelProps) {
     })
   }, [flatNodes])
 
-  const handleNodeContentChange = useCallback((coreInfoId: string, content: string) => {
-    updateCoreInfo(coreInfoId, { content })
-    setDirtyIds((prev) => {
-      const next = new Set(prev)
-      const baseline = originalContentMap[coreInfoId] ?? ""
-      if ((content ?? "") === baseline) {
-        next.delete(coreInfoId)
-      } else {
-        next.add(coreInfoId)
-      }
-      return next
-    })
-  }, [originalContentMap, updateCoreInfo])
-
   const handleSave = useCallback(async () => {
-    if (dirtyIds.size === 0 || saving) return
+    const currentDirtyIds = dirtyIdsRef.current
+    const currentFlatNodes = flatNodesRef.current
+    if (currentDirtyIds.size === 0 || saving) return
 
-    const contentMap = new Map(flatNodes.map((node) => [node.core_info_id, node.content ?? ""]))
-    const payload = Array.from(dirtyIds).map((id) => ({
+    const contentMap = new Map(currentFlatNodes.map((node) => [node.core_info_id, node.content ?? ""]))
+    const payload = Array.from(currentDirtyIds).map((id) => ({
       id,
       content: contentMap.get(id) ?? "",
     }))
@@ -247,6 +244,7 @@ export default function CoreInfoPanel({ onAfterSave }: CoreInfoPanelProps) {
         })
         return next
       })
+      dirtyIdsRef.current = new Set()
       setDirtyIds(new Set())
 
       if (onAfterSave) {
@@ -257,7 +255,29 @@ export default function CoreInfoPanel({ onAfterSave }: CoreInfoPanelProps) {
     } finally {
       setSaving(false)
     }
-  }, [dirtyIds, flatNodes, onAfterSave, saving])
+  }, [onAfterSave, saving])
+
+  const handleNodeContentChange = useCallback((coreInfoId: string, content: string) => {
+    updateCoreInfo(coreInfoId, { content })
+    setDirtyIds((prev) => {
+      const next = new Set(prev)
+      const baseline = originalContentMap[coreInfoId] ?? ""
+      if ((content ?? "") === baseline) {
+        next.delete(coreInfoId)
+      } else {
+        next.add(coreInfoId)
+      }
+      // 同步到 ref，确保 timer 回调读到最新值
+      dirtyIdsRef.current = next
+      return next
+    })
+
+    // 防抖自动保存：停止输入 800ms 后触发
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+    autoSaveTimer.current = setTimeout(() => {
+      void handleSave()
+    }, 800)
+  }, [originalContentMap, updateCoreInfo, handleSave])
 
   if (coreInfoTree.length === 0) {
     return (
@@ -269,17 +289,10 @@ export default function CoreInfoPanel({ onAfterSave }: CoreInfoPanelProps) {
 
   return (
     <div className="px-3 py-3">
-      {dirtyIds.size > 0 && (
-        <div className="mb-2 flex items-center justify-between rounded-md border border-blue-200 bg-blue-50 px-2 py-1.5">
-          <span className="text-xs text-blue-700">有 {dirtyIds.size} 项核心信息待保存</span>
-          <button
-            type="button"
-            onClick={() => void handleSave()}
-            disabled={saving}
-            className="h-7 rounded border border-blue-300 px-2.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100 disabled:opacity-50"
-          >
-            {saving ? "保存中..." : "保存"}
-          </button>
+      {saving && (
+        <div className="mb-2 flex items-center gap-1.5 text-xs text-gray-400">
+          <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
+          自动保存中...
         </div>
       )}
       <div className="flex flex-col">

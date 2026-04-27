@@ -398,9 +398,15 @@ export default function DocumentListContainer() {
       {showCreate && (
         <CreateDocumentModal
           onClose={() => setShowCreate(false)}
-          onCreated={doc => {
+          onCreated={async (doc) => {
             setShowCreate(false)
-            router.push(`/documents/${doc.document_id}/apply-template?autoApply=1`)
+            // 自动应用核心信息模板，让用户进入编辑页后可以直接填写
+            try {
+              await documentService.applyCoreInfoTemplate(doc.document_id)
+            } catch {
+              // 静默失败，不阻断跳转
+            }
+            router.push(`/documents/${doc.document_id}`)
           }}
         />
       )}

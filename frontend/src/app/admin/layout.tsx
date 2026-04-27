@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { href: "/admin/users", label: "用户管理" },
   { href: "/admin/documents", label: "文档管理" },
   { href: "/admin/templates", label: "模板管理" },
+  { href: "/admin/literature", label: "文献管理" },
 ]
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
