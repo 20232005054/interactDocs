@@ -19,8 +19,6 @@ from schemas.response_schemas import (
 from core.response import success_response, ResponseModel
 from core.auth import get_current_user
 from db.session import get_db
-from db.mappers.document_citation_mapper import DocumentCitationMapper
-from db.mappers.literature_mapper import LiteratureMapper
 
 
 router = APIRouter(prefix="/api/v1/documents", tags=["文档管理"])
@@ -72,7 +70,7 @@ async def list_documents(
 
 @router.get("/{document_id}", summary="获取文档详情", response_model=ResponseModel[DocumentDetailResponse])
 async def get_document(document_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    document, template_name = await DocumentService.get_document(db, document_id)
+    document, template_name = await DocumentService.get_document(db, document_id, owner_id=current_user.user_id)
     return success_response(data=DocumentDetailResponse(
         document_id=document.document_id,
         title=document.title,
@@ -86,7 +84,7 @@ async def get_document(document_id: UUID, current_user=Depends(get_current_user)
 
 @router.put("/{document_id}", summary="更新文档信息", response_model=ResponseModel[DocumentResponse])
 async def update_document(document_id: UUID, doc_in: DocumentUpdate, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    document = await DocumentService.update_document(db, document_id, doc_in)
+    document = await DocumentService.update_document(db, document_id, doc_in, owner_id=current_user.user_id)
     return success_response(data=DocumentResponse(
         document_id=document.document_id,
         title=document.title,
@@ -99,13 +97,13 @@ async def update_document(document_id: UUID, doc_in: DocumentUpdate, current_use
 
 @router.delete("/{document_id}", summary="删除文档", response_model=ResponseModel[None])
 async def delete_document(document_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await DocumentService.delete_document(db, document_id)
+    result = await DocumentService.delete_document(db, document_id, owner_id=current_user.user_id)
     return success_response(message=result["message"])
 
 
 @router.get("/{document_id}/snapshots", summary="获取文档快照列表", response_model=ResponseModel[SnapshotListResponse])
 async def get_document_snapshots(document_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    snapshots = await DocumentSnapshotService.get_document_snapshots(db, document_id)
+    snapshots = await DocumentSnapshotService.get_document_snapshots(db, document_id, owner_id=current_user.user_id)
     return success_response(data=SnapshotListResponse(
         snapshots=[SnapshotResponse(**s) for s in snapshots]
     ))
@@ -113,13 +111,13 @@ async def get_document_snapshots(document_id: UUID, current_user=Depends(get_cur
 
 @router.get("/{document_id}/snapshots/detail/{snapshot_id}", summary="获取快照详情", response_model=ResponseModel[SnapshotResponse])
 async def get_snapshot_detail(document_id: UUID, snapshot_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    snapshot = await DocumentSnapshotService.get_snapshot_detail(db, document_id, snapshot_id)
+    snapshot = await DocumentSnapshotService.get_snapshot_detail(db, document_id, snapshot_id, owner_id=current_user.user_id)
     return success_response(data=SnapshotResponse(**snapshot))
 
 
 @router.post("/{document_id}/snapshots", summary="创建文档快照", response_model=ResponseModel[SnapshotResponse])
 async def create_document_snapshot(document_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    snapshot = await DocumentSnapshotService.create_document_snapshot(db, document_id)
+    snapshot = await DocumentSnapshotService.create_document_snapshot(db, document_id, owner_id=current_user.user_id)
     return success_response(data=SnapshotResponse(**snapshot))
 
 
@@ -141,13 +139,13 @@ async def restore_snapshot(
     current_user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await DocumentSnapshotService.restore_snapshot(db, document_id, snapshot_id)
+    result = await DocumentSnapshotService.restore_snapshot(db, document_id, snapshot_id, owner_id=current_user.user_id)
     return success_response(message=result["message"])
 
 
 @router.get("/{document_id}/full-content", summary="获取文档全量内容（章节树+段落）", response_model=ResponseModel[FullContentResponse])
 async def get_full_content(document_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    doc_id, tree = await DocumentService.get_full_content(db, document_id)
+    doc_id, tree = await DocumentService.get_full_content(db, document_id, owner_id=current_user.user_id)
 
     def build_chapter_node(node) -> FullContentChapter:
         chapter = node["chapter"]
@@ -186,12 +184,13 @@ async def get_full_content(document_id: UUID, current_user=Depends(get_current_u
 
 @router.get("/{document_id}/template-info", summary="获取文档关联的模板完整信息", response_model=ResponseModel[TemplateInfoResponse])
 async def get_template_info(document_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    template_info = await DocumentService.get_template_info(db, document_id)
+    template_info = await DocumentService.get_template_info(db, document_id, owner_id=current_user.user_id)
     return success_response(data=template_info)
 
 
 @router.post("/{document_id}/apply-core-info-template", summary="应用核心信息模板", response_model=ResponseModel[ApplyCoreInfoResponse])
 async def apply_core_info_template(document_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await DocumentService.get_document(db, document_id, owner_id=current_user.user_id)
     tree, count = await TemplateApplyService.apply_core_info_template_as_tree(db, document_id)
     return success_response(data=ApplyCoreInfoResponse(
         message=f"成功创建 {count} 个核心信息字段",
@@ -201,6 +200,7 @@ async def apply_core_info_template(document_id: UUID, current_user=Depends(get_c
 
 @router.post("/{document_id}/apply-summary-template", summary="应用摘要模板", response_model=ResponseModel[ApplySummaryResponse])
 async def apply_summary_template(document_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await DocumentService.get_document(db, document_id, owner_id=current_user.user_id)
     created_items = await TemplateApplyService.apply_summary_template(db, document_id)
     return success_response(data=ApplySummaryResponse(
         message=f"成功创建 {len(created_items)} 个摘要",
@@ -223,6 +223,7 @@ async def apply_summary_template(document_id: UUID, current_user=Depends(get_cur
 
 @router.post("/{document_id}/apply-structure-template", summary="应用文章结构模板", response_model=ResponseModel[ApplyStructureResponse])
 async def apply_structure_template(document_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await DocumentService.get_document(db, document_id, owner_id=current_user.user_id)
     created_items = await TemplateApplyService.apply_structure_template(db, document_id)
     return success_response(data=ApplyStructureResponse(
         message=f"成功创建 {len(created_items)} 个章节",
@@ -325,7 +326,7 @@ async def sync_template(
 
 @router.get("/{document_id}/citations", summary="获取文档引用文献列表", response_model=ResponseModel[DocumentCitationsResponse])
 async def get_document_citations(document_id: UUID, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    rows = await DocumentCitationMapper.get_distinct_by_document_id(db, document_id)
+    rows = await DocumentService.get_citations(db, document_id, owner_id=current_user.user_id)
     items = [
         DocumentCitationItem(
             citation_number=r["citation_number"],

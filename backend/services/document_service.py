@@ -191,10 +191,12 @@ class DocumentService:
         return total, documents
 
     @staticmethod
-    async def get_document(db: AsyncSession, document_id: UUID):
+    async def get_document(db: AsyncSession, document_id: UUID, owner_id: UUID = None):
         document = await DocumentMapper.get_document_by_id(db, document_id)
         if not document:
             raise HTTPException(status_code=404, detail="文档不存在")
+        if owner_id is not None and str(document.user_id) != str(owner_id):
+            raise HTTPException(status_code=403, detail="无权访问此文档")
         template_name = None
         if document.template_id:
             result = await db.execute(
@@ -204,10 +206,12 @@ class DocumentService:
         return document, template_name
 
     @staticmethod
-    async def update_document(db: AsyncSession, document_id: UUID, doc_in: DocumentUpdate):
+    async def update_document(db: AsyncSession, document_id: UUID, doc_in: DocumentUpdate, owner_id: UUID = None):
         document = await DocumentMapper.get_document_by_id(db, document_id)
         if not document:
             raise HTTPException(status_code=404, detail="文档不存在")
+        if owner_id is not None and str(document.user_id) != str(owner_id):
+            raise HTTPException(status_code=403, detail="无权修改此文档")
 
         update_data = {}
         if doc_in.title is not None:
@@ -222,17 +226,19 @@ class DocumentService:
         return await DocumentMapper.get_document_by_id(db, document_id)
 
     @staticmethod
-    async def delete_document(db: AsyncSession, document_id: UUID):
+    async def delete_document(db: AsyncSession, document_id: UUID, owner_id: UUID = None):
         document = await DocumentMapper.get_document_by_id(db, document_id)
         if not document:
             raise HTTPException(status_code=404, detail="文档不存在")
+        if owner_id is not None and str(document.user_id) != str(owner_id):
+            raise HTTPException(status_code=403, detail="无权删除此文档")
 
         await DocumentMapper.delete_document(db, document)
         await db.commit()
         return {"message": "删除成功"}
 
     @staticmethod
-    async def get_full_content(db: AsyncSession, document_id: UUID):
+    async def get_full_content(db: AsyncSession, document_id: UUID, owner_id: UUID = None):
         """
         获取文档全量内容：章节树 + 每个章节的段落
         两次查询解决 N+1：一次拉所有章节，一次拉所有段落
@@ -243,6 +249,8 @@ class DocumentService:
         document = await DocumentMapper.get_document_by_id(db, document_id)
         if not document:
             raise HTTPException(status_code=404, detail="文档不存在")
+        if owner_id is not None and str(document.user_id) != str(owner_id):
+            raise HTTPException(status_code=403, detail="无权访问此文档")
 
         chapters = await ChapterMapper.get_chapters_by_document_id(db, document_id)
         paragraphs = await ParagraphMapper.get_paragraphs_by_document_id(db, document_id)
@@ -273,7 +281,15 @@ class DocumentService:
         return document_id, tree
 
     @staticmethod
-    async def _get_core_info_map(db: AsyncSession, document_id: UUID) -> dict:
+    async def get_citations(db: AsyncSession, document_id: UUID, owner_id: UUID = None) -> list:
+        """获取文档引用文献列表（去重，按编号排序）"""
+        document = await DocumentMapper.get_document_by_id(db, document_id)
+        if not document:
+            raise HTTPException(status_code=404, detail="文档不存在")
+        if owner_id is not None and str(document.user_id) != str(owner_id):
+            raise HTTPException(status_code=403, detail="无权访问此文档")
+        from db.mappers.document_citation_mapper import DocumentCitationMapper
+        return await DocumentCitationMapper.get_distinct_by_document_id(db, document_id)
         """获取文档核心信息的键值对映射，key 为 field_key，value 为 content"""
         result = await db.execute(
             select(DocumentCoreInfo).where(DocumentCoreInfo.document_id == document_id)
@@ -282,13 +298,15 @@ class DocumentService:
         return {info.field_key: info.content for info in core_infos if info.field_key}
 
     @staticmethod
-    async def get_template_info(db: AsyncSession, document_id: UUID):
+    async def get_template_info(db: AsyncSession, document_id: UUID, owner_id: UUID = None):
         """
         获取文档关联的模板完整信息（包含核心信息模板、摘要模板、结构模板）
         """
         document = await DocumentMapper.get_document_by_id(db, document_id)
         if not document:
             raise HTTPException(status_code=404, detail="文档不存在")
+        if owner_id is not None and str(document.user_id) != str(owner_id):
+            raise HTTPException(status_code=403, detail="无权访问此文档")
 
         core_info_templates = await CoreInfoTemplateMapper.get_by_template_id(db, document.template_id)
         summary_templates = await SummaryTemplateMapper.get_by_template_id(db, document.template_id)
@@ -342,6 +360,8 @@ class DocumentService:
         document = await DocumentMapper.get_document_by_id(db, document_id)
         if not document:
             raise HTTPException(status_code=404, detail="文档不存在")
+        if str(document.user_id) != str(user_id):
+            raise HTTPException(status_code=403, detail="无权操作此文档")
         if not document.template_id:
             raise HTTPException(status_code=400, detail="文档未关联模板")
 
@@ -451,6 +471,8 @@ class DocumentService:
         document = await DocumentMapper.get_document_by_id(db, document_id)
         if not document:
             raise HTTPException(status_code=404, detail="文档不存在")
+        if str(document.user_id) != str(user_id):
+            raise HTTPException(status_code=403, detail="无权操作此文档")
         if not document.template_id:
             raise HTTPException(status_code=400, detail="文档未关联模板")
 

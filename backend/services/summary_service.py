@@ -76,7 +76,6 @@ class SummaryService:
             await SummaryMapper.delete_summary(db, summary)
             
             # 更新后续摘要的order_index
-            from sqlalchemy import update
             await db.execute(
                 update(DocumentSummary)
                 .where(DocumentSummary.document_id == document_id)

@@ -207,12 +207,14 @@ async def delete_template(template_id: UUID, editor=Depends(get_editor_user), db
 
 
 @router.put("/{template_id}/content", summary="用户更新模板", response_model=ResponseModel[TemplateResponse])
-async def update_template_content(template_id: UUID, content: dict, editor=Depends(get_editor_user), db: AsyncSession = Depends(get_db)):
+async def update_template_content(template_id: UUID, content: dict, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     t = await TemplateService.get_template(db, template_id)
     if not t:
         raise HTTPException(status_code=404, detail="模板不存在")
     if t.template_type == TemplateType.SYSTEM:
         raise HTTPException(status_code=403, detail="不能更新官方模板")
+    if t.user_id is None or str(t.user_id) != str(current_user.user_id):
+        raise HTTPException(status_code=403, detail="无权修改此模板")
     t = await TemplateService.update_template_content(db, template_id, content)
     return success_response(data=_template_response(t))
 

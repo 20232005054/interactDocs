@@ -10,11 +10,13 @@ from fastapi import HTTPException
 class DocumentSnapshotService:
 
     @staticmethod
-    async def get_document_snapshots(db: AsyncSession, document_id: UUID):
+    async def get_document_snapshots(db: AsyncSession, document_id: UUID, owner_id: UUID = None):
         """获取文档快照列表"""
         document = await DocumentMapper.get_document_by_id(db, document_id)
         if not document:
             raise HTTPException(status_code=404, detail="文档不存在")
+        if owner_id is not None and str(document.user_id) != str(owner_id):
+            raise HTTPException(status_code=403, detail="无权访问此文档")
 
         snapshots = await DocumentMapper.get_snapshots_by_document_id(db, document_id)
 
@@ -32,11 +34,13 @@ class DocumentSnapshotService:
         return snapshot_list
 
     @staticmethod
-    async def get_snapshot_detail(db: AsyncSession, document_id: UUID, snapshot_id: UUID):
+    async def get_snapshot_detail(db: AsyncSession, document_id: UUID, snapshot_id: UUID, owner_id: UUID = None):
         """获取快照详情"""
         document = await DocumentMapper.get_document_by_id(db, document_id)
         if not document:
             raise HTTPException(status_code=404, detail="文档不存在")
+        if owner_id is not None and str(document.user_id) != str(owner_id):
+            raise HTTPException(status_code=403, detail="无权访问此文档")
 
         snapshot = await DocumentMapper.get_snapshot_by_id(db, snapshot_id, document_id)
         if not snapshot:
@@ -57,11 +61,13 @@ class DocumentSnapshotService:
         }
 
     @staticmethod
-    async def create_document_snapshot(db: AsyncSession, document_id: UUID):
+    async def create_document_snapshot(db: AsyncSession, document_id: UUID, owner_id: UUID = None):
         """创建文档快照（全量：章节+段落+摘要+核心信息），最多保留 20 个"""
         document = await DocumentMapper.get_document_by_id(db, document_id)
         if not document:
             raise HTTPException(status_code=404, detail="文档不存在")
+        if owner_id is not None and str(document.user_id) != str(owner_id):
+            raise HTTPException(status_code=403, detail="无权操作此文档")
 
         MAX_SNAPSHOTS = 20
         existing = await DocumentMapper.get_snapshots_by_document_id(db, document_id)
@@ -72,18 +78,23 @@ class DocumentSnapshotService:
         document.snapshot_cursor += 1
         description = f"快照{document.snapshot_cursor}"
 
-        # 章节 + 段落
-        chapters_result = await db.execute(
-            select(Chapter).where(Chapter.document_id == document_id).order_by(Chapter.order_index)
-        )
-        chapters = chapters_result.scalars().all()
+        # 章节 + 段落（两次查询，消除 N+1）
+        from db.mappers.chapter_mapper import ChapterMapper
+        from db.mappers.paragraph_mapper import ParagraphMapper
+        from db.mappers.summary_mapper import SummaryMapper
+        from db.mappers.core_info_mapper import CoreInfoMapper
+
+        chapters = await ChapterMapper.get_chapters_by_document_id(db, document_id)
+        all_paragraphs = await ParagraphMapper.get_paragraphs_by_document_id(db, document_id)
+
+        # 按 chapter_id 分组段落
+        para_map: dict = {}
+        for p in all_paragraphs:
+            para_map.setdefault(p.chapter_id, []).append(p)
 
         chapters_data = []
         for chapter in chapters:
-            paragraphs_result = await db.execute(
-                select(Paragraph).where(Paragraph.chapter_id == chapter.chapter_id).order_by(Paragraph.order_index)
-            )
-            paragraphs = paragraphs_result.scalars().all()
+            paragraphs = para_map.get(chapter.chapter_id, [])
             chapters_data.append({
                 "chapter_id": str(chapter.chapter_id),
                 "parent_id": str(chapter.parent_id) if chapter.parent_id else None,
@@ -102,15 +113,12 @@ class DocumentSnapshotService:
                         "ai_generate": para.ai_generate,
                         "ischange": para.ischange,
                     }
-                    for para in paragraphs
+                    for para in sorted(paragraphs, key=lambda x: x.order_index)
                 ],
             })
 
         # 摘要
-        summaries_result = await db.execute(
-            select(DocumentSummary).where(DocumentSummary.document_id == document_id).order_by(DocumentSummary.order_index)
-        )
-        summaries = summaries_result.scalars().all()
+        summaries = await SummaryMapper.get_summaries_by_document_id(db, document_id)
         summaries_data = [
             {
                 "summary_id": str(s.summary_id),
@@ -125,10 +133,7 @@ class DocumentSnapshotService:
         ]
 
         # 核心信息
-        core_info_result = await db.execute(
-            select(DocumentCoreInfo).where(DocumentCoreInfo.document_id == document_id).order_by(DocumentCoreInfo.order_index)
-        )
-        core_infos = core_info_result.scalars().all()
+        core_infos = await CoreInfoMapper.get_core_info_by_document_id(db, document_id)
         core_info_data = [
             {
                 "core_info_id": str(ci.core_info_id),
@@ -197,7 +202,7 @@ class DocumentSnapshotService:
         }
 
     @staticmethod
-    async def restore_snapshot(db: AsyncSession, document_id: UUID, snapshot_id: UUID):
+    async def restore_snapshot(db: AsyncSession, document_id: UUID, snapshot_id: UUID, owner_id: UUID = None):
         """
         从快照恢复文档（全量恢复：章节+段落+摘要+核心信息）
 
@@ -208,6 +213,8 @@ class DocumentSnapshotService:
         document = await DocumentMapper.get_document_by_id(db, document_id)
         if not document:
             raise HTTPException(status_code=404, detail="文档不存在")
+        if owner_id is not None and str(document.user_id) != str(owner_id):
+            raise HTTPException(status_code=403, detail="无权操作此文档")
 
         snapshot = await DocumentMapper.get_snapshot_by_id(db, snapshot_id, document_id)
         if not snapshot:

@@ -1,12 +1,16 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import func, or_, and_
 from uuid import UUID, uuid4
-from db.models import Template
+from datetime import datetime, timezone
+from fastapi import HTTPException
+from db.models import Template, CoreInfoTemplate, SummaryTemplate, StructureTemplate
 from db.mappers.template_mapper import TemplateMapper
 from db.mappers.core_info_template_mapper import CoreInfoTemplateMapper
 from db.mappers.summary_template_mapper import SummaryTemplateMapper
 from db.mappers.structure_template_mapper import StructureTemplateMapper
-from db.models import Template, CoreInfoTemplate, SummaryTemplate, StructureTemplate
+from db.mappers.literature_mapper import LiteratureMapper
+from db.mappers.template_literature_mapper import TemplateLiteratureMapper
 from core.constants import TemplateType
 
 class TemplateService:
@@ -126,8 +130,6 @@ class TemplateService:
         """
         返回系统模板 + 当前用户个人模板库（document_id IS NULL）的合并列表
         """
-        from sqlalchemy import func, or_, and_
-
         base_filter = or_(
             and_(Template.template_type == TemplateType.SYSTEM, Template.is_active == True),
             and_(Template.template_type == TemplateType.USER_REUSABLE, Template.user_id == user_id, Template.is_active == True),
@@ -163,7 +165,6 @@ class TemplateService:
         """
         获取指定模板所在 group 的所有历史版本，按版本号升序。
         """
-        from fastapi import HTTPException
         template = await TemplateMapper.get_template(db, template_id)
         if not template:
             raise HTTPException(status_code=404, detail="模板不存在")
@@ -175,9 +176,6 @@ class TemplateService:
         获取模板完整预览信息（核心信息模板树 + 摘要模板列表 + 结构模板树）。
         用于用户创建文档前预览模板内容。
         """
-        from fastapi import HTTPException
-        from db.mappers.core_info_template_mapper import CoreInfoTemplateMapper
-        from db.mappers.summary_template_mapper import SummaryTemplateMapper
         from services.structure_template_service import StructureTemplateService
         from schemas.response_schemas import (
             TemplateInfoResponse, CoreInfoTemplateResponse, SummaryTemplateResponse
@@ -347,10 +345,6 @@ class TemplateService:
         - 保留 literature_key（跨系统导入时用于匹配文献）
         - CoreInfoTemplate / StructureTemplate 以嵌套 children 表示树形结构
         """
-        from fastapi import HTTPException
-        from datetime import datetime, timezone
-        from db.mappers.literature_mapper import LiteratureMapper
-
         template = await TemplateMapper.get_template(db, template_id)
         if not template:
             raise HTTPException(status_code=404, detail="模板不存在")
@@ -453,8 +447,6 @@ class TemplateService:
         - template_type：不传则默认 USER_REUSABLE（type=2）；传 SYSTEM（type=1）时 user_id 应为 None
         - field_key 原样保留（sources 引用依赖它）
         """
-        from fastapi import HTTPException
-
         if template_type is None:
             template_type = TemplateType.USER_REUSABLE
 
@@ -535,8 +527,6 @@ class TemplateService:
 
         # 5. 匹配并绑定文献
         # 匹配优先级：literature_key → DOI → 标题归一化
-        from db.mappers.literature_mapper import LiteratureMapper
-        from db.mappers.template_literature_mapper import TemplateLiteratureMapper
 
         unmatched_literature = []
         for lit_ref in data.get("literature_references") or []:
