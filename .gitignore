@@ -42,6 +42,9 @@ reference/
 devlogs/
 .kiro/steering/devlog.md
 
-# 本地文件不上传
-backend/static/images/
-backend/static/literature/
+# 本地文件不上传（精确路径，避免误伤前端同名目录）
+/backend/static/images/
+/backend/static/literature/
+/literature/*.pdf
+/literature/*.doc
+/literature/*.docx
