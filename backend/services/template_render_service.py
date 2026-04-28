@@ -298,8 +298,16 @@ class TemplateRenderService:
 
     @staticmethod
     async def _call_ai_renderer(prompt: str, template_id: str = None, field_key: str = None) -> str:
+        system_prompt = (
+            "你是一位专业的临床研究文档写作专家。\n"
+            "\n"
+            "**文献引用规范**：\n"
+            "- 如果提供了参考文献，只能引用已提供的文献，使用 [编号] 格式标记\n"
+            "- 不要自行编造或添加其他文献\n"
+            "- 不要在生成内容末尾添加参考文献列表，系统会自动管理\n"
+        )
         result = await call_qwen_once(
-            "你是一位专业的临床研究文档写作专家。",
+            system_prompt,
             [],
             prompt,
             template_id=template_id,
