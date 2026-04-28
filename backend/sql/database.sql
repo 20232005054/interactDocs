@@ -8,6 +8,13 @@
 -- CREATE DATABASE agent02;
 
 -- ============================================
+-- 0. 扩展安装
+-- ============================================
+
+-- 安装 pgvector 扩展（用于文献向量检索）
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- ============================================
 -- 1. 用户表
 -- ============================================
 CREATE TABLE IF NOT EXISTS users (
@@ -143,7 +150,7 @@ CREATE TABLE IF NOT EXISTS document_core_info (
     content TEXT NOT NULL,
     field_type VARCHAR(20) DEFAULT 'text',
     options JSONB,
-    is_required BOOLEAN DEFAULT FALSE,
+    is_required BOOLEAN DEFAULT TRUE,
     order_index INTEGER NOT NULL DEFAULT 0,
     is_locked BOOLEAN NOT NULL DEFAULT FALSE,
     is_change INTEGER NOT NULL DEFAULT 0,
