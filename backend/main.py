@@ -21,9 +21,13 @@ try:
 except ImportError:
     pass
 
-# 配置日志：INFO 级别输出到控制台，格式含时间和模块名
+# 配置日志：DEBUG 级别输出到控制台，格式含时间和模块名
+# logging.DEBUG - 输出所有调试信息（最详细）
+# logging.INFO - 输出一般信息（当前设置）
+# logging.WARNING - 只输出警告和错误
+# logging.ERROR - 只输出错误
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.WARNING,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     datefmt="%H:%M:%S",
 )

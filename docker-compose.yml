@@ -1,0 +1,101 @@
+# ============================================================
+# InteractiveDocs Docker 配置
+# 
+# 前端启动步骤：
+# 1. cp .env.docker .env（填写 DASHSCOPE_API_KEY）
+# 2. docker-compose up -d
+# 3. 等 10 秒后访问 http://localhost:8001/docs
+# 
+# 包含服务：
+# - PostgreSQL 16 (带 pgvector) - 端口 5432
+# - Redis 7 (SSE 事件总线) - 端口 6379
+# - FastAPI 后端 - 端口 8001
+# 
+# 常用命令：
+# - 查看日志：docker-compose logs -f backend
+# - 重启：docker-compose restart backend
+# - 停止：docker-compose down
+# ============================================================
+
+version: '3.8'
+
+services:
+  # PostgreSQL 数据库
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: interactivedocs-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: interactivedocs
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Redis（SSE 事件总线）
+  redis:
+    image: redis:7-alpine
+    container_name: interactivedocs-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # 后端服务
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: interactivedocs-backend
+    ports:
+      - "8001:8001"
+    environment:
+      # 数据库配置（连接容器内的 postgres 服务）
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/interactivedocs
+      DB_ECHO: "false"
+      
+      # Redis 配置（连接容器内的 redis 服务）
+      REDIS_URL: redis://redis:6379/0
+      
+      # 文件存储（使用本地存储）
+      STORAGE_BACKEND: local
+      LOCAL_STORAGE_PATH: static
+      LOCAL_STORAGE_URL_PREFIX: /static
+      
+      # AI 配置（需要替换为你的真实 API Key）
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-your-api-key-here}
+      AI_MODEL: qwen-plus
+      AI_TIMEOUT_SECONDS: 60.0
+      AI_MAX_RETRIES: 2
+      AI_RETRY_BACKOFF_SECONDS: 0.8
+      AI_MAX_CONCURRENCY: 5
+      
+      # JWT 密钥（生产环境请修改）
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-secret-key-change-in-production}
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRE_MINUTES: 43200
+    volumes:
+      # 挂载静态文件目录（持久化上传的文件）
+      - backend_static:/app/static
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  backend_static:
