@@ -1,16 +1,18 @@
 """
 文献上传与处理服务
 
-流程：
-1. 接收 PDF 文件 → 上传 OSS → 创建 literature 记录（pending）
-2. 后台异步任务：
-   a. PyPDFLoader 解析 PDF
-   b. 按章节关键词打 section_type 标签
-   c. RecursiveCharacterTextSplitter 分块
-   d. DashScope embedding 向量化
-   e. 批量写入 literature_chunks
-   f. 正则提取 DOI → CrossRef API 补全 metadata
-   g. upload_status = ready
+支持两种处理模式：
+1. 快速模式（fast）：仅提取摘要 + 向量化，3-5秒完成
+   - 适用场景：普通用户段落级临时引用（scope='private'）
+   - 处理流程：提取摘要 → 向量化 1 个 chunk → CrossRef 补全 metadata
+   
+2. 完整模式（full）：全文解析 + 分块 + 向量化，30-60秒完成
+   - 适用场景：管理员维护知识库（scope='public'）
+   - 处理流程：全文解析 → 分块 → 向量化 N 个 chunk → CrossRef 补全 metadata
+
+根据 scope 自动选择处理模式：
+- scope='private' → 快速模式
+- scope='public' → 完整模式
 """
 
 import asyncio
@@ -30,6 +32,11 @@ from db.models import Literature, LiteratureChunk
 from db.session import AsyncSessionLocal
 from services.ai_client import get_embedding
 from services.oss_service import upload_file, delete_file, read_file
+from services.literature_extract_service import (
+    extract_abstract_smart,
+    extract_doi_from_text,
+    fetch_crossref_metadata,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -68,53 +75,125 @@ def _extract_doi(text: str) -> str | None:
 
 async def _fetch_crossref_metadata(doi: str) -> dict:
     """通过 CrossRef API 获取文献 metadata"""
-    url = f"https://api.crossref.org/works/{doi}"
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(url, headers={"User-Agent": "InteractiveDocs/1.0"})
-            if resp.status_code != 200:
-                return {}
-            data = resp.json().get("message", {})
-            authors_list = data.get("author", [])
-            authors = ", ".join(
-                f"{a.get('family', '')} {a.get('given', '')}".strip()
-                for a in authors_list[:5]
-            )
-            journal = ""
-            container = data.get("container-title", [])
-            if container:
-                journal = container[0]
-            publish_date = None
-            date_parts = data.get("published", {}).get("date-parts", [[]])
-            if date_parts and date_parts[0]:
-                parts = date_parts[0]
-                try:
-                    from datetime import date
-                    y = parts[0] if len(parts) > 0 else 2000
-                    m = parts[1] if len(parts) > 1 else 1
-                    d = parts[2] if len(parts) > 2 else 1
-                    publish_date = date(y, m, d)
-                except Exception:
-                    pass
-            title = ""
-            titles = data.get("title", [])
-            if titles:
-                title = titles[0]
-            return {
-                "title": title or None,
-                "authors": authors or None,
-                "journal": journal or None,
-                "publish_date": publish_date,
-            }
-    except Exception as e:
-        logger.warning("CrossRef API 调用失败 doi=%s: %s", doi, e)
-        return {}
+    # 复用 literature_extract_service 中的实现
+    return await fetch_crossref_metadata(doi)
 
 
-async def _process_literature_async(literature_id: UUID, file_path: str) -> None:
+async def _process_literature_fast(literature_id: UUID, file_path: str) -> None:
     """
-    后台任务：解析 PDF → 向量化 → 写入 chunks → 补全 metadata
-    file_path 为本地临时文件路径，处理完后删除
+    快速处理模式：仅提取摘要 + 向量化
+    耗时：3-5 秒
+    适用：private 文献（普通用户段落级引用）
+    
+    处理流程：
+    1. 提取摘要（extract_abstract_smart）
+    2. 向量化摘要（1 个 chunk）
+    3. 提取 DOI 并补全 metadata（可选）
+    4. 更新 processing_mode='fast', chunk_count=1
+    """
+    import os
+    try:
+        async with AsyncSessionLocal() as db:
+            await LiteratureMapper.update_status(db, literature_id, "processing")
+            await db.commit()
+
+        # 1. 提取摘要
+        logger.info("[文献处理-快速] 开始提取摘要 literature_id=%s", literature_id)
+        
+        # 先检查是否已有 DOI（用户手动填写）
+        async with AsyncSessionLocal() as db_check:
+            existing_lit = await LiteratureMapper.get_by_id(db_check, literature_id)
+            existing_doi = existing_lit.doi if existing_lit else None
+        
+        abstract = await extract_abstract_smart(file_path, existing_doi)
+        
+        if not abstract or len(abstract) < 50:
+            raise ValueError("摘要提取失败或内容过短")
+        
+        logger.info("[文献处理-快速] 摘要提取成功，长度=%d", len(abstract))
+
+        # 2. 向量化摘要
+        logger.info("[文献处理-快速] 开始向量化摘要")
+        embedding = await get_embedding(abstract)
+        
+        # 3. 写入单个 chunk（section_type='abstract'）
+        async with AsyncSessionLocal() as db:
+            from sqlalchemy import text
+            embedding_str = embedding if isinstance(embedding, str) else str(embedding)
+            sql = text(f"""
+                INSERT INTO literature_chunks
+                    (chunk_id, literature_id, section_type, content, embedding, chunk_index)
+                VALUES
+                    (:chunk_id, :literature_id, 'abstract', :content, '{embedding_str}'::vector, 0)
+            """)
+            await db.execute(sql, {
+                "chunk_id": str(uuid4()),
+                "literature_id": str(literature_id),
+                "content": abstract,
+            })
+            await db.commit()
+        
+        logger.info("[文献处理-快速] 摘要向量化完成")
+
+        # 4. 提取 DOI 并补全 metadata
+        metadata_update: dict = {}
+        
+        if existing_doi:
+            # 已有 DOI，直接补全其他字段
+            logger.info("[文献处理-快速] 已有 DOI=%s，补全 metadata", existing_doi)
+            crossref_data = await _fetch_crossref_metadata(existing_doi)
+            for k, v in crossref_data.items():
+                if v is not None and not getattr(existing_lit, k, None):
+                    metadata_update[k] = v
+        else:
+            # 尝试从摘要提取 DOI
+            doi = extract_doi_from_text(abstract)
+            if doi:
+                logger.info("[文献处理-快速] 提取到 DOI=%s，补全 metadata", doi)
+                crossref_data = await _fetch_crossref_metadata(doi)
+                metadata_update = {k: v for k, v in crossref_data.items() if v is not None}
+                metadata_update["doi"] = doi
+            else:
+                logger.info("[文献处理-快速] 未提取到 DOI，跳过 CrossRef 补全")
+
+        # 5. 更新状态和处理模式
+        async with AsyncSessionLocal() as db:
+            if metadata_update:
+                await LiteratureMapper.update_metadata(db, literature_id, metadata_update)
+                logger.info("[文献处理-快速] metadata 补全字段: %s", list(metadata_update.keys()))
+            
+            # 更新处理模式和分块数量
+            await LiteratureMapper.update_processing_info(db, literature_id, "fast", 1)
+            await LiteratureMapper.update_status(db, literature_id, "ready")
+            await db.commit()
+
+        logger.info("[文献处理-快速] ✅ 完成 literature_id=%s (耗时约 3-5 秒)", literature_id)
+
+    except Exception as e:
+        logger.error("[文献处理-快速] ❌ 失败 literature_id=%s: %s", literature_id, e, exc_info=True)
+        async with AsyncSessionLocal() as db:
+            await LiteratureMapper.update_status(db, literature_id, "failed", str(e))
+            await db.commit()
+    finally:
+        try:
+            os.remove(file_path)
+        except Exception:
+            pass
+
+
+async def _process_literature_full(literature_id: UUID, file_path: str) -> None:
+    """
+    完整处理模式：全文解析 + 分块 + 向量化
+    耗时：30-60 秒
+    适用：public 文献（admin/editor 维护的知识库）
+    
+    处理流程：
+    1. PyPDFLoader 全文解析
+    2. RecursiveCharacterTextSplitter 分块（500字/块）
+    3. 向量化所有分块
+    4. 章节类型标签（abstract/intro/method/result/conclusion）
+    5. CrossRef 补全 metadata
+    6. 更新 processing_mode='full', chunk_count=N
     """
     import os
     try:
@@ -123,7 +202,7 @@ async def _process_literature_async(literature_id: UUID, file_path: str) -> None
             await db.commit()
 
         # 1. 解析 PDF
-        logger.info("[文献处理] 开始解析 literature_id=%s", literature_id)
+        logger.info("[文献处理-完整] 开始解析 literature_id=%s", literature_id)
         pages = await asyncio.to_thread(
             lambda: PyPDFLoader(file_path).load()
         )
@@ -131,7 +210,7 @@ async def _process_literature_async(literature_id: UUID, file_path: str) -> None
             raise ValueError("PDF 解析结果为空")
 
         full_text = "\n".join(p.page_content for p in pages)
-        logger.info("[文献处理] 解析完成，共 %d 页，全文 %d 字符", len(pages), len(full_text))
+        logger.info("[文献处理-完整] 解析完成，共 %d 页，全文 %d 字符", len(pages), len(full_text))
 
         # 2. 分块
         splitter = RecursiveCharacterTextSplitter(
@@ -142,7 +221,7 @@ async def _process_literature_async(literature_id: UUID, file_path: str) -> None
         docs = splitter.create_documents([full_text])
         if not docs:
             raise ValueError("文本分块结果为空")
-        logger.info("[文献处理] 分块完成，共 %d 块", len(docs))
+        logger.info("[文献处理-完整] 分块完成，共 %d 块", len(docs))
 
         # 3. 向量化 + 写入 chunks
         chunks: list[LiteratureChunk] = []
@@ -161,7 +240,7 @@ async def _process_literature_async(literature_id: UUID, file_path: str) -> None
                 chunk_index=idx,
             ))
             if idx % progress_step == 0 or idx == len(docs) - 1:
-                logger.info("[文献处理] 向量化进度 %d/%d (%.0f%%)", idx + 1, len(docs), (idx + 1) / len(docs) * 100)
+                logger.info("[文献处理-完整] 向量化进度 %d/%d (%.0f%%)", idx + 1, len(docs), (idx + 1) / len(docs) * 100)
 
         async with AsyncSessionLocal() as db:
             for chunk in chunks:
@@ -181,45 +260,45 @@ async def _process_literature_async(literature_id: UUID, file_path: str) -> None
                     "chunk_index": chunk.chunk_index,
                 })
             await db.commit()
-        logger.info("[文献处理] 写入 %d 个分块 literature_id=%s", len(chunks), literature_id)
+        logger.info("[文献处理-完整] 写入 %d 个分块 literature_id=%s", len(chunks), literature_id)
 
         # 4. 提取 DOI，补全 metadata
-        # 如果上传时已手动填写 doi，跳过自动提取，只补全其他 metadata 字段
         async with AsyncSessionLocal() as db_check:
             existing_lit = await LiteratureMapper.get_by_id(db_check, literature_id)
             existing_doi = existing_lit.doi if existing_lit else None
 
         metadata_update: dict = {}
         if existing_doi:
-            # 已有 doi，直接用已有的调 CrossRef 补全其他字段
-            logger.info("[文献处理] 已有 DOI=%s，跳过提取，直接补全 metadata", existing_doi)
+            logger.info("[文献处理-完整] 已有 DOI=%s，补全 metadata", existing_doi)
             crossref_data = await _fetch_crossref_metadata(existing_doi)
-            # 只补全空字段，不覆盖用户已填写的内容
             for k, v in crossref_data.items():
                 if v is not None and not getattr(existing_lit, k, None):
                     metadata_update[k] = v
         else:
-            # 没有 doi，尝试从 PDF 全文提取
-            doi = _extract_doi(full_text)
+            doi = extract_doi_from_text(full_text)
             if doi:
-                logger.info("[文献处理] 提取到 DOI=%s，调用 CrossRef", doi)
+                logger.info("[文献处理-完整] 提取到 DOI=%s，补全 metadata", doi)
                 crossref_data = await _fetch_crossref_metadata(doi)
                 metadata_update = {k: v for k, v in crossref_data.items() if v is not None}
                 metadata_update["doi"] = doi
             else:
-                logger.info("[文献处理] 未提取到 DOI，跳过 CrossRef 补全")
+                logger.info("[文献处理-完整] 未提取到 DOI，跳过 CrossRef 补全")
 
+        # 5. 更新状态和处理模式
         async with AsyncSessionLocal() as db:
             if metadata_update:
                 await LiteratureMapper.update_metadata(db, literature_id, metadata_update)
-                logger.info("[文献处理] metadata 补全字段: %s", list(metadata_update.keys()))
+                logger.info("[文献处理-完整] metadata 补全字段: %s", list(metadata_update.keys()))
+            
+            # 更新处理模式和分块数量
+            await LiteratureMapper.update_processing_info(db, literature_id, "full", len(chunks))
             await LiteratureMapper.update_status(db, literature_id, "ready")
             await db.commit()
 
-        logger.info("[文献处理] ✅ 完成 literature_id=%s", literature_id)
+        logger.info("[文献处理-完整] ✅ 完成 literature_id=%s (耗时约 30-60 秒)", literature_id)
 
     except Exception as e:
-        logger.error("[文献处理] ❌ 失败 literature_id=%s: %s", literature_id, e, exc_info=True)
+        logger.error("[文献处理-完整] ❌ 失败 literature_id=%s: %s", literature_id, e, exc_info=True)
         async with AsyncSessionLocal() as db:
             await LiteratureMapper.update_status(db, literature_id, "failed", str(e))
             await db.commit()
@@ -247,8 +326,11 @@ class LiteratureService:
         2. 上传 OSS
         3. 创建 literature 记录（pending），scope/user_id 由调用方传入
         4. literature_key：传入则使用（跨系统迁移），不传则自动生成 lit_xxxxxxxx
-        5. 启动后台处理任务
-        6. 立即返回 literature 对象
+        5. 根据 scope 自动选择处理模式：
+           - scope='private' → 快速模式（3-5秒）
+           - scope='public' → 完整模式（30-60秒）
+        6. 启动后台处理任务
+        7. 立即返回 literature 对象
         """
         import tempfile
 
@@ -266,11 +348,16 @@ class LiteratureService:
         object_key = f"literature/{uuid4().hex}.pdf"
         file_url = await upload_file(file_content, object_key, "application/pdf")
 
+        # 根据 scope 决定初始 processing_mode
+        processing_mode = "fast" if scope == "private" else "full"
+
         literature = Literature(
             literature_key=literature_key,
             source_file=file_url,
             upload_status="pending",
             scope=scope,
+            processing_mode=processing_mode,
+            chunk_count=0,
             user_id=user_id,
         )
         result = await LiteratureMapper.create(db, literature)
@@ -280,10 +367,23 @@ class LiteratureService:
         try:
             tmp.write(file_content)
             tmp.close()
-            task = asyncio.create_task(
-                _process_literature_async(result.literature_id, tmp.name),
-                name=f"literature_process_{result.literature_id}",
-            )
+            
+            # 根据 scope 选择处理函数
+            if scope == "public":
+                # 完整模式：全文处理
+                task = asyncio.create_task(
+                    _process_literature_full(result.literature_id, tmp.name),
+                    name=f"literature_full_{result.literature_id}",
+                )
+                logger.info("[文献上传] 启动完整模式处理 literature_id=%s scope=%s", result.literature_id, scope)
+            else:
+                # 快速模式：仅摘要
+                task = asyncio.create_task(
+                    _process_literature_fast(result.literature_id, tmp.name),
+                    name=f"literature_fast_{result.literature_id}",
+                )
+                logger.info("[文献上传] 启动快速模式处理 literature_id=%s scope=%s", result.literature_id, scope)
+            
             task.add_done_callback(log_task_exception)
         except Exception:
             import os
@@ -359,7 +459,7 @@ class LiteratureService:
 
     @staticmethod
     async def retry(db, literature_id: UUID) -> Literature:
-        """重新处理失败的文献"""
+        """重新处理失败的文献（保持原有的处理模式）"""
         import tempfile
         from fastapi import HTTPException
         lit = await LiteratureMapper.get_by_id(db, literature_id)
@@ -386,10 +486,21 @@ class LiteratureService:
         try:
             tmp.write(file_content)
             tmp.close()
-            task = asyncio.create_task(
-                _process_literature_async(literature_id, tmp.name),
-                name=f"literature_retry_{literature_id}",
-            )
+            
+            # 根据原有的 processing_mode 选择处理函数
+            if lit.processing_mode == "full":
+                task = asyncio.create_task(
+                    _process_literature_full(literature_id, tmp.name),
+                    name=f"literature_retry_full_{literature_id}",
+                )
+                logger.info("[文献重试] 使用完整模式 literature_id=%s", literature_id)
+            else:
+                task = asyncio.create_task(
+                    _process_literature_fast(literature_id, tmp.name),
+                    name=f"literature_retry_fast_{literature_id}",
+                )
+                logger.info("[文献重试] 使用快速模式 literature_id=%s", literature_id)
+            
             task.add_done_callback(log_task_exception)
         except Exception:
             import os

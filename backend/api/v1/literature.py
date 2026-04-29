@@ -47,6 +47,8 @@ def _lit_response(lit, user_name: str | None = None) -> LiteratureResponse:
         upload_status=lit.upload_status,
         error_message=lit.error_message,
         scope=lit.scope,
+        processing_mode=lit.processing_mode,
+        chunk_count=lit.chunk_count,
         user_id=lit.user_id,
         user_name=user_name,
         created_at=lit.created_at,
@@ -94,12 +96,15 @@ async def upload_literature(
 ):
     """
     上传 PDF 文献到知识库。
-    - admin/editor 上传的文献 scope=public，所有人可见
-    - 普通用户上传的文献 scope=private，仅自己可见
-    - 可选填元数据（title/authors/journal/doi/impact_factor），填了则跳过对应字段的 CrossRef 自动补全
-    - literature_key：跨系统迁移时传入导出方的 key，不传则自动生成
-    - 立即返回 literature_id 和 pending 状态
-    - 后台异步处理：解析 → 向量化 → CrossRef 补全未填写的 metadata
+    
+    处理模式自动选择：
+    - admin/editor 上传 → scope=public → 完整模式（30-60秒，全文分块）
+    - 普通用户上传 → scope=private → 快速模式（3-5秒，仅摘要）
+    
+    可选填元数据（title/authors/journal/doi/impact_factor），填了则跳过对应字段的 CrossRef 自动补全。
+    literature_key：跨系统迁移时传入导出方的 key，不传则自动生成。
+    
+    立即返回 literature_id 和 pending 状态，后台异步处理。
     """
     scope = "public" if current_user.role in (UserRole.EDITOR, UserRole.ADMIN) else "private"
     file_content = await file.read()

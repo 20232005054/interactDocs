@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
@@ -6,6 +6,7 @@ from typing import Optional, List
 from pydantic import BaseModel
 
 from core.response import success_response, ResponseModel
+from core.auth import get_current_user
 from db.session import get_db
 from services.paragraph_service import ParagraphService
 from services import ai_service
@@ -141,3 +142,217 @@ async def get_paragraph_summaries(paragraph_id: UUID, db: AsyncSession = Depends
 async def reorder_paragraphs(document_id: UUID, payload: ParagraphReorderPayload, db: AsyncSession = Depends(get_db)):
     await ParagraphService.reorder_paragraphs(db, document_id, payload.items)
     return success_response(message="排序更新成功")
+
+
+# ============================================================
+# 段落文献管理接口
+# ============================================================
+
+@router.post(
+    "/paragraphs/{paragraph_id}/literature/upload",
+    summary="上传文献并绑定到段落（快速模式）",
+    response_model=ResponseModel[dict],
+)
+async def upload_literature_to_paragraph(
+    paragraph_id: UUID,
+    file: UploadFile = File(...),
+    title: Optional[str] = Form(None),
+    authors: Optional[str] = Form(None),
+    doi: Optional[str] = Form(None),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """
+    上传文献并绑定到段落（强制快速模式）。
+    即使是 admin/editor，段落级上传也用快速模式，因为：
+    1. 用户期望立即可用
+    2. 段落级引用通常是临时性的
+    """
+    from services.literature_service import LiteratureService
+    from db.mappers.paragraph_literature_mapper import ParagraphLiteratureMapper
+    from db.mappers.paragraph_mapper import ParagraphMapper
+    from db.mappers.chapter_mapper import ChapterMapper
+    from db.mappers.document_mapper import DocumentMapper
+    from core.auth import get_current_user
+    from fastapi import UploadFile, File, Form
+    
+    # 验证段落权限
+    paragraph = await ParagraphMapper.get_by_id(db, paragraph_id)
+    if not paragraph:
+        raise HTTPException(status_code=404, detail="段落不存在")
+    
+    chapter = await ChapterMapper.get_by_id(db, paragraph.chapter_id)
+    document = await DocumentMapper.get_by_id(db, chapter.document_id)
+    
+    if str(document.user_id) != str(current_user.user_id):
+        raise HTTPException(status_code=403, detail="无权操作此段落")
+    
+    # 强制 scope=private，触发快速模式
+    file_content = await file.read()
+    lit = await LiteratureService.upload(
+        db,
+        file_content=file_content,
+        filename=file.filename or "upload.pdf",
+        scope="private",  # 强制快速模式
+        user_id=current_user.user_id,
+    )
+    
+    # 如果用户填写了元数据，立即写入
+    manual_meta = {k: v for k, v in {
+        "title": title,
+        "authors": authors,
+        "doi": doi,
+    }.items() if v is not None}
+    
+    if manual_meta:
+        from db.mappers.literature_mapper import LiteratureMapper
+        await LiteratureMapper.update_metadata(db, lit.literature_id, manual_meta)
+        await db.commit()
+        await db.refresh(lit)
+    
+    # 自动绑定到段落
+    await ParagraphLiteratureMapper.bind(db, paragraph_id, lit.literature_id)
+    await db.commit()
+    
+    return success_response(data={
+        "literature_id": str(lit.literature_id),
+        "literature_key": lit.literature_key,
+        "processing_mode": "fast",
+        "estimated_time": "3-5秒",
+        "bound_to_paragraph": True,
+        "upload_status": lit.upload_status,
+    })
+
+
+@router.post(
+    "/paragraphs/{paragraph_id}/literature/{literature_id}",
+    summary="绑定已有文献到段落",
+    response_model=ResponseModel[None],
+)
+async def bind_literature_to_paragraph(
+    paragraph_id: UUID,
+    literature_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """绑定已有文献到段落"""
+    from services.literature_service import LiteratureService
+    from db.mappers.paragraph_literature_mapper import ParagraphLiteratureMapper
+    from db.mappers.paragraph_mapper import ParagraphMapper
+    from db.mappers.chapter_mapper import ChapterMapper
+    from db.mappers.document_mapper import DocumentMapper
+    from core.auth import get_current_user
+    
+    # 验证段落权限
+    paragraph = await ParagraphMapper.get_by_id(db, paragraph_id)
+    if not paragraph:
+        raise HTTPException(status_code=404, detail="段落不存在")
+    
+    chapter = await ChapterMapper.get_by_id(db, paragraph.chapter_id)
+    document = await DocumentMapper.get_by_id(db, chapter.document_id)
+    
+    if str(document.user_id) != str(current_user.user_id):
+        raise HTTPException(status_code=403, detail="无权操作此段落")
+    
+    # 验证文献存在且有权访问
+    lit = await LiteratureService.get_by_id(db, literature_id)
+    if not lit:
+        raise HTTPException(status_code=404, detail="文献不存在")
+    
+    # private 文献只有上传者可绑定
+    if lit.scope == "private" and str(lit.user_id) != str(current_user.user_id):
+        raise HTTPException(status_code=403, detail="只能绑定自己上传的私有文献")
+    
+    # 绑定
+    await ParagraphLiteratureMapper.bind(db, paragraph_id, literature_id)
+    await db.commit()
+    
+    return success_response(message="绑定成功")
+
+
+@router.delete(
+    "/paragraphs/{paragraph_id}/literature/{literature_id}",
+    summary="解绑文献与段落",
+    response_model=ResponseModel[None],
+)
+async def unbind_literature_from_paragraph(
+    paragraph_id: UUID,
+    literature_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """解绑文献与段落"""
+    from db.mappers.paragraph_literature_mapper import ParagraphLiteratureMapper
+    from db.mappers.paragraph_mapper import ParagraphMapper
+    from db.mappers.chapter_mapper import ChapterMapper
+    from db.mappers.document_mapper import DocumentMapper
+    from core.auth import get_current_user
+    
+    # 验证段落权限
+    paragraph = await ParagraphMapper.get_by_id(db, paragraph_id)
+    if not paragraph:
+        raise HTTPException(status_code=404, detail="段落不存在")
+    
+    chapter = await ChapterMapper.get_by_id(db, paragraph.chapter_id)
+    document = await DocumentMapper.get_by_id(db, chapter.document_id)
+    
+    if str(document.user_id) != str(current_user.user_id):
+        raise HTTPException(status_code=403, detail="无权操作此段落")
+    
+    # 解绑
+    success = await ParagraphLiteratureMapper.unbind(db, paragraph_id, literature_id)
+    await db.commit()
+    
+    if not success:
+        raise HTTPException(status_code=404, detail="绑定关系不存在")
+    
+    return success_response(message="解绑成功")
+
+
+@router.get(
+    "/paragraphs/{paragraph_id}/literature",
+    summary="获取段落绑定的文献列表",
+    response_model=ResponseModel[dict],
+)
+async def list_paragraph_literature(
+    paragraph_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """获取段落绑定的文献列表"""
+    from db.mappers.paragraph_literature_mapper import ParagraphLiteratureMapper
+    from db.mappers.paragraph_mapper import ParagraphMapper
+    from schemas.response_schemas import LiteratureResponse
+    
+    # 验证段落存在
+    paragraph = await ParagraphMapper.get_by_id(db, paragraph_id)
+    if not paragraph:
+        raise HTTPException(status_code=404, detail="段落不存在")
+    
+    # 获取绑定的文献列表
+    items = await ParagraphLiteratureMapper.list_by_paragraph_id(db, paragraph_id)
+    
+    return success_response(data={
+        "items": [
+            LiteratureResponse(
+                literature_id=lit.literature_id,
+                literature_key=lit.literature_key,
+                title=lit.title,
+                authors=lit.authors,
+                journal=lit.journal,
+                publish_date=lit.publish_date,
+                doi=lit.doi,
+                impact_factor=lit.impact_factor,
+                source_file=lit.source_file,
+                upload_status=lit.upload_status,
+                error_message=lit.error_message,
+                scope=lit.scope,
+                processing_mode=lit.processing_mode,
+                chunk_count=lit.chunk_count,
+                user_id=lit.user_id,
+                created_at=lit.created_at,
+            )
+            for lit in items
+        ],
+        "total": len(items),
+    })
+

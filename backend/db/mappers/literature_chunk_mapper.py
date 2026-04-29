@@ -84,3 +84,54 @@ class LiteratureChunkMapper:
             .where(LiteratureChunk.literature_id == literature_id)
         )
         return len(result.scalars().all())
+
+    @staticmethod
+    async def search_by_paragraph_id(
+        db: AsyncSession,
+        paragraph_id: UUID,
+        user_id: UUID,
+        query_embedding: list[float],
+        top_k: int = 3,
+    ) -> list[dict]:
+        """
+        向量相似度检索（段落级）。
+        检索该段落绑定的文献分块：
+          - scope='public' 的文献对所有人可见
+          - scope='private' 的文献只对上传者（user_id）可见
+        返回 top_k 个最相关片段，含 literature 主表信息。
+        """
+        embedding_str = "[" + ",".join(str(v) for v in query_embedding) + "]"
+        sql = text("""
+            SELECT
+                lc.chunk_id,
+                lc.literature_id,
+                lc.section_type,
+                lc.content,
+                lc.chunk_index,
+                1 - (lc.embedding <=> :embedding ::vector) AS similarity,
+                l.title,
+                l.authors,
+                l.journal,
+                l.publish_date,
+                l.doi,
+                l.impact_factor
+            FROM literature_chunks lc
+            JOIN literature l ON lc.literature_id = l.literature_id
+            JOIN paragraph_literature pl ON l.literature_id = pl.literature_id
+            WHERE pl.paragraph_id = :paragraph_id
+              AND (
+                  l.scope = 'public'
+                  OR (l.scope = 'private' AND l.user_id = :user_id)
+              )
+              AND l.upload_status = 'ready'
+            ORDER BY lc.embedding <=> :embedding ::vector
+            LIMIT :top_k
+        """)
+        result = await db.execute(sql, {
+            "embedding": embedding_str,
+            "paragraph_id": str(paragraph_id),
+            "user_id": str(user_id),
+            "top_k": top_k,
+        })
+        rows = result.mappings().all()
+        return [dict(row) for row in rows]

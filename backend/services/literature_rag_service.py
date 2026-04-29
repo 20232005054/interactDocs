@@ -2,7 +2,7 @@
 文献 RAG 检索服务
 
 职责：
-1. 根据 document_template_id + user_id 检索相关文献分块（pgvector 向量检索）
+1. 两级检索：段落文献优先，模板文献补充
 2. 格式化引用上下文注入 AI prompt
 3. 解析 AI 返回内容中的 [1][2] 标记，写入 document_citations 表
 """
@@ -32,7 +32,7 @@ class LiteratureRagService:
         top_k: int = 5,
     ) -> tuple[str, list[dict]]:
         """
-        向量检索 + 格式化引用上下文。
+        向量检索 + 格式化引用上下文（模板级）。
 
         直接通过文档绑定的 template_id（type=0 私有副本）查关联表，
         检索 public 文献 + 当前用户的 private 文献。
@@ -63,7 +63,7 @@ class LiteratureRagService:
             return "", []
 
         logger.info(
-            "[RAG] 检索到 %d 个 chunk，template_id=%s query_len=%d",
+            "[RAG-模板] 检索到 %d 个 chunk，template_id=%s query_len=%d",
             len(chunks), document_template_id, len(query)
         )
 
@@ -71,20 +71,122 @@ class LiteratureRagService:
         seen_literature_ids: set = set()
         deduped_chunks = []
         for chunk in chunks:
-            lid = chunk["literature_id"]
-            if lid not in seen_literature_ids:
-                seen_literature_ids.add(lid)
+            lit_id = chunk["literature_id"]
+            if lit_id not in seen_literature_ids:
+                seen_literature_ids.add(lit_id)
+                chunk["source"] = "template"  # 标记来源
                 deduped_chunks.append(chunk)
 
-        # 构建引用列表和上下文字符串
+        # 复用格式化逻辑
+        return LiteratureRagService._format_context_and_citations(deduped_chunks)
+
+    @staticmethod
+    async def retrieve_and_format_for_paragraph(
+        db: AsyncSession,
+        paragraph_id: UUID,
+        document_template_id: UUID,
+        user_id: UUID,
+        query: str,
+        top_k: int = 5,
+    ) -> tuple[str, list[dict]]:
+        """
+        两级检索策略（段落级）：
+        1. 优先检索段落绑定的文献（top_k=3）
+        2. 补充检索模板绑定的文献（top_k=2）
+        3. 合并去重，总共返回 top_k=5 个片段
+        
+        Returns:
+            (context_str, citations)
+            - context_str: 注入 prompt 的引用上下文字符串
+            - citations: [{"number": 1, "literature_id": UUID, "source": "paragraph"|"template", ...}]
+        """
+        if not query or not query.strip():
+            return "", []
+
+        try:
+            query_embedding = await get_embedding(query)
+        except Exception as e:
+            logger.warning("文献检索 embedding 失败，跳过文献注入: %s", e)
+            return "", []
+
+        # 第一优先级：段落文献
+        paragraph_chunks = []
+        try:
+            paragraph_chunks = await LiteratureChunkMapper.search_by_paragraph_id(
+                db, paragraph_id, user_id, query_embedding, top_k=3
+            )
+            logger.info(
+                "[RAG-段落] 检索到 %d 个 chunk paragraph_id=%s",
+                len(paragraph_chunks), paragraph_id
+            )
+        except Exception as e:
+            logger.warning("段落文献检索失败: %s", e)
+
+        # 第二优先级：模板文献（补充）
+        template_chunks = []
+        remaining = top_k - len(paragraph_chunks)
+        if remaining > 0:
+            try:
+                template_chunks = await LiteratureChunkMapper.search_by_template_id(
+                    db, document_template_id, user_id, query_embedding, top_k=remaining
+                )
+                logger.info(
+                    "[RAG-模板] 检索到 %d 个 chunk template_id=%s",
+                    len(template_chunks), document_template_id
+                )
+            except Exception as e:
+                logger.warning("模板文献检索失败: %s", e)
+
+        # 合并去重（按 literature_id 去重，段落文献优先）
+        seen_lit_ids = set()
+        merged_chunks = []
+
+        for chunk in paragraph_chunks:
+            lit_id = chunk["literature_id"]
+            if lit_id not in seen_lit_ids:
+                seen_lit_ids.add(lit_id)
+                chunk["source"] = "paragraph"  # 标记来源
+                merged_chunks.append(chunk)
+
+        for chunk in template_chunks:
+            lit_id = chunk["literature_id"]
+            if lit_id not in seen_lit_ids:
+                seen_lit_ids.add(lit_id)
+                chunk["source"] = "template"  # 标记来源
+                merged_chunks.append(chunk)
+
+        if not merged_chunks:
+            return "", []
+
+        logger.info(
+            "[RAG-合并] 最终 %d 个 chunk (段落:%d, 模板:%d)",
+            len(merged_chunks), len(paragraph_chunks), len([c for c in merged_chunks if c.get("source") == "template"])
+        )
+
+        # 构建引用列表和上下文字符串（复用现有逻辑）
+        return LiteratureRagService._format_context_and_citations(merged_chunks[:top_k])
+
+    @staticmethod
+    def _format_context_and_citations(chunks: list[dict]) -> tuple[str, list[dict]]:
+        """
+        格式化文献片段为引用上下文和引用列表（内部方法）
+        
+        Args:
+            chunks: 文献片段列表，每项包含 literature_id, title, content, source 等字段
+            
+        Returns:
+            (context_str, citations)
+        """
         citations = []
         context_parts = []
-        for i, chunk in enumerate(deduped_chunks, start=1):
+        
+        for i, chunk in enumerate(chunks, start=1):
             title = chunk.get("title") or "未知文献"
             journal = chunk.get("journal") or ""
             publish_date = chunk.get("publish_date")
             year = publish_date.year if publish_date else ""
             doi = chunk.get("doi") or ""
+            source = chunk.get("source", "template")  # 默认为模板文献
 
             ref_line = f"[{i}] {title}"
             if journal:
@@ -105,6 +207,7 @@ class LiteratureRagService:
                 "doi": doi,
                 "authors": chunk.get("authors") or "",
                 "impact_factor": chunk.get("impact_factor"),
+                "source": source,  # 标记来源：paragraph 或 template
             })
 
         context_str = (

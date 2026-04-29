@@ -198,13 +198,14 @@ async def ai_assist_paragraph(
             else:
                 prompt = await _build_assist_prompt(db, paragraph, chapter, document, instruction)
 
-            # 注入文献 RAG 上下文
+            # 注入文献 RAG 上下文（两级检索：段落文献优先，模板文献补充）
             try:
                 from services.literature_rag_service import LiteratureRagService
                 if document.template_id and document.user_id:
                     query = f"{chapter.title} {prompt}"[:500]
-                    literature_context, lit_citations = await LiteratureRagService.retrieve_and_format(
+                    literature_context, lit_citations = await LiteratureRagService.retrieve_and_format_for_paragraph(
                         db=db,
+                        paragraph_id=paragraph_id,
                         document_template_id=document.template_id,
                         user_id=document.user_id,
                         query=query,

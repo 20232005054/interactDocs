@@ -50,6 +50,10 @@ class LiteratureResponse(BaseModel):
     error_message: Optional[str] = None
     scope: str
     # scope: 'public'=公共文献, 'private'=用户私有文献
+    processing_mode: str = "fast"
+    # processing_mode: 'fast'=快速模式（仅摘要，3秒）, 'full'=完整模式（全文分块，30-60秒）
+    chunk_count: int = 0
+    # chunk_count: 分块数量，fast=1, full=N
     user_id: Optional[UUID] = None
     user_name: Optional[str] = None
     created_at: datetime

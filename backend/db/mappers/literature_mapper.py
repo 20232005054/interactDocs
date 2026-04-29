@@ -100,6 +100,20 @@ class LiteratureMapper:
         )
 
     @staticmethod
+    async def update_processing_info(
+        db: AsyncSession,
+        literature_id: UUID,
+        processing_mode: str,
+        chunk_count: int,
+    ) -> None:
+        """更新文献处理模式和分块数量"""
+        await db.execute(
+            sa_update(Literature)
+            .where(Literature.literature_id == literature_id)
+            .values(processing_mode=processing_mode, chunk_count=chunk_count)
+        )
+
+    @staticmethod
     async def delete(db: AsyncSession, literature_id: UUID) -> bool:
         result = await db.execute(
             sa_delete(Literature).where(Literature.literature_id == literature_id)

@@ -317,12 +317,17 @@ class Literature(Base):
     error_message   = Column(Text, nullable=True)
     scope           = Column(String(20), nullable=False, default="private")
     # scope: 'public'=admin/editor 维护的公共文献, 'private'=用户私有文献
+    processing_mode = Column(String(20), nullable=False, default="fast")
+    # processing_mode: 'fast'=快速模式（仅摘要，3秒）, 'full'=完整模式（全文分块，30-60秒）
+    chunk_count     = Column(Integer, nullable=False, default=0)
+    # chunk_count: 分块数量，fast模式=1，full模式=N
     user_id         = Column(UUID(as_uuid=True), ForeignKey("users.user_id"), nullable=True)
     created_at      = Column(TIMESTAMP, server_default=func.now())
 
     chunks          = relationship("LiteratureChunk", back_populates="literature", cascade="all, delete-orphan")
     citations       = relationship("DocumentCitation", back_populates="literature", cascade="all, delete-orphan")
     template_links  = relationship("TemplateLiterature", back_populates="literature", cascade="all, delete-orphan")
+    paragraph_links = relationship("ParagraphLiterature", back_populates="literature", cascade="all, delete-orphan")
 
 
 class TemplateLiterature(Base):
@@ -366,3 +371,16 @@ class DocumentCitation(Base):
     created_at      = Column(TIMESTAMP, server_default=func.now())
 
     literature      = relationship("Literature", back_populates="citations")
+
+
+class ParagraphLiterature(Base):
+    """段落-文献关联表（多对多），支持段落级精准文献引用"""
+    __tablename__ = "paragraph_literature"
+
+    id              = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    paragraph_id    = Column(UUID(as_uuid=True), ForeignKey("paragraphs.paragraph_id", ondelete="CASCADE"), nullable=False)
+    literature_id   = Column(UUID(as_uuid=True), ForeignKey("literature.literature_id", ondelete="CASCADE"), nullable=False)
+    created_at      = Column(TIMESTAMP, server_default=func.now())
+
+    # 关系
+    literature      = relationship("Literature", back_populates="paragraph_links")
