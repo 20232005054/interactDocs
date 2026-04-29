@@ -177,12 +177,12 @@ async def upload_literature_to_paragraph(
     from fastapi import UploadFile, File, Form
     
     # 验证段落权限
-    paragraph = await ParagraphMapper.get_by_id(db, paragraph_id)
+    paragraph = await ParagraphMapper.get_paragraph_by_id(db, paragraph_id)
     if not paragraph:
         raise HTTPException(status_code=404, detail="段落不存在")
     
-    chapter = await ChapterMapper.get_by_id(db, paragraph.chapter_id)
-    document = await DocumentMapper.get_by_id(db, chapter.document_id)
+    chapter = await ChapterMapper.get_chapter_by_id(db, paragraph.chapter_id)
+    document = await DocumentMapper.get_document_by_id(db, chapter.document_id)
     
     if str(document.user_id) != str(current_user.user_id):
         raise HTTPException(status_code=403, detail="无权操作此段落")
@@ -244,12 +244,12 @@ async def bind_literature_to_paragraph(
     from core.auth import get_current_user
     
     # 验证段落权限
-    paragraph = await ParagraphMapper.get_by_id(db, paragraph_id)
+    paragraph = await ParagraphMapper.get_paragraph_by_id(db, paragraph_id)
     if not paragraph:
         raise HTTPException(status_code=404, detail="段落不存在")
     
-    chapter = await ChapterMapper.get_by_id(db, paragraph.chapter_id)
-    document = await DocumentMapper.get_by_id(db, chapter.document_id)
+    chapter = await ChapterMapper.get_chapter_by_id(db, paragraph.chapter_id)
+    document = await DocumentMapper.get_document_by_id(db, chapter.document_id)
     
     if str(document.user_id) != str(current_user.user_id):
         raise HTTPException(status_code=403, detail="无权操作此段落")
@@ -289,12 +289,12 @@ async def unbind_literature_from_paragraph(
     from core.auth import get_current_user
     
     # 验证段落权限
-    paragraph = await ParagraphMapper.get_by_id(db, paragraph_id)
+    paragraph = await ParagraphMapper.get_paragraph_by_id(db, paragraph_id)
     if not paragraph:
         raise HTTPException(status_code=404, detail="段落不存在")
     
-    chapter = await ChapterMapper.get_by_id(db, paragraph.chapter_id)
-    document = await DocumentMapper.get_by_id(db, chapter.document_id)
+    chapter = await ChapterMapper.get_chapter_by_id(db, paragraph.chapter_id)
+    document = await DocumentMapper.get_document_by_id(db, chapter.document_id)
     
     if str(document.user_id) != str(current_user.user_id):
         raise HTTPException(status_code=403, detail="无权操作此段落")
@@ -324,7 +324,7 @@ async def list_paragraph_literature(
     from schemas.response_schemas import LiteratureResponse
     
     # 验证段落存在
-    paragraph = await ParagraphMapper.get_by_id(db, paragraph_id)
+    paragraph = await ParagraphMapper.get_paragraph_by_id(db, paragraph_id)
     if not paragraph:
         raise HTTPException(status_code=404, detail="段落不存在")
     

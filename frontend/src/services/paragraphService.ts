@@ -4,6 +4,7 @@ import type {
   ParagraphListResponse,
   CreateParagraphPayload,
   UpdateParagraphPayload,
+  LiteratureListResponse,
 } from "@/types/api"
 
 export interface EvaluateAIResult {
@@ -126,4 +127,8 @@ export const paragraphService = {
       }
     }
   },
+
+  // 查询段落绑定的文献
+  listLiterature: (paragraphId: string): Promise<LiteratureListResponse> =>
+    request.get(`/api/v1/paragraphs/${paragraphId}/literature`),
 }

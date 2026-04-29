@@ -7,6 +7,7 @@ import { Markdown } from "tiptap-markdown"
 import { useAIAssist } from "@/hooks/useAIAssist"
 import { useChatStore } from "@/store/chatStore"
 import { paragraphService, type EvaluateAIResult } from "@/services/paragraphService"
+import ParagraphLiteraturePanel from "./ParagraphLiteraturePanel"
 import { cn } from "@/lib/utils"
 import type { ParaType } from "@/types/api"
 
@@ -72,6 +73,7 @@ export default function ParagraphToolbar({
   const [showAssistInput, setShowAssistInput] = useState(false)
   const [assistInstruction, setAssistInstruction] = useState("")
   const [assistError, setAssistError] = useState<string | null>(null)
+  const [showLiterature, setShowLiterature] = useState(false)
   const evalAbortRef = useRef<AbortController | null>(null)
 
   const isAssisting = aiAssistingParagraphId === paragraphId
@@ -131,7 +133,7 @@ export default function ParagraphToolbar({
         className={cn(
           "flex items-center gap-1 rounded-lg border border-gray-200 bg-white/95 px-1.5 py-1 shadow-sm transition w-fit",
           "opacity-0 pointer-events-none h-0 overflow-hidden",
-          (visible || isAssisting || showEval || showAssistInput) && "opacity-100 pointer-events-auto h-auto overflow-visible"
+          (visible || isAssisting || showEval || showAssistInput || showLiterature) && "opacity-100 pointer-events-auto h-auto overflow-visible"
         )}
       >
         <button
@@ -171,6 +173,18 @@ export default function ParagraphToolbar({
           )}
         >
           {evaluating ? "评估中..." : "AI 评估"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowLiterature((prev) => !prev)}
+          className={cn(
+            "h-6 px-2 rounded text-xs transition font-medium",
+            showLiterature
+              ? "bg-teal-100 text-teal-700 hover:bg-teal-200"
+              : "bg-teal-50 text-teal-600 hover:bg-teal-100"
+          )}
+        >
+          {showLiterature ? "收起文献" : "文献管理"}
         </button>
       </div>
 
@@ -279,6 +293,13 @@ export default function ParagraphToolbar({
           )}
         </div>
       )}
+
+      {/* 段落文献管理面板 */}
+      <ParagraphLiteraturePanel
+        paragraphId={paragraphId}
+        visible={showLiterature}
+        onClose={() => setShowLiterature(false)}
+      />
     </div>
   )
 }

@@ -4,6 +4,7 @@ import type {
   LiteratureListResponse,
   UpdateLiteraturePayload,
   UploadLiteraturePayload,
+  ParagraphLiteratureUploadPayload,
 } from "@/types/api"
 
 export const literatureService = {
@@ -44,4 +45,27 @@ export const literatureService = {
 
   unbind: (templateId: string, literatureId: string): Promise<void> =>
     request.delete(`/api/v1/templates/${templateId}/literature/${literatureId}`),
+
+  // 段落文献管理
+  uploadToParagraph: async (
+    paragraphId: string,
+    payload: ParagraphLiteratureUploadPayload
+  ): Promise<Literature> => {
+    const form = new FormData()
+    form.append("file", payload.file)
+    if (payload.title) form.append("title", payload.title)
+    if (payload.authors) form.append("authors", payload.authors)
+    if (payload.journal) form.append("journal", payload.journal)
+    if (payload.doi) form.append("doi", payload.doi)
+    if (payload.impact_factor != null) form.append("impact_factor", String(payload.impact_factor))
+    return request.post(`/api/v1/paragraphs/${paragraphId}/literature/upload`, form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
+  },
+
+  bindToParagraph: (paragraphId: string, literatureId: string): Promise<void> =>
+    request.post(`/api/v1/paragraphs/${paragraphId}/literature/${literatureId}`),
+
+  unbindFromParagraph: (paragraphId: string, literatureId: string): Promise<void> =>
+    request.delete(`/api/v1/paragraphs/${paragraphId}/literature/${literatureId}`),
 }

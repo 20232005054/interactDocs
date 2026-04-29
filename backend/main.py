@@ -27,7 +27,7 @@ except ImportError:
 # logging.WARNING - 只输出警告和错误
 # logging.ERROR - 只输出错误
 logging.basicConfig(
-    level=logging.WARNING,
+    level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     datefmt="%H:%M:%S",
 )

@@ -557,6 +557,7 @@ export interface UpdateCoreInfoPayload {
 // ============================================================
 export type LiteratureUploadStatus = "pending" | "processing" | "ready" | "failed"
 export type LiteratureScope = "public" | "private"
+export type LiteratureProcessingMode = "fast" | "full"
 
 export interface Literature {
   literature_id: string
@@ -571,6 +572,8 @@ export interface Literature {
   upload_status: LiteratureUploadStatus
   error_message: string | null
   scope: LiteratureScope
+  processing_mode: LiteratureProcessingMode
+  chunk_count: number
   user_id: string | null
   user_name: string | null
   created_at: string
@@ -591,6 +594,15 @@ export interface UploadLiteraturePayload {
 }
 
 export interface UpdateLiteraturePayload {
+  title?: string
+  authors?: string
+  journal?: string
+  doi?: string
+  impact_factor?: number
+}
+
+export interface ParagraphLiteratureUploadPayload {
+  file: File
   title?: string
   authors?: string
   journal?: string
