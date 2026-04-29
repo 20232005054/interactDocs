@@ -248,6 +248,7 @@ CREATE TABLE IF NOT EXISTS dependency_edges (
 
 -- 7.1 文献主表（独立存在，通过关联表绑定到模板）
 -- scope: 'public'=admin/editor 维护的公共文献, 'private'=用户私有文献
+-- processing_mode: 'fast'=快速模式（仅摘要，3秒）, 'full'=完整模式（全文分块，30-60秒）
 CREATE TABLE IF NOT EXISTS literature (
     literature_id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     literature_key  VARCHAR(20) NOT NULL UNIQUE,
@@ -264,6 +265,8 @@ CREATE TABLE IF NOT EXISTS literature (
     error_message   TEXT,
     scope           VARCHAR(20) NOT NULL DEFAULT 'private',
     user_id         UUID REFERENCES users(user_id),
+    processing_mode VARCHAR(20) NOT NULL DEFAULT 'fast',
+    chunk_count     INTEGER NOT NULL DEFAULT 0,
     created_at      TIMESTAMP DEFAULT NOW()
 );
 
@@ -298,6 +301,17 @@ CREATE TABLE IF NOT EXISTS document_citations (
     literature_id   UUID NOT NULL REFERENCES literature(literature_id) ON DELETE CASCADE,
     citation_number INTEGER NOT NULL,
     created_at      TIMESTAMP DEFAULT NOW()
+);
+
+-- 7.5 段落-文献关联表（多对多，支持段落级精准文献引用）
+CREATE TABLE IF NOT EXISTS paragraph_literature (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    paragraph_id    UUID NOT NULL REFERENCES paragraphs(paragraph_id) ON DELETE CASCADE,
+    literature_id   UUID NOT NULL REFERENCES literature(literature_id) ON DELETE CASCADE,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- 唯一约束：同一段落不能重复绑定同一文献
+    CONSTRAINT uk_paragraph_literature UNIQUE (paragraph_id, literature_id)
 );
 
 -- ============================================
@@ -370,3 +384,7 @@ CREATE INDEX IF NOT EXISTS idx_literature_chunks_literature_id ON literature_chu
 -- 引用关联索引
 CREATE INDEX IF NOT EXISTS idx_document_citations_document_id ON document_citations(document_id);
 CREATE INDEX IF NOT EXISTS idx_document_citations_source ON document_citations(source_type, source_id);
+
+-- 段落-文献关联索引
+CREATE INDEX IF NOT EXISTS idx_paragraph_literature_paragraph ON paragraph_literature(paragraph_id);
+CREATE INDEX IF NOT EXISTS idx_paragraph_literature_literature ON paragraph_literature(literature_id);
