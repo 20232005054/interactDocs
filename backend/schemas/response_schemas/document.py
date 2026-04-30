@@ -48,3 +48,23 @@ class SnapshotResponse(BaseModel):
 
 class SnapshotListResponse(BaseModel):
     snapshots: List[SnapshotResponse]
+
+
+class ParagraphLiteratureItem(BaseModel):
+    """段落文献绑定关系项"""
+    paragraph_id: str
+    chapter_id: str
+    chapter_title: str
+    paragraph_content: str
+    paragraph_order: int
+    literature_id: str
+    literature_title: Optional[str] = None
+    literature_authors: Optional[str] = None
+    literature_journal: Optional[str] = None
+    literature_doi: Optional[str] = None
+
+
+class ParagraphLiteratureResponse(BaseModel):
+    """文档段落文献绑定关系响应"""
+    items: List[ParagraphLiteratureItem]
+    total: int

@@ -21,6 +21,7 @@ import CoreInfoPanel from "@/components/editor/CoreInfoPanel"
 import SummaryPanel from "@/components/editor/SummaryPanel"
 import AIChatPanel from "@/components/editor/AIChatPanel"
 import CitationsPanel from "@/components/editor/CitationsPanel"
+import LiteratureManagementPanel from "@/components/editor/LiteratureManagementPanel"
 import { useDocumentSSE } from "@/hooks/useDocumentSSE"
 
 interface DocumentEditorContainerProps {
@@ -145,7 +146,7 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
     { key: "core-info", label: "核心信息", icon: FileText },
     { key: "summary", label: "摘要", icon: FileEdit },
     { key: "chat", label: "AI 对话", icon: MessageSquare },
-    { key: "citations", label: "参考文献", icon: BookOpen },
+    { key: "citations", label: "文献管理", icon: BookOpen },
   ]
 
   if (loading) {
@@ -300,8 +301,8 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
               )}
               
               {rightPanelTab === "citations" && (
-                <div className="h-full overflow-y-auto compact-scrollbar">
-                  <CitationsPanel documentId={documentId} />
+                <div className="h-full overflow-hidden">
+                  <LiteratureManagementPanel documentId={documentId} templateId={templateId} />
                 </div>
               )}
             </div>

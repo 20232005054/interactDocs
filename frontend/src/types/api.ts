@@ -639,3 +639,24 @@ export interface DocumentCitationsResponse {
   citations: DocumentCitationItem[]
   total: number
 }
+
+// ============================================================
+// 段落文献绑定关系
+// ============================================================
+export interface ParagraphLiteratureItem {
+  paragraph_id: string
+  chapter_id: string
+  chapter_title: string
+  paragraph_content: string
+  paragraph_order: number
+  literature_id: string
+  literature_title: string | null
+  literature_authors: string | null
+  literature_journal: string | null
+  literature_doi: string | null
+}
+
+export interface ParagraphLiteratureResponse {
+  items: ParagraphLiteratureItem[]
+  total: number
+}

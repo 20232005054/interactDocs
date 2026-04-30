@@ -11,6 +11,7 @@ import type {
   TemplateInfoResponse,
   UpdateDocumentPayload,
   DocumentCitationsResponse,
+  ParagraphLiteratureResponse,
 } from "@/types/api"
 
 export const documentService = {
@@ -93,4 +94,7 @@ export const documentService = {
 
   getCitations: (documentId: string): Promise<DocumentCitationsResponse> =>
     request.get(`/api/v1/documents/${documentId}/citations`),
+
+  getParagraphLiterature: (documentId: string): Promise<ParagraphLiteratureResponse> =>
+    request.get(`/api/v1/documents/${documentId}/paragraph-literature`),
 }

@@ -290,7 +290,25 @@ class DocumentService:
             raise HTTPException(status_code=403, detail="无权访问此文档")
         from db.mappers.document_citation_mapper import DocumentCitationMapper
         return await DocumentCitationMapper.get_distinct_by_document_id(db, document_id)
-        """获取文档核心信息的键值对映射，key 为 field_key，value 为 content"""
+
+    @staticmethod
+    async def get_paragraph_literature(db: AsyncSession, document_id: UUID, owner_id: UUID = None) -> list[dict]:
+        """
+        批量查询文档所有段落的文献绑定关系
+        
+        Returns:
+            list[dict]: 绑定关系列表，按章节和段落顺序排序
+        """
+        document = await DocumentMapper.get_document_by_id(db, document_id)
+        if not document:
+            raise HTTPException(status_code=404, detail="文档不存在")
+        if owner_id is not None and str(document.user_id) != str(owner_id):
+            raise HTTPException(status_code=403, detail="无权访问此文档")
+        from db.mappers.paragraph_literature_mapper import ParagraphLiteratureMapper
+        return await ParagraphLiteratureMapper.list_by_document_id(db, document_id)
+
+    @staticmethod
+    async def get_core_info_map(db: AsyncSession, document_id: UUID):
         result = await db.execute(
             select(DocumentCoreInfo).where(DocumentCoreInfo.document_id == document_id)
         )

@@ -22,6 +22,7 @@ import type {
   CreateStructureTemplatePayload,
   UpdateStructureTemplatePayload,
   StructureTemplateReorderPayload,
+  LiteratureListResponse,
 } from "@/types/api"
 
 // ============================================================
@@ -89,6 +90,9 @@ export const templateService = {
     a.click()
     URL.revokeObjectURL(url)
   },
+
+  getLiterature: (templateId: string): Promise<LiteratureListResponse> =>
+    request.get(`/api/v1/templates/${templateId}/literature`),
 }
 
 // ============================================================

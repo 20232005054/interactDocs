@@ -19,6 +19,8 @@ from schemas.response_schemas.document import (
     DocumentListResponse,
     SnapshotResponse,
     SnapshotListResponse,
+    ParagraphLiteratureItem,
+    ParagraphLiteratureResponse,
 )
 
 from schemas.response_schemas.chapter import (
@@ -98,6 +100,7 @@ __all__ = [
     # document
     "DocumentResponse", "DocumentDetailResponse", "DocumentListItem", "DocumentListResponse",
     "SnapshotResponse", "SnapshotListResponse",
+    "ParagraphLiteratureItem", "ParagraphLiteratureResponse",
     # chapter
     "ParagraphResponse", "ParagraphListResponse", "ParagraphInChapter", "FullContentParagraph",
     "ChapterResponse", "ChapterTreeNode", "ChapterTreeResponse", "TocItem", "ChapterTocResponse",

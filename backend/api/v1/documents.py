@@ -15,6 +15,7 @@ from schemas.response_schemas import (
     TemplateInfoResponse, FullContentResponse, FullContentChapter, FullContentParagraph,
     TemplateDetailResponse,
     DocumentCitationItem, DocumentCitationsResponse,
+    ParagraphLiteratureItem, ParagraphLiteratureResponse,
 )
 from core.response import success_response, ResponseModel
 from core.auth import get_current_user
@@ -341,3 +342,23 @@ async def get_document_citations(document_id: UUID, current_user=Depends(get_cur
         for r in rows
     ]
     return success_response(data=DocumentCitationsResponse(citations=items, total=len(items)))
+
+
+@router.get("/{document_id}/paragraph-literature", summary="获取文档段落文献绑定关系", response_model=ResponseModel[ParagraphLiteratureResponse])
+async def get_document_paragraph_literature(
+    document_id: UUID,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    批量查询文档所有段落的文献绑定关系（避免 N+1 查询）
+    
+    返回按章节和段落顺序排序的绑定关系列表，包含：
+    - 段落信息（ID、内容摘要、顺序）
+    - 章节信息（ID、标题）
+    - 文献信息（ID、标题、作者、期刊、DOI）
+    """
+    items_data = await DocumentService.get_paragraph_literature(db, document_id, owner_id=current_user.user_id)
+    items = [ParagraphLiteratureItem(**item) for item in items_data]
+    return success_response(data=ParagraphLiteratureResponse(items=items, total=len(items)))
+

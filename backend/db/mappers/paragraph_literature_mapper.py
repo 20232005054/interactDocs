@@ -126,3 +126,60 @@ class ParagraphLiteratureMapper:
             ).order_by(ParagraphLiterature.created_at.asc())
         )
         return list(result.scalars().all())
+
+    @staticmethod
+    async def list_by_document_id(db: AsyncSession, document_id: UUID) -> list[dict]:
+        """
+        批量查询文档所有段落的文献绑定关系（避免 N+1 查询）
+        
+        Returns:
+            list[dict]: 绑定关系列表，每项包含：
+                - paragraph_id: UUID
+                - chapter_id: UUID
+                - chapter_title: str
+                - paragraph_content: str (截取前100字符)
+                - paragraph_order: int
+                - literature_id: UUID
+                - literature_title: str
+                - literature_authors: str
+                - literature_journal: str
+                - literature_doi: str
+        """
+        from db.models import Paragraph, Chapter
+        
+        result = await db.execute(
+            select(
+                ParagraphLiterature.paragraph_id,
+                Paragraph.chapter_id,
+                Chapter.title.label("chapter_title"),
+                Paragraph.content,
+                Paragraph.order_index.label("paragraph_order"),
+                Literature.literature_id,
+                Literature.title.label("literature_title"),
+                Literature.authors.label("literature_authors"),
+                Literature.journal.label("literature_journal"),
+                Literature.doi.label("literature_doi"),
+            )
+            .join(Paragraph, ParagraphLiterature.paragraph_id == Paragraph.paragraph_id)
+            .join(Chapter, Paragraph.chapter_id == Chapter.chapter_id)
+            .join(Literature, ParagraphLiterature.literature_id == Literature.literature_id)
+            .where(Chapter.document_id == document_id)
+            .order_by(Chapter.order_index.asc(), Paragraph.order_index.asc())
+        )
+        
+        rows = result.all()
+        return [
+            {
+                "paragraph_id": str(row.paragraph_id),
+                "chapter_id": str(row.chapter_id),
+                "chapter_title": row.chapter_title,
+                "paragraph_content": row.content[:100] + "..." if len(row.content) > 100 else row.content,
+                "paragraph_order": row.paragraph_order,
+                "literature_id": str(row.literature_id),
+                "literature_title": row.literature_title,
+                "literature_authors": row.literature_authors,
+                "literature_journal": row.literature_journal,
+                "literature_doi": row.literature_doi,
+            }
+            for row in rows
+        ]
