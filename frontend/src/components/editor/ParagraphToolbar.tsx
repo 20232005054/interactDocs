@@ -4,6 +4,7 @@ import { useRef, useState } from "react"
 import { useEditor, EditorContent } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import { Markdown } from "tiptap-markdown"
+import { Sparkles, Loader2 } from "lucide-react"
 import { useAIAssist } from "@/hooks/useAIAssist"
 import { useChatStore } from "@/store/chatStore"
 import { paragraphService, type EvaluateAIResult } from "@/services/paragraphService"
@@ -223,59 +224,76 @@ export default function ParagraphToolbar({
       )}
 
       {isAssisting && aiAssistPreview && (
-        <div className="mt-1 p-2 rounded-md bg-blue-50 border border-blue-200 text-xs text-gray-700 leading-relaxed">
-          <div className="mb-1 flex items-center justify-between gap-2">
-            <div className="text-xs font-medium text-blue-500">AI 生成预览</div>
+        <div className="mt-1 p-3 rounded-md bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 shadow-sm">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-blue-500 animate-pulse" />
+              <span className="text-xs font-medium text-blue-600">AI 生成预览</span>
+              {!hasPreview && (
+                <span className="flex items-center gap-1 text-[10px] text-blue-400">
+                  <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                  <span>生成中...</span>
+                </span>
+              )}
+            </div>
             {hasPreview && (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => applyAssist(paragraphId, chapterId)}
-                  className="h-6 rounded bg-green-500 px-2 text-[11px] text-white hover:bg-green-600 transition"
+                  className="h-7 rounded-md bg-green-500 px-3 text-xs font-medium text-white hover:bg-green-600 transition shadow-sm"
                 >
-                  应用
+                  ✓ 应用
                 </button>
                 <button
                   type="button"
                   onClick={discardAssist}
-                  className="h-6 rounded bg-white px-2 text-[11px] text-gray-500 hover:bg-gray-50 transition"
+                  className="h-7 rounded-md bg-white border border-gray-200 px-3 text-xs font-medium text-gray-600 hover:bg-gray-50 transition"
                 >
-                  丢弃
+                  × 丢弃
                 </button>
               </div>
             )}
           </div>
-          <MarkdownPreview content={aiAssistPreview} streaming={!hasPreview} />
-          {!hasPreview && (
-            <span className="inline-block w-0.5 h-3 bg-blue-400 ml-0.5 animate-pulse align-middle" />
-          )}
+          <div className="text-xs text-gray-700 leading-relaxed">
+            <MarkdownPreview content={aiAssistPreview} streaming={!hasPreview} />
+          </div>
         </div>
       )}
 
       {/* AI 评估结果 */}
       {showEval && (evalPreview || evalResult) && (
-        <div className={cn("p-2 rounded-md bg-purple-50 border border-purple-200 text-xs leading-relaxed", isAssisting && aiAssistPreview ? "mt-2" : "mt-1")}>
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-purple-500 font-medium">AI 评估结果</span>
+        <div className={cn("p-3 rounded-md bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200 shadow-sm", isAssisting && aiAssistPreview ? "mt-2" : "mt-1")}>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-purple-500" />
+              <span className="text-xs text-purple-600 font-medium">AI 评估结果</span>
+              {evaluating && (
+                <span className="flex items-center gap-1 text-[10px] text-purple-400">
+                  <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                  <span>评估中...</span>
+                </span>
+              )}
+            </div>
             <button
               type="button"
               onClick={() => { setShowEval(false); setEvalPreview(""); setEvalResult(null) }}
-              className="text-gray-400 hover:text-gray-600 text-xs"
+              className="text-gray-400 hover:text-gray-600 text-sm font-bold leading-none"
             >
               ×
             </button>
           </div>
 
           {evalResult ? (
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2 text-xs leading-relaxed">
               <p className="text-gray-700 whitespace-pre-wrap">{evalResult.evaluation}</p>
               {evalResult.suggestions.length > 0 && (
                 <div>
-                  <p className="text-purple-600 font-medium mb-0.5">改进建议：</p>
-                  <ul className="flex flex-col gap-0.5">
+                  <p className="text-purple-600 font-medium mb-1">改进建议：</p>
+                  <ul className="flex flex-col gap-1">
                     {evalResult.suggestions.map((s, i) => (
-                      <li key={i} className="text-gray-600 flex gap-1">
-                        <span className="text-purple-400 shrink-0">{i + 1}.</span>
+                      <li key={i} className="text-gray-600 flex gap-1.5">
+                        <span className="text-purple-400 shrink-0 font-medium">{i + 1}.</span>
                         <span>{s}</span>
                       </li>
                     ))}
@@ -284,11 +302,8 @@ export default function ParagraphToolbar({
               )}
             </div>
           ) : (
-            <p className="text-gray-700 whitespace-pre-wrap">
+            <p className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">
               {evalPreview}
-              {evaluating && (
-                <span className="inline-block w-0.5 h-3 bg-purple-400 ml-0.5 animate-pulse align-middle" />
-              )}
             </p>
           )}
         </div>

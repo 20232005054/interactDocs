@@ -1,6 +1,10 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core"
+import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
+import { GripVertical } from "lucide-react"
 import { chapterService } from "@/services/chapterService"
 import { useDocumentStore } from "@/store/documentStore"
 import { useEditorStore } from "@/store/editorStore"
@@ -12,6 +16,52 @@ import { cn } from "@/lib/utils"
 interface ChapterTreeProps {
   documentId: string
   onReload: () => void
+  onRefreshContent?: () => Promise<void> // 轻量级刷新章节内容
+}
+
+// ----------------------------------------------------------------
+// 可拖拽的树节点
+// ----------------------------------------------------------------
+interface SortableTreeNodeProps {
+  node: ChapterTreeNode
+  documentId: string
+  depth: number
+  onReload: () => void
+}
+
+function SortableTreeNode({ node, documentId, depth, onReload }: SortableTreeNodeProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: node.chapter_id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "touch-none",
+        isDragging && "opacity-50 z-50"
+      )}
+    >
+      <TreeNode
+        node={node}
+        documentId={documentId}
+        depth={depth}
+        onReload={onReload}
+        dragHandleProps={{ ...attributes, ...listeners }}
+      />
+    </div>
+  )
 }
 
 // ----------------------------------------------------------------
@@ -22,9 +72,10 @@ interface TreeNodeProps {
   documentId: string
   depth: number
   onReload: () => void
+  dragHandleProps?: React.HTMLAttributes<HTMLDivElement>
 }
 
-function TreeNode({ node, documentId, depth, onReload }: TreeNodeProps) {
+function TreeNode({ node, documentId, depth, onReload, dragHandleProps }: TreeNodeProps) {
   const { activeChapterId, setActiveChapterId } = useEditorStore()
   const { updateChapterTitle } = useDocumentStore()
 
@@ -96,11 +147,25 @@ function TreeNode({ node, documentId, depth, onReload }: TreeNodeProps) {
     <div>
       <div
         className={cn(
-          "group flex items-center gap-1 py-1.5 pr-2 rounded-sm cursor-pointer select-none transition-colors",
-          isActive ? "bg-blue-50 text-blue-700" : "text-gray-700 hover:bg-gray-100"
+          "group flex items-center gap-1 py-1.5 pr-2 rounded-sm cursor-pointer select-none transition-colors border-l-4",
+          isActive 
+            ? "bg-blue-50 text-blue-700 border-blue-500 font-semibold" 
+            : "text-gray-700 hover:bg-gray-100 border-transparent"
         )}
         style={{ paddingLeft: `${8 + depth * 14}px` }}
       >
+        {/* 拖拽手柄 */}
+        {dragHandleProps && (
+          <div
+            {...dragHandleProps}
+            className="cursor-grab active:cursor-grabbing shrink-0 opacity-0 group-hover:opacity-100 transition"
+            title="拖动排序"
+            onClick={e => e.stopPropagation()}
+          >
+            <GripVertical className="w-3.5 h-3.5 text-gray-300 hover:text-gray-500" />
+          </div>
+        )}
+
         {/* 折叠按钮 */}
         <button
           type="button"
@@ -173,15 +238,20 @@ function TreeNode({ node, documentId, depth, onReload }: TreeNodeProps) {
       {/* 子节点 */}
       {!collapsed && hasChildren && (
         <div>
-          {node.children.map(child => (
-            <TreeNode
-              key={child.chapter_id}
-              node={child}
-              documentId={documentId}
-              depth={depth + 1}
-              onReload={onReload}
-            />
-          ))}
+          <SortableContext
+            items={node.children.map((child) => child.chapter_id)}
+            strategy={verticalListSortingStrategy}
+          >
+            {node.children.map(child => (
+              <SortableTreeNode
+                key={child.chapter_id}
+                node={child}
+                documentId={documentId}
+                depth={depth + 1}
+                onReload={onReload}
+              />
+            ))}
+          </SortableContext>
         </div>
       )}
 
@@ -201,9 +271,109 @@ function TreeNode({ node, documentId, depth, onReload }: TreeNodeProps) {
 // ----------------------------------------------------------------
 // 主组件
 // ----------------------------------------------------------------
-export default function ChapterTree({ documentId, onReload }: ChapterTreeProps) {
+export default function ChapterTree({ documentId, onReload, onRefreshContent }: ChapterTreeProps) {
   const { tree } = useDocumentStore()
   const [adding, setAdding] = useState(false)
+  const [localTree, setLocalTree] = useState<ChapterTreeNode[]>([])
+
+  // 拖拽传感器配置
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  // 初始化本地树状态
+  useEffect(() => {
+    setLocalTree(tree)
+  }, [tree])
+
+  // 拖拽结束处理
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (!over || active.id === over.id) return
+
+    // 查找被拖拽节点和目标节点
+    const findNodeAndParent = (tree: ChapterTreeNode[], id: string, parent: ChapterTreeNode | null = null): { node: ChapterTreeNode; parent: ChapterTreeNode | null } | null => {
+      for (const node of tree) {
+        if (node.chapter_id === id) {
+          return { node, parent }
+        }
+        if (node.children.length > 0) {
+          const result = findNodeAndParent(node.children, id, node)
+          if (result) return result
+        }
+      }
+      return null
+    }
+
+    const activeResult = findNodeAndParent(localTree, active.id as string)
+    const overResult = findNodeAndParent(localTree, over.id as string)
+
+    if (!activeResult || !overResult) return
+
+    // 只支持同级拖拽（parent_id 相同）
+    const activeParentId = activeResult.parent?.chapter_id ?? null
+    const overParentId = overResult.parent?.chapter_id ?? null
+
+    if (activeParentId !== overParentId) {
+      toastError("暂不支持跨层级拖拽")
+      return
+    }
+
+    // 获取同级所有节点
+    const siblings = activeResult.parent ? activeResult.parent.children : localTree
+    const oldIndex = siblings.findIndex((n) => n.chapter_id === active.id)
+    const newIndex = siblings.findIndex((n) => n.chapter_id === over.id)
+
+    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return
+
+    // 重新排序
+    const newSiblings = [...siblings]
+    const [movedNode] = newSiblings.splice(oldIndex, 1)
+    newSiblings.splice(newIndex, 0, movedNode)
+
+    // 更新本地状态
+    const updateTree = (tree: ChapterTreeNode[]): ChapterTreeNode[] => {
+      if (activeResult.parent) {
+        return tree.map((node) => {
+          if (node.chapter_id === activeResult.parent!.chapter_id) {
+            return { ...node, children: newSiblings }
+          }
+          if (node.children.length > 0) {
+            return { ...node, children: updateTree(node.children) }
+          }
+          return node
+        })
+      }
+      return newSiblings
+    }
+
+    const newTree = updateTree(localTree)
+    setLocalTree(newTree)
+
+    // 调用后端 reorder 接口
+    try {
+      const orderedIds = newSiblings.map((n) => n.chapter_id)
+      await chapterService.reorder(documentId, {
+        parent_id: activeParentId,
+        ordered_ids: orderedIds,
+      })
+      // 拖拽成功后轻量级刷新章节内容（不重新加载整个页面）
+      if (onRefreshContent) {
+        await onRefreshContent()
+      } else {
+        // 降级方案：如果没有提供轻量级刷新，则使用完整刷新
+        onReload()
+      }
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : "排序失败")
+      // 失败时恢复原状态
+      setLocalTree(localTree)
+    }
+  }, [localTree, documentId, onReload, onRefreshContent])
 
   const handleAddRoot = useCallback(async () => {
     setAdding(true)
@@ -234,18 +404,29 @@ export default function ChapterTree({ documentId, onReload }: ChapterTreeProps) 
 
       {/* 树列表 */}
       <div className="compact-scrollbar flex-1 overflow-y-auto py-1">
-        {tree.length === 0 ? (
+        {localTree.length === 0 ? (
           <p className="text-xs text-gray-400 text-center py-6">暂无章节</p>
         ) : (
-          tree.map(node => (
-            <TreeNode
-              key={node.chapter_id}
-              node={node}
-              documentId={documentId}
-              depth={0}
-              onReload={onReload}
-            />
-          ))
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={localTree.map((node) => node.chapter_id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {localTree.map(node => (
+                <SortableTreeNode
+                  key={node.chapter_id}
+                  node={node}
+                  documentId={documentId}
+                  depth={0}
+                  onReload={onReload}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
         )}
       </div>
     </div>

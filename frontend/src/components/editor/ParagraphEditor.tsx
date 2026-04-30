@@ -158,10 +158,10 @@ const ParagraphEditor = forwardRef<ParagraphEditorHandle, ParagraphEditorProps>(
         className={cn(
           "w-full relative",
           isChanged && "border-l-2 border-orange-400 pl-2",
-          paraType === "heading1" && "[&_.tiptap]:text-xl [&_.tiptap]:font-bold [&_.tiptap]:text-gray-900",
-          paraType === "heading2" && "[&_.tiptap]:text-lg [&_.tiptap]:font-semibold [&_.tiptap]:text-gray-800",
-          paraType === "heading3" && "[&_.tiptap]:text-base [&_.tiptap]:font-medium [&_.tiptap]:text-gray-700",
-          paraType === "paragraph" && "[&_.tiptap]:text-sm [&_.tiptap]:text-gray-700",
+          paraType === "heading1" && "[&_.tiptap]:text-2xl [&_.tiptap]:font-bold [&_.tiptap]:text-gray-900",
+          paraType === "heading2" && "[&_.tiptap]:text-xl [&_.tiptap]:font-semibold [&_.tiptap]:text-gray-800",
+          paraType === "heading3" && "[&_.tiptap]:text-lg [&_.tiptap]:font-medium [&_.tiptap]:text-gray-700",
+          paraType === "paragraph" && "[&_.tiptap]:text-base [&_.tiptap]:text-gray-700 [&_.tiptap]:leading-relaxed",
         )}
       >
         {editor && !editor.state.selection.empty && (

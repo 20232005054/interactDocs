@@ -201,13 +201,22 @@ function ParagraphRow({
         className="relative flex-1 min-w-0"
         onClick={() => {
           // 点击编辑区时同步选中上下文
-          upsertSelectionParagraphContext({
-            paragraph_id: paragraph.paragraph_id,
-            chapter_id: chapterId,
-            chapter_title: chapterTitle,
-            content: localContent,
-            para_type: paragraph.para_type,
-          })
+          // 如果该段落已经是手动添加的上下文，则不添加 selection 上下文（避免重复）
+          const hasManualContext = useChatStore.getState().contextItems.some((item) => (
+            item.kind === "paragraph" && 
+            item.source === "manual" && 
+            item.paragraph_id === paragraph.paragraph_id
+          ))
+          
+          if (!hasManualContext) {
+            upsertSelectionParagraphContext({
+              paragraph_id: paragraph.paragraph_id,
+              chapter_id: chapterId,
+              chapter_title: chapterTitle,
+              content: localContent,
+              para_type: paragraph.para_type,
+            })
+          }
         }}
       >
         <ParagraphEditor
@@ -287,10 +296,10 @@ function ChapterBlock({ flatChapter, onReload }: ChapterBlockProps) {
   }
 
   const titleCls = cn(
-    "font-semibold text-gray-900 leading-snug",
-    depth === 0 && "text-xl",
-    depth === 1 && "text-lg",
-    depth >= 2 && "text-base",
+    "font-bold text-gray-900 leading-relaxed",
+    depth === 0 && "text-2xl mb-1",
+    depth === 1 && "text-xl mb-0.5",
+    depth >= 2 && "text-lg",
   )
 
   const sortedParagraphs = [...node.paragraphs].sort((a, b) => a.order_index - b.order_index)
@@ -306,7 +315,7 @@ function ChapterBlock({ flatChapter, onReload }: ChapterBlockProps) {
       {/* 章节标题 */}
       <div
         className={cn(
-          "flex items-center gap-2 mb-3 pb-2",
+          "flex items-center gap-2 mb-2 pb-1.5",
           depth === 0 && "border-b border-gray-200",
           depth === 1 && "border-b border-gray-100",
         )}
@@ -320,7 +329,7 @@ function ChapterBlock({ flatChapter, onReload }: ChapterBlockProps) {
 
       {/* 段落列表 */}
       <div
-        className="flex flex-col gap-1"
+        className="flex flex-col gap-1.5"
         style={{ paddingLeft: `${depth * 8 + 4}px` }}
       >
         {sortedParagraphs.length === 0 ? (
@@ -375,7 +384,7 @@ export default function DocumentBody({ onReload }: DocumentBodyProps) {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-8 py-8">
+    <div className="max-w-4xl mx-auto px-6 py-6">
       {flatList.map(fc => (
         <ChapterBlock
           key={fc.node.chapter_id}

@@ -23,4 +23,7 @@ export const summaryService = {
 
   applyAI: (summaryId: string): Promise<Summary> =>
     request.post(`/api/v1/summaries/${summaryId}/ai/apply`),
+
+  reorder: (documentId: string, orderedIds: string[]): Promise<void> =>
+    request.post(`/api/v1/documents/${documentId}/summaries/reorder`, { ordered_ids: orderedIds }),
 }
