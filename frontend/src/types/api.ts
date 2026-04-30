@@ -544,6 +544,17 @@ export interface CoreInfoTreeResponse {
   items: CoreInfo[]
 }
 
+export interface CreateCoreInfoPayload {
+  title: string
+  content?: string
+  field_type?: string
+  options?: string[] | null
+  is_required?: boolean
+  parent_id?: string | null
+  order_index?: number | null
+  is_locked?: boolean
+}
+
 export interface UpdateCoreInfoPayload {
   title?: string
   content?: string

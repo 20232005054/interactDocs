@@ -4,13 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent, DragOverlay } from "@dnd-kit/core"
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { GripVertical, Trash2 } from "lucide-react"
+import { GripVertical, Trash2, Plus } from "lucide-react"
 import { coreInfoService } from "@/services/coreInfoService"
 import { useDocumentStore } from "@/store/documentStore"
 import type { CoreInfo } from "@/types/api"
 import { cn } from "@/lib/utils"
 import { toastError, toastSuccess } from "@/hooks/useToast"
 import ConfirmDialog from "@/components/ui/ConfirmDialog"
+import CreateCoreInfoDialog from "@/components/editor/CreateCoreInfoDialog"
 
 // ----------------------------------------------------------------
 // 可拖拽的核心信息节点
@@ -280,7 +281,7 @@ interface CoreInfoPanelProps {
 // 主组件
 // ----------------------------------------------------------------
 export default function CoreInfoPanel({ onAfterSave }: CoreInfoPanelProps) {
-  const { coreInfoTree, updateCoreInfo, documentId } = useDocumentStore()
+  const { coreInfoTree, updateCoreInfo, documentId, setCoreInfoTree } = useDocumentStore()
   const [originalContentMap, setOriginalContentMap] = useState<Record<string, string>>({})
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
@@ -289,6 +290,8 @@ export default function CoreInfoPanel({ onAfterSave }: CoreInfoPanelProps) {
   const dirtyIdsRef = useRef<Set<string>>(new Set())
   const flatNodesRef = useRef<CoreInfo[]>([])
   const [localCoreInfoTree, setLocalCoreInfoTree] = useState<CoreInfo[]>([])
+  const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [creating, setCreating] = useState(false)
 
   // 拖拽传感器配置
   const sensors = useSensors(
@@ -505,16 +508,79 @@ export default function CoreInfoPanel({ onAfterSave }: CoreInfoPanelProps) {
     }
   }, [])
 
+  const handleCreate = useCallback(async (data: {
+    title: string
+    field_type: string
+    parent_id: string | null
+    is_required: boolean
+    options?: string[]
+  }) => {
+    if (!documentId) return
+
+    setCreating(true)
+    try {
+      const newCoreInfo = await coreInfoService.create(documentId, {
+        title: data.title,
+        content: "",
+        field_type: data.field_type,
+        parent_id: data.parent_id,
+        is_required: data.is_required,
+        options: data.options,
+      })
+
+      // 刷新核心信息树
+      const treeRes = await coreInfoService.getByDocument(documentId)
+      setCoreInfoTree(treeRes.items)
+      setLocalCoreInfoTree(treeRes.items)
+
+      toastSuccess("核心信息已创建")
+      setShowCreateDialog(false)
+    } catch (err: unknown) {
+      toastError(err instanceof Error ? err.message : "创建失败")
+    } finally {
+      setCreating(false)
+    }
+  }, [documentId, setCoreInfoTree])
+
   if (localCoreInfoTree.length === 0) {
     return (
-      <div className="flex items-center justify-center h-32 text-xs text-gray-400">
-        暂无核心信息
+      <div className="flex flex-col items-center justify-center h-full px-6 py-8">
+        <p className="text-xs text-gray-400 mb-4">暂无核心信息</p>
+        <button
+          type="button"
+          onClick={() => setShowCreateDialog(true)}
+          disabled={!documentId || creating}
+          className="h-8 px-4 rounded bg-blue-500 text-white text-xs font-medium hover:bg-blue-600 disabled:opacity-50 transition flex items-center gap-1.5"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>新建核心信息</span>
+        </button>
+        <CreateCoreInfoDialog
+          open={showCreateDialog}
+          onConfirm={handleCreate}
+          onCancel={() => setShowCreateDialog(false)}
+          coreInfoTree={localCoreInfoTree}
+        />
       </div>
     )
   }
 
   return (
     <div className="px-6 py-6 space-y-6">
+      {/* 顶部操作栏 */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-medium text-gray-700">核心信息</h3>
+        <button
+          type="button"
+          onClick={() => setShowCreateDialog(true)}
+          disabled={!documentId || creating}
+          className="h-7 px-3 rounded bg-blue-500 text-white text-xs font-medium hover:bg-blue-600 disabled:opacity-50 transition flex items-center gap-1.5"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>新建</span>
+        </button>
+      </div>
+
       {saving && (
         <div className="mb-2 flex items-center gap-1.5 text-xs text-gray-400">
           <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
@@ -543,6 +609,14 @@ export default function CoreInfoPanel({ onAfterSave }: CoreInfoPanelProps) {
           </SortableContext>
         </div>
       </DndContext>
+
+      {/* 新建对话框 */}
+      <CreateCoreInfoDialog
+        open={showCreateDialog}
+        onConfirm={handleCreate}
+        onCancel={() => setShowCreateDialog(false)}
+        coreInfoTree={localCoreInfoTree}
+      />
     </div>
   )
 }

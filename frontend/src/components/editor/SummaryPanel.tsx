@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core"
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { GripVertical, Trash2 } from "lucide-react"
+import { GripVertical, Trash2, Plus } from "lucide-react"
 import { summaryService } from "@/services/summaryService"
 import { useDocumentStore } from "@/store/documentStore"
 import type { Summary } from "@/types/api"
@@ -66,7 +66,7 @@ interface SummaryCardProps {
 }
 
 function SummaryCard({ summary, onChangeContent, onDelete, dragHandleProps }: SummaryCardProps) {
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const handleChange = (val: string) => {
@@ -186,11 +186,12 @@ interface SummaryPanelProps {
 // 主组件
 // ----------------------------------------------------------------
 export default function SummaryPanel({ onAfterSave }: SummaryPanelProps) {
-  const { summaries, updateSummary, documentId } = useDocumentStore()
+  const { summaries, updateSummary, documentId, setSummaries } = useDocumentStore()
   const [originalContentMap, setOriginalContentMap] = useState<Record<string, string>>({})
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
   const [localSummaries, setLocalSummaries] = useState<Summary[]>([])
+  const [creating, setCreating] = useState(false)
 
   const orderedSummaries = useMemo(
     () => summaries.slice().sort((a, b) => a.order_index - b.order_index),
@@ -322,10 +323,44 @@ export default function SummaryPanel({ onAfterSave }: SummaryPanelProps) {
     }
   }, [dirtyIds, onAfterSave, localSummaries, saving])
 
+  const handleCreate = useCallback(async () => {
+    if (!documentId) return
+
+    setCreating(true)
+    try {
+      const newSummary = await summaryService.create(documentId)
+      
+      // 刷新摘要列表
+      const summariesRes = await summaryService.getByDocument(documentId)
+      setSummaries(summariesRes.summaries)
+      
+      toastSuccess("摘要已创建")
+      
+      // 自动滚动到新摘要（延迟以确保 DOM 更新）
+      setTimeout(() => {
+        const element = document.querySelector(`[data-summary-id="${newSummary.summary_id}"]`)
+        element?.scrollIntoView({ behavior: "smooth", block: "nearest" })
+      }, 100)
+    } catch (err: unknown) {
+      toastError(err instanceof Error ? err.message : "创建失败")
+    } finally {
+      setCreating(false)
+    }
+  }, [documentId, setSummaries])
+
   if (summaries.length === 0) {
     return (
-      <div className="flex items-center justify-center h-32 text-xs text-gray-400">
-        暂无摘要
+      <div className="flex flex-col items-center justify-center h-full px-6 py-8">
+        <p className="text-xs text-gray-400 mb-4">暂无摘要</p>
+        <button
+          type="button"
+          onClick={handleCreate}
+          disabled={!documentId || creating}
+          className="h-8 px-4 rounded bg-blue-500 text-white text-xs font-medium hover:bg-blue-600 disabled:opacity-50 transition flex items-center gap-1.5"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>{creating ? "创建中..." : "新建摘要"}</span>
+        </button>
       </div>
     )
   }
@@ -334,6 +369,20 @@ export default function SummaryPanel({ onAfterSave }: SummaryPanelProps) {
 
   return (
     <div className="px-6 py-6 flex flex-col gap-4">
+      {/* 顶部操作栏 */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-medium text-gray-700">摘要列表</h3>
+        <button
+          type="button"
+          onClick={handleCreate}
+          disabled={!documentId || creating}
+          className="h-7 px-3 rounded bg-blue-500 text-white text-xs font-medium hover:bg-blue-600 disabled:opacity-50 transition flex items-center gap-1.5"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>{creating ? "创建中..." : "新建"}</span>
+        </button>
+      </div>
+
       {dirtyIds.size > 0 && (
         <div className="flex items-center justify-between rounded-md border border-blue-200 bg-blue-50 px-2 py-1.5">
           <span className="text-xs text-blue-700">有 {dirtyIds.size} 条摘要待保存</span>
@@ -366,12 +415,13 @@ export default function SummaryPanel({ onAfterSave }: SummaryPanelProps) {
           strategy={verticalListSortingStrategy}
         >
           {localSummaries.map(s => (
-            <SortableSummaryCard
-              key={s.summary_id}
-              summary={s}
-              onChangeContent={handleSummaryContentChange}
-              onDelete={handleDelete}
-            />
+            <div key={s.summary_id} data-summary-id={s.summary_id}>
+              <SortableSummaryCard
+                summary={s}
+                onChangeContent={handleSummaryContentChange}
+                onDelete={handleDelete}
+              />
+            </div>
           ))}
         </SortableContext>
       </DndContext>

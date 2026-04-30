@@ -12,6 +12,9 @@ export const summaryService = {
   get: (summaryId: string): Promise<Summary> =>
     request.get(`/api/v1/summaries/${summaryId}`),
 
+  create: (documentId: string): Promise<Summary> =>
+    request.post(`/api/v1/documents/${documentId}/summaries`),
+
   update: (summaryId: string, payload: UpdateSummaryPayload): Promise<Summary> =>
     request.put(`/api/v1/summaries/${summaryId}`, payload),
 
