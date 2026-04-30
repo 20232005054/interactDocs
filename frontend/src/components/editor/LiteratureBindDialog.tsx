@@ -59,8 +59,6 @@ export default function LiteratureBindDialog({
   const filtered = items.filter((i) => {
     // 过滤已绑定的文献
     if (boundLiteratureIds.includes(i.literature_id)) return false
-    // 过滤他人的 private 文献
-    if (i.scope === "private" && i.user_id !== user?.user_id) return false
     // 只显示 ready 状态的文献
     if (i.upload_status !== "ready") return false
     // 关键字搜索

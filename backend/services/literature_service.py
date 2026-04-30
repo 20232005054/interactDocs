@@ -150,6 +150,13 @@ async def _process_literature_fast(literature_id: UUID, file_path: str) -> None:
             # 尝试从 PDF 前 3 页提取 DOI（而不是只从摘要提取）
             doi = await asyncio.to_thread(extract_doi_from_pdf, file_path)
             if doi:
+                # DOI 去重检查
+                async with AsyncSessionLocal() as db_check:
+                    existing = await LiteratureMapper.find_by_doi(db_check, doi)
+                    if existing and str(existing.literature_id) != str(literature_id):
+                        # 发现重复文献，标记为失败
+                        raise ValueError(f"该文献已存在（DOI: {doi}），literature_id={existing.literature_id}")
+                
                 logger.info("[文献处理-快速] 提取到 DOI=%s，补全 metadata", doi)
                 crossref_data = await _fetch_crossref_metadata(doi)
                 metadata_update = {k: v for k, v in crossref_data.items() if v is not None}

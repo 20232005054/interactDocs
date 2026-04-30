@@ -70,7 +70,18 @@ export default function UploadLiteratureDialog({ onClose, onUploaded }: UploadLi
       const lit = await literatureService.upload(payload)
       onUploaded(lit)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "上传失败")
+      // 特殊处理 409 冲突错误（文献已存在）
+      if (err instanceof Error) {
+        if (err.message.includes("该文献已存在")) {
+          setError(err.message)
+        } else if (err.message.includes("409")) {
+          setError("该文献已存在，请勿重复上传")
+        } else {
+          setError(err.message)
+        }
+      } else {
+        setError("上传失败")
+      }
     } finally {
       setUploading(false)
     }

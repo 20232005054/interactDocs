@@ -130,9 +130,15 @@ class LiteratureMapper:
 
     @staticmethod
     async def find_by_doi(db: AsyncSession, doi: str) -> Literature | None:
-        """按 DOI 精确查找（第二优先级匹配）"""
+        """
+        按 DOI 精确查找（第二优先级匹配）。
+        如果有多条记录，返回最早创建的那条。
+        """
         result = await db.execute(
-            select(Literature).where(Literature.doi == doi)
+            select(Literature)
+            .where(Literature.doi == doi)
+            .order_by(Literature.created_at.asc())
+            .limit(1)
         )
         return result.scalar_one_or_none()
 

@@ -105,7 +105,21 @@ async def upload_literature(
     literature_key：跨系统迁移时传入导出方的 key，不传则自动生成。
     
     立即返回 literature_id 和 pending 状态，后台异步处理。
+    
+    去重检查：
+    - 如果用户手动填写了 DOI，先检查是否已存在
+    - 如果已存在，返回 409 错误
     """
+    # DOI 去重检查
+    if doi and doi.strip():
+        from db.mappers.literature_mapper import LiteratureMapper
+        existing = await LiteratureMapper.find_by_doi(db, doi.strip())
+        if existing:
+            raise HTTPException(
+                status_code=409,
+                detail=f"该文献已存在（DOI: {doi.strip()}）"
+            )
+    
     scope = "public" if current_user.role in (UserRole.EDITOR, UserRole.ADMIN) else "private"
     file_content = await file.read()
     lit = await LiteratureService.upload(
