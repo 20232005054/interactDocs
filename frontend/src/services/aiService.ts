@@ -11,7 +11,8 @@ interface AIChatStreamOptions {
 
 interface AIChatStreamResult {
   response: string
-  actions: AIChatAction[]
+  actions?: AIChatAction[]
+  suggestions?: any[] // 临时使用 any，后续可以定义具体类型
 }
 
 export const aiService = {
@@ -61,6 +62,7 @@ export const aiService = {
         const parsed = JSON.parse(raw) as {
           response?: string
           actions?: AIChatAction[]
+          suggestions?: any[]
           error?: string
         }
 
@@ -68,9 +70,18 @@ export const aiService = {
           throw new Error(parsed.error)
         }
 
-        if (parsed.actions) {
+        // 如果包含 actions 或 suggestions，说明是最终响应
+        if (parsed.actions || parsed.suggestions) {
           finalResponse = parsed.response ?? accumulated
-          actions = parsed.actions
+          actions = parsed.actions ?? []
+          // 将 suggestions 也返回
+          if (parsed.suggestions) {
+            return {
+              response: finalResponse || accumulated,
+              actions,
+              suggestions: parsed.suggestions,
+            }
+          }
           continue
         }
 

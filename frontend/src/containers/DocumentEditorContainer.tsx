@@ -295,7 +295,7 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
               
               {rightPanelTab === "chat" && (
                 <div className="h-full overflow-hidden">
-                  <AIChatPanel documentId={documentId} />
+                  <AIChatPanel documentId={documentId} onReload={load} />
                 </div>
               )}
               

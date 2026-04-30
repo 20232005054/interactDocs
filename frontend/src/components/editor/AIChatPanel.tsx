@@ -2,9 +2,16 @@
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import { aiService } from "@/services/aiService"
+import { chapterService } from "@/services/chapterService"
+import { paragraphService } from "@/services/paragraphService"
+import { summaryService } from "@/services/summaryService"
 import { useEditorStore } from "@/store/editorStore"
 import { useChatStore, type ChatContextItem } from "@/store/chatStore"
 import { cn } from "@/lib/utils"
+import { toastSuccess, toastError } from "@/hooks/useToast"
+import AISuggestionList from "./AISuggestionList"
+import MarkdownContent from "@/components/ui/MarkdownContent"
+import type { AISuggestion, RawSuggestion } from "@/types/ai-suggestions"
 
 const INPUT_MAX_HEIGHT = 120
 
@@ -13,10 +20,12 @@ interface Message {
   role: "user" | "assistant"
   content: string
   streaming?: boolean
+  suggestions?: AISuggestion[]
 }
 
 interface AIChatPanelProps {
   documentId: string
+  onReload?: () => void
 }
 
 function getContextMeta(item: ChatContextItem) {
@@ -46,7 +55,7 @@ function getContextMeta(item: ChatContextItem) {
   }
 }
 
-export default function AIChatPanel({ documentId }: AIChatPanelProps) {
+export default function AIChatPanel({ documentId, onReload }: AIChatPanelProps) {
   const { activeChapterId } = useEditorStore()
   const contextItems = useChatStore((state) => state.contextItems)
   const removeContext = useChatStore((state) => state.removeContext)
@@ -75,6 +84,137 @@ export default function AIChatPanel({ documentId }: AIChatPanelProps) {
   useEffect(() => {
     adjustTextareaHeight(textareaRef.current)
   }, [input, adjustTextareaHeight])
+
+  // 应用单个建议
+  const applySuggestion = useCallback(async (suggestion: AISuggestion) => {
+    try {
+      switch (suggestion.type) {
+        case "create_chapter": {
+          let newChapterId: string
+          if (suggestion.parent_id) {
+            const newChapter = await chapterService.createSub(documentId, suggestion.parent_id)
+            newChapterId = newChapter.chapter_id
+          } else {
+            const newChapter = await chapterService.create(documentId)
+            newChapterId = newChapter.chapter_id
+          }
+          // 更新章节标题
+          await chapterService.update(newChapterId, { title: suggestion.title })
+          toastSuccess(`已创建章节：${suggestion.title}`)
+          break
+        }
+
+        case "create_paragraph": {
+          await paragraphService.create(suggestion.chapter_id, {
+            para_type: suggestion.para_type,
+            content: suggestion.content,
+          })
+          toastSuccess("已创建段落")
+          break
+        }
+
+        case "edit_content": {
+          if (suggestion.target_type === "paragraph") {
+            await paragraphService.update(suggestion.target_id, {
+              content: suggestion.suggested_content,
+            })
+            toastSuccess("已应用修改")
+          } else if (suggestion.target_type === "summary") {
+            await summaryService.update(suggestion.target_id, {
+              content: suggestion.suggested_content,
+            })
+            toastSuccess("已应用修改")
+          }
+          break
+        }
+
+        case "insert_text": {
+          // 获取章节的段落列表
+          const paragraphs = await paragraphService.getByChapter(suggestion.chapter_id)
+          if (suggestion.position === "start") {
+            // 插入到开头：创建新段落
+            await paragraphService.create(suggestion.chapter_id, {
+              para_type: "paragraph",
+              content: suggestion.content,
+            })
+          } else {
+            // 插入到末尾：在最后一个段落后插入
+            if (paragraphs.paragraphs.length > 0) {
+              const lastParagraph = paragraphs.paragraphs[paragraphs.paragraphs.length - 1]
+              await paragraphService.insertAfter(lastParagraph.paragraph_id, {
+                para_type: "paragraph",
+                content: suggestion.content,
+              })
+            } else {
+              // 如果章节没有段落，直接创建
+              await paragraphService.create(suggestion.chapter_id, {
+                para_type: "paragraph",
+                content: suggestion.content,
+              })
+            }
+          }
+          toastSuccess("已插入文本")
+          break
+        }
+      }
+
+      // 更新建议状态为已应用
+      setMessages(prev => prev.map(msg => ({
+        ...msg,
+        suggestions: msg.suggestions?.map(s =>
+          s.id === suggestion.id ? { ...s, status: "applied" as const } : s
+        ),
+      })))
+
+      // 刷新页面内容
+      if (onReload) {
+        onReload()
+      }
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : "应用建议失败")
+      throw err
+    }
+  }, [documentId, onReload])
+
+  // 拒绝单个建议
+  const rejectSuggestion = useCallback((suggestion: AISuggestion) => {
+    setMessages(prev => prev.map(msg => ({
+      ...msg,
+      suggestions: msg.suggestions?.map(s =>
+        s.id === suggestion.id ? { ...s, status: "rejected" as const } : s
+      ),
+    })))
+  }, [])
+
+  // 批量应用所有待处理的建议
+  const applyAllSuggestions = useCallback(async (messageId: string) => {
+    const message = messages.find(m => m.id === messageId)
+    if (!message?.suggestions) return
+
+    const pendingSuggestions = message.suggestions.filter(s => s.status === "pending")
+    
+    for (const suggestion of pendingSuggestions) {
+      try {
+        await applySuggestion(suggestion)
+      } catch (err) {
+        // 继续应用其他建议
+        console.error("应用建议失败:", err)
+      }
+    }
+  }, [messages, applySuggestion])
+
+  // 批量拒绝所有待处理的建议
+  const rejectAllSuggestions = useCallback((messageId: string) => {
+    setMessages(prev => prev.map(msg => {
+      if (msg.id !== messageId) return msg
+      return {
+        ...msg,
+        suggestions: msg.suggestions?.map(s =>
+          s.status === "pending" ? { ...s, status: "rejected" as const } : s
+        ),
+      }
+    }))
+  }, [])
 
   const streamAssistantReply = useCallback(async (text: string, assistantId: string) => {
     if (!text.trim()) return
@@ -121,9 +261,24 @@ export default function AIChatPanel({ documentId }: AIChatPanelProps) {
         }
       )
 
+      // 解析建议
+      let suggestions: AISuggestion[] = []
+      if (result.suggestions && Array.isArray(result.suggestions)) {
+        suggestions = result.suggestions.map((raw: RawSuggestion) => ({
+          ...raw,
+          id: `suggestion-${Date.now()}-${Math.random()}`,
+          status: "pending" as const,
+        }))
+      }
+
       setMessages((prev) => prev.map((message) => (
         message.id === assistantId
-          ? { ...message, content: result.response, streaming: false }
+          ? { 
+              ...message, 
+              content: result.response, 
+              streaming: false,
+              suggestions: suggestions.length > 0 ? suggestions : undefined,
+            }
           : message
       )))
     } catch (err: unknown) {
@@ -252,19 +407,27 @@ export default function AIChatPanel({ documentId }: AIChatPanelProps) {
             >
               <div
                 className={cn(
-                  "w-fit max-w-full whitespace-pre-wrap break-words rounded-xl px-3 py-2 text-xs leading-relaxed",
+                  "w-fit max-w-full rounded-xl px-3 py-2 text-xs leading-relaxed",
                   message.role === "user"
-                    ? "rounded-br-sm bg-blue-500 text-white"
+                    ? "rounded-br-sm bg-blue-500 text-white whitespace-pre-wrap break-words"
                     : "rounded-bl-sm bg-gray-100 text-gray-800"
                 )}
               >
-                {message.content || (message.streaming && (
-                  <span className="inline-flex gap-0.5">
-                    <span className="h-1 w-1 animate-bounce rounded-full bg-gray-400 [animation-delay:0ms]" />
-                    <span className="h-1 w-1 animate-bounce rounded-full bg-gray-400 [animation-delay:150ms]" />
-                    <span className="h-1 w-1 animate-bounce rounded-full bg-gray-400 [animation-delay:300ms]" />
-                  </span>
-                ))}
+                {message.role === "user" ? (
+                  // 用户消息：纯文本显示
+                  message.content
+                ) : (
+                  // AI 消息：Markdown 渲染
+                  message.content ? (
+                    <MarkdownContent content={message.content} />
+                  ) : message.streaming ? (
+                    <span className="inline-flex gap-0.5">
+                      <span className="h-1 w-1 animate-bounce rounded-full bg-gray-400 [animation-delay:0ms]" />
+                      <span className="h-1 w-1 animate-bounce rounded-full bg-gray-400 [animation-delay:150ms]" />
+                      <span className="h-1 w-1 animate-bounce rounded-full bg-gray-400 [animation-delay:300ms]" />
+                    </span>
+                  ) : null
+                )}
                 {message.streaming && message.content && (
                   <span className="ml-0.5 inline-block h-3 w-0.5 animate-pulse align-middle bg-gray-500" />
                 )}
@@ -292,6 +455,19 @@ export default function AIChatPanel({ documentId }: AIChatPanelProps) {
                   >
                     引用
                   </button>
+                </div>
+              )}
+
+              {/* AI 建议列表 */}
+              {message.role === "assistant" && message.suggestions && message.suggestions.length > 0 && (
+                <div className="mt-2 w-full">
+                  <AISuggestionList
+                    suggestions={message.suggestions}
+                    onApply={applySuggestion}
+                    onReject={rejectSuggestion}
+                    onApplyAll={() => applyAllSuggestions(message.id)}
+                    onRejectAll={() => rejectAllSuggestions(message.id)}
+                  />
                 </div>
               )}
             </div>
