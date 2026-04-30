@@ -7,12 +7,16 @@ import { coreInfoService } from "@/services/coreInfoService"
 import { summaryService } from "@/services/summaryService"
 import { chapterService } from "@/services/chapterService"
 import { templateService } from "@/services/templateService"
+import { literatureService } from "@/services/literatureService"
 import { useDocumentStore } from "@/store/documentStore"
+import { useAuthStore } from "@/store/authStore"
 import CoreInfoTemplateStep from "@/components/template/CoreInfoTemplateStep"
 import SummaryTemplateStep from "@/components/template/SummaryTemplateStep"
 import StructureTemplateStep from "@/components/template/StructureTemplateStep"
+import UploadLiteratureDialog from "@/components/literature/UploadLiteratureDialog"
 import { cn } from "@/lib/utils"
-import type { TemplateDependenciesResponse } from "@/types/api"
+import { toastError } from "@/hooks/useToast"
+import type { TemplateDependenciesResponse, Literature } from "@/types/api"
 
 type ApplyKey = "core-info" | "summary" | "structure"
 type ApplyStatus = "idle" | "applying" | "done" | "error"
@@ -28,6 +32,7 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
   const router = useRouter()
   const searchParams = useSearchParams()
   const { setFullContent, setSummaries, setCoreInfoTree, documentTitle } = useDocumentStore()
+  const { user } = useAuthStore()
   const panelContainerRef = useRef<HTMLDivElement>(null)
   const autoApplyTriggeredRef = useRef(false)
   const resizeStateRef = useRef<{
@@ -52,6 +57,14 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
   const [panelWidths, setPanelWidths] = useState<[number, number, number]>([24, 28, 48])
   const [activeHandle, setActiveHandle] = useState<number | null>(null)
   const shouldAutoApply = searchParams.get("autoApply") === "1"
+
+  // 文献管理状态
+  const [showLiterature, setShowLiterature] = useState(false)
+  const [showUpload, setShowUpload] = useState(false)
+  const [boundLiterature, setBoundLiterature] = useState<Literature[]>([])
+  const [allLiterature, setAllLiterature] = useState<Literature[]>([])
+  const [litLoading, setLitLoading] = useState(false)
+  const [litSearch, setLitSearch] = useState("")
 
   const loadDependencies = useCallback(async (id: string) => {
     try {
@@ -79,6 +92,30 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
 
     load()
   }, [documentId, loadDependencies])
+
+  // 加载已绑定文献
+  const loadBoundLiterature = useCallback(async (id: string) => {
+    try {
+      const res = await literatureService.listByTemplate(id)
+      setBoundLiterature(res.items)
+    } catch {
+      setBoundLiterature([])
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!templateId) return
+    void loadBoundLiterature(templateId)
+  }, [templateId, loadBoundLiterature])
+
+  // 展开文献面板时懒加载知识库列表
+  useEffect(() => {
+    if (!showLiterature || allLiterature.length > 0) return
+    setLitLoading(true)
+    literatureService.list().then(res => {
+      setAllLiterature(res.items)
+    }).catch(() => {}).finally(() => setLitLoading(false))
+  }, [showLiterature, allLiterature.length])
 
   const setStatus = useCallback((key: ApplyKey, status: ApplyStatus) => {
     setApplyStatus((prev) => ({ ...prev, [key]: status }))
@@ -291,6 +328,13 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
               {saveMessage && <p className="text-sm text-green-700">{saveMessage}</p>}
               {applyError && <p className="text-sm text-red-500">{applyError}</p>}
               <button
+                onClick={() => setShowLiterature((prev) => !prev)}
+                disabled={applying || savingTemplate || !templateId}
+                className="h-10 rounded-full border border-template-border bg-white px-5 text-sm font-medium text-gray-600 hover:bg-template-hover disabled:opacity-50 transition"
+              >
+                {showLiterature ? "收起文献" : "管理文献"}
+              </button>
+              <button
                 onClick={handleSaveTemplate}
                 disabled={applying || savingTemplate || !templateId}
                 className="h-10 rounded-full border border-template-accent bg-white px-5 text-sm font-medium text-template-accent hover:bg-template-accent-light disabled:opacity-50 transition"
@@ -310,6 +354,145 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
       </header>
 
       <main className="mx-auto flex min-h-0 w-full max-w-[1800px] flex-1 flex-col overflow-hidden px-3 py-4 lg:px-4">
+        {/* 文献管理面板 */}
+        {showLiterature && templateId && (
+          <section className="mb-3 rounded-2xl border border-template-border bg-white shadow-sm shrink-0">
+            <div className="border-b border-template-border-inner px-4 py-3 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700">文献绑定</h3>
+                <p className="mt-0.5 text-xs text-gray-400">绑定到此模板的文献将在 AI 生成时作为参考来源</p>
+              </div>
+              <span className="text-xs text-muted-foreground">{boundLiterature.length} 篇已绑定</span>
+            </div>
+            <div className="grid grid-cols-2 divide-x divide-template-border-inner">
+              {/* 左列：已绑定 */}
+              <div className="p-4">
+                <p className="mb-2 text-xs font-medium text-gray-500">已绑定文献</p>
+                {boundLiterature.length === 0 ? (
+                  <p className="text-xs text-gray-400 py-3 text-center">暂未绑定任何文献</p>
+                ) : (
+                  <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
+                    {boundLiterature.map(lit => (
+                      <div key={lit.literature_id} className="flex items-start justify-between gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-gray-700 truncate">{lit.title ?? "标题解析中..."}</p>
+                          {lit.authors && <p className="text-xs text-gray-400 truncate mt-0.5">{lit.authors}</p>}
+                          {lit.journal && <p className="text-xs text-gray-400 truncate">{lit.journal}</p>}
+                          {/* Scope 标签 */}
+                          <div className="mt-1">
+                            {lit.scope === "public" ? (
+                              <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium bg-blue-100 text-blue-600">
+                                🌐 公共
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium bg-purple-100 text-purple-600">
+                                🔒 私有
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await literatureService.unbind(templateId, lit.literature_id)
+                              setBoundLiterature(prev => prev.filter(l => l.literature_id !== lit.literature_id))
+                            } catch (err: unknown) {
+                              toastError(err instanceof Error ? err.message : "解绑失败")
+                            }
+                          }}
+                          className="shrink-0 text-xs text-gray-400 hover:text-red-500 transition"
+                        >
+                          解绑
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 右列：知识库选择 */}
+              <div className="p-4">
+                <div className="mb-2 flex items-center gap-2">
+                  <p className="text-xs font-medium text-gray-500">知识库文献</p>
+                  <input
+                    type="text"
+                    value={litSearch}
+                    onChange={e => setLitSearch(e.target.value)}
+                    placeholder="搜索标题、作者..."
+                    className="ml-auto h-7 w-44 rounded border border-gray-200 px-2 text-xs outline-none focus:border-blue-300 transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowUpload(true)}
+                    className="shrink-0 h-7 px-3 rounded bg-blue-500 text-white text-xs font-medium hover:bg-blue-600 transition"
+                  >
+                    + 上传
+                  </button>
+                </div>
+                {litLoading ? (
+                  <p className="text-xs text-gray-400 py-3 text-center">加载中...</p>
+                ) : (
+                  <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
+                    {allLiterature
+                      .filter(lit => {
+                        if (!litSearch.trim()) return true
+                        const kw = litSearch.toLowerCase()
+                        return lit.title?.toLowerCase().includes(kw) || lit.authors?.toLowerCase().includes(kw)
+                      })
+                      .filter(lit => lit.upload_status === "ready")
+                      .map(lit => {
+                        const isBound = boundLiterature.some(b => b.literature_id === lit.literature_id)
+                        return (
+                          <div key={lit.literature_id} className="flex items-start justify-between gap-2 rounded-lg border border-gray-100 px-3 py-2 hover:bg-gray-50 transition">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-medium text-gray-700 truncate">{lit.title ?? "—"}</p>
+                              {lit.authors && <p className="text-xs text-gray-400 truncate mt-0.5">{lit.authors}</p>}
+                              {lit.journal && <p className="text-xs text-gray-400 truncate">{lit.journal}</p>}
+                              {/* Scope 标签 */}
+                              <div className="mt-1">
+                                {lit.scope === "public" ? (
+                                  <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium bg-blue-100 text-blue-600">
+                                    🌐 公共
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium bg-purple-100 text-purple-600">
+                                    🔒 私有
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {isBound ? (
+                              <span className="shrink-0 text-xs text-green-600 font-medium">已绑定</span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    await literatureService.bind(templateId, lit.literature_id)
+                                    setBoundLiterature(prev => [...prev, lit])
+                                  } catch (err: unknown) {
+                                    toastError(err instanceof Error ? err.message : "绑定失败")
+                                  }
+                                }}
+                                className="shrink-0 text-xs text-primary hover:underline"
+                              >
+                                绑定
+                              </button>
+                            )}
+                          </div>
+                        )
+                      })}
+                    {allLiterature.filter(l => l.upload_status === "ready").length === 0 && !litLoading && (
+                      <p className="text-xs text-gray-400 py-3 text-center">知识库暂无就绪文献</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
+
         {templateId && (
           <div
             ref={panelContainerRef}
@@ -349,6 +532,17 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
           </div>
         )}
       </main>
+
+      {/* 上传文献对话框 */}
+      {showUpload && (
+        <UploadLiteratureDialog
+          onClose={() => setShowUpload(false)}
+          onUploaded={(lit) => {
+            setAllLiterature((prev) => [lit, ...prev])
+            setShowUpload(false)
+          }}
+        />
+      )}
     </div>
   )
 }

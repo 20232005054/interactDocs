@@ -186,6 +186,55 @@ async def extract_abstract_smart(pdf_path: str, doi: Optional[str] = None) -> st
     raise ValueError("无法从 PDF 提取任何可用内容，文件可能损坏或格式不支持")
 
 
+def extract_doi_from_pdf(pdf_path: str) -> Optional[str]:
+    """
+    从 PDF 文件中提取 DOI
+    
+    策略：
+    1. 优先从 PDF 元数据提取
+    2. 扫描前 3 页的完整文本（包括页眉、页脚）
+    3. 使用正则匹配 DOI 模式
+    
+    Args:
+        pdf_path: PDF 文件路径
+        
+    Returns:
+        DOI 字符串，未找到返回 None
+    """
+    try:
+        from pypdf import PdfReader
+        
+        reader = PdfReader(pdf_path)
+        
+        # 方法1：尝试从 PDF 元数据提取
+        if reader.metadata:
+            for key in ["/doi", "/DOI", "/Subject"]:
+                if key in reader.metadata:
+                    metadata_value = str(reader.metadata[key]).strip()
+                    # 从元数据值中提取 DOI
+                    doi = extract_doi_from_text(metadata_value)
+                    if doi:
+                        logger.info("[DOI 提取] 从 PDF 元数据提取成功 (字段=%s): %s", key, doi)
+                        return doi
+        
+        # 方法2：扫描前 3 页的完整文本
+        max_pages = min(3, len(reader.pages))
+        for page_num in range(max_pages):
+            page_text = reader.pages[page_num].extract_text()
+            if page_text:
+                doi = extract_doi_from_text(page_text)
+                if doi:
+                    logger.info("[DOI 提取] 从第 %d 页提取成功: %s", page_num + 1, doi)
+                    return doi
+        
+        logger.info("[DOI 提取] 未找到 DOI（已扫描前 %d 页）", max_pages)
+        return None
+        
+    except Exception as e:
+        logger.error("[DOI 提取] PDF 解析失败: %s", e, exc_info=True)
+        return None
+
+
 def extract_doi_from_text(text: str) -> Optional[str]:
     """
     从文本中提取 DOI
@@ -200,15 +249,28 @@ def extract_doi_from_text(text: str) -> Optional[str]:
         return None
     
     # DOI 正则模式：10.xxxx/xxxxx
-    pattern = r'\b10\.\d{4,9}/[^\s"\'<>]+\b'
-    match = re.search(pattern, text)
+    # 支持多种常见格式：
+    # - 纯 DOI: 10.1234/abcd
+    # - 带前缀: doi:10.1234/abcd, DOI:10.1234/abcd
+    # - 带 URL: https://doi.org/10.1234/abcd
+    patterns = [
+        r'(?:doi\.org/|doi:|DOI:)?\s*(10\.\d{4,9}/[^\s"\'<>]+)',
+        r'\b(10\.\d{4,9}/[^\s"\'<>]+)\b',
+    ]
     
-    if match:
-        doi = match.group(0)
-        # 清理末尾可能的标点符号
-        doi = doi.rstrip(".,;)")
-        logger.info("[DOI 提取] 成功提取 DOI: %s", doi)
-        return doi
+    for pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            doi = match.group(1) if match.lastindex else match.group(0)
+            # 清理末尾可能的标点符号
+            doi = doi.rstrip(".,;)")
+            
+            # 清理 eLife 特有的版本号后缀（.001, .002, .003 等）
+            # 例如：10.7554/eLife.24179.001 → 10.7554/eLife.24179
+            # 这些版本号后缀在 CrossRef 中不被识别
+            doi = re.sub(r'\.\d{3}$', '', doi)
+            
+            return doi
     
     return None
 

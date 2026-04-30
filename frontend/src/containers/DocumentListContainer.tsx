@@ -266,6 +266,12 @@ export default function DocumentListContainer() {
           >
             我的模板
           </button>
+          <button
+            onClick={() => router.push("/literature")}
+            className="text-sm text-gray-500 hover:text-gray-700 transition"
+          >
+            文献管理
+          </button>
           <span className="text-sm text-gray-500">{user?.name}</span>
           <button
             onClick={() => { clearAuth(); router.push("/login") }}

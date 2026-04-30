@@ -35,6 +35,7 @@ from services.oss_service import upload_file, delete_file, read_file
 from services.literature_extract_service import (
     extract_abstract_smart,
     extract_doi_from_text,
+    extract_doi_from_pdf,
     fetch_crossref_metadata,
 )
 
@@ -146,8 +147,8 @@ async def _process_literature_fast(literature_id: UUID, file_path: str) -> None:
                 if v is not None and not getattr(existing_lit, k, None):
                     metadata_update[k] = v
         else:
-            # 尝试从摘要提取 DOI
-            doi = extract_doi_from_text(abstract)
+            # 尝试从 PDF 前 3 页提取 DOI（而不是只从摘要提取）
+            doi = await asyncio.to_thread(extract_doi_from_pdf, file_path)
             if doi:
                 logger.info("[文献处理-快速] 提取到 DOI=%s，补全 metadata", doi)
                 crossref_data = await _fetch_crossref_metadata(doi)
