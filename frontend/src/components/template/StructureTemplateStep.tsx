@@ -503,6 +503,7 @@ function TreeItem({
           isSortOver && "ring-1 ring-green-400/60 bg-green-50"
         )}
       >
+        {/* 动态缩进：树形结构深度不可预测，使用内联 style 计算 paddingLeft */}
         <button
           type="button"
           onClick={() => onSelect(node)}

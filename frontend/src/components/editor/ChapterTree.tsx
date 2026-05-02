@@ -145,6 +145,7 @@ function TreeNode({ node, documentId, depth, onReload, dragHandleProps }: TreeNo
 
   return (
     <div>
+      {/* 动态缩进：树形结构深度不可预测，使用内联 style 计算 paddingLeft */}
       <div
         className={cn(
           "group flex items-center gap-1 py-1.5 pr-2 rounded-sm cursor-pointer select-none transition-colors border-l-4",

@@ -244,6 +244,7 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
         </main>
 
         {/* 右侧：信息面板（可折叠、可拖动调整宽度） */}
+        {/* 动态宽度：用户可拖动调整面板宽度，使用内联 style 应用实时计算的宽度值 */}
         {!rightPanelCollapsed && (
           <aside 
             className="shrink-0 border-l border-gray-200 bg-white flex flex-col overflow-hidden relative"

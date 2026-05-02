@@ -313,6 +313,7 @@ function ChapterBlock({ flatChapter, onReload }: ChapterBlockProps) {
       )}
     >
       {/* 章节标题 */}
+      {/* 动态缩进：树形结构深度不可预测，使用内联 style 计算 paddingLeft */}
       <div
         className={cn(
           "flex items-center gap-2 mb-2 pb-1.5",
@@ -328,6 +329,7 @@ function ChapterBlock({ flatChapter, onReload }: ChapterBlockProps) {
       </div>
 
       {/* 段落列表 */}
+      {/* 动态缩进：树形结构深度不可预测，使用内联 style 计算 paddingLeft */}
       <div
         className="flex flex-col gap-1.5"
         style={{ paddingLeft: `${depth * 8 + 4}px` }}

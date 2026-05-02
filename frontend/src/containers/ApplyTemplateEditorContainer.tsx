@@ -500,6 +500,7 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
           >
             {panels.map((panel, index) => (
               <Fragment key={panel.key}>
+                {/* CSS 变量：使用 flex-grow 实现可调整宽度的面板布局，通过 CSS 变量传递动态计算的比例值 */}
                 <div
                   className="min-w-0 xl:h-full xl:basis-0 xl:shrink-0 xl:[flex-grow:var(--panel-grow)]"
                   style={{ ["--panel-grow" as string]: panelWidths[index] }}

@@ -105,7 +105,7 @@ function CoreInfoNode({ node, depth, onChangeContent, onDelete, dragHandleProps 
 
   return (
     <>
-      {/* 动态树形缩进，Tailwind 无法静态生成，保留内联 style */}
+      {/* 动态缩进：树形结构深度不可预测，使用内联 style 计算 paddingLeft */}
       <div style={{ paddingLeft: `${depth * 12}px` }}>
         {/* 节点头部 */}
         <div className="flex items-center gap-1 py-1 group">
@@ -182,6 +182,7 @@ function CoreInfoNode({ node, depth, onChangeContent, onDelete, dragHandleProps 
         </div>
 
       {/* 内容编辑区（非 group 类型） */}
+      {/* 固定缩进：保持与上方节点头部的视觉对齐 */}
       {!isGroup && (
         <div className="mb-2" style={{ paddingLeft: "14px" }}>
           {node.field_type === "select" && node.options?.length ? (
@@ -213,6 +214,7 @@ function CoreInfoNode({ node, depth, onChangeContent, onDelete, dragHandleProps 
               placeholder={node.is_locked ? "已锁定" : "请输入数值..."}
             />
           ) : (
+            // 自适应高度：textarea 根据内容动态调整高度
             <textarea
               value={node.content}
               onChange={e => handleChange(e.target.value)}
