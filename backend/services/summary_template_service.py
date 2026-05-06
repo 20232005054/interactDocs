@@ -202,7 +202,9 @@ class SummaryTemplateService:
 
     @staticmethod
     async def _get_core_info_structured_text(db: AsyncSession, document_id: UUID) -> str:
-        return await TemplateRenderService._get_core_info_structured_text(db, document_id)
+        """获取核心信息结构化文本（统一入口）"""
+        from services.ai_context_builder import AIContextBuilder
+        return await AIContextBuilder.get_core_info_structured_text(db, document_id)
 
     @staticmethod
     async def _get_summary_content_map(db: AsyncSession, document: Document) -> dict:

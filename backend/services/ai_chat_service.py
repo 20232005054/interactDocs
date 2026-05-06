@@ -7,53 +7,11 @@ from uuid import UUID
 from db.models import Document, ChatRecord, Chapter, Paragraph, DocumentSummary
 from services.ai_client import call_qwen_stream
 from services.summary_template_service import SummaryTemplateService
+from core.ai_prompts import SYSTEM_PROMPT_CHAT
+from services.ai_context_builder import AIContextBuilder
 
-SYSTEM_PROMPT = (
-    "你是一位资深的临床研究 AI 助手，协助用户完善临床研究方案文档。\n"
-    "回答要专业、简洁、直接。\n"
-    "\n"
-    "**你可以提供以下类型的建议**：\n"
-    "\n"
-    '1. **创建章节建议**（用户需要手动应用）：\n'
-    '   [SUGGESTION]{"type": "create_chapter", "title": "章节标题", "parent_id": null, "description": "章节说明"}\n'
-    "   - parent_id 为 null 表示根章节，否则为父章节 ID（必须是用户提供的上下文中的章节 ID）\n"
-    "   - description 简要说明该章节应包含的内容\n"
-    "\n"
-    '2. **创建段落建议**（用户需要手动应用）：\n'
-    '   [SUGGESTION]{"type": "create_paragraph", "chapter_id": "章节ID", "para_type": "paragraph", "content": "段落内容", "description": "段落说明"}\n'
-    "   - chapter_id 必须是用户提供的上下文中的章节 ID\n"
-    "   - para_type 可选：paragraph（正文）、heading1、heading2、heading3（标题）\n"
-    "   - content 是建议的段落内容\n"
-    "   - description 简要说明为什么建议创建这个段落\n"
-    "\n"
-    '3. **修改内容建议**（用户需要手动应用）：\n'
-    '   [SUGGESTION]{"type": "edit_content", "target_type": "paragraph", "target_id": "目标ID", "original_content": "原内容", "suggested_content": "修改后的内容", "reason": "修改理由"}\n'
-    "   - target_type 可选：paragraph（段落）、summary（摘要）\n"
-    "   - target_id 必须是用户提供的上下文中的 ID\n"
-    "   - original_content 是当前内容（用于用户对比）\n"
-    "   - suggested_content 是修改后的内容\n"
-    "   - reason 说明为什么要这样修改\n"
-    "\n"
-    '4. **插入文本建议**（用户需要手动应用）：\n'
-    '   [SUGGESTION]{"type": "insert_text", "chapter_id": "章节ID", "content": "要插入的文本", "position": "end", "description": "插入说明"}\n'
-    "   - chapter_id 是目标章节 ID\n"
-    "   - content 是要插入的文本内容\n"
-    "   - position 可选：start（开头）、end（末尾）\n"
-    "   - description 说明为什么要插入这段文本\n"
-    "\n"
-    "**使用建议的注意事项**：\n"
-    "- 一次回复可以包含多个 [SUGGESTION]，每个独立一行\n"
-    '- 所有建议都需要用户手动点击"应用"才会生效，不会自动执行\n'
-    "- 只在用户明确要求创建、修改、插入内容时才提供建议\n"
-    "- 建议中引用的 ID（chapter_id、target_id 等）必须来自用户提供的上下文\n"
-    "- 如果用户只是咨询问题，不要提供建议，直接回答即可\n"
-    "- 在提供建议前，先在回复中用自然语言说明你的建议，让用户理解\n"
-    "\n"
-    "**文献引用规范**：\n"
-    "- 如果对话中提供了参考文献，只能引用已提供的文献，使用 [编号] 格式标记\n"
-    "- 不要自行编造或添加其他文献\n"
-    "- 不要在回答末尾添加参考文献列表，系统会自动管理\n"
-)
+# 使用统一的 System Prompt
+SYSTEM_PROMPT = SYSTEM_PROMPT_CHAT
 
 
 class AIChatService:
@@ -117,9 +75,9 @@ class AIChatService:
         if doc.purpose:
             parts.append(f"文档用途：{doc.purpose}")
 
-        # 核心信息结构化背景
+        # 核心信息结构化背景（使用统一接口）
         try:
-            core_info_text = await SummaryTemplateService._get_core_info_structured_text(
+            core_info_text = await AIContextBuilder.get_core_info_structured_text(
                 db, doc.document_id
             )
             if core_info_text:

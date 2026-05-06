@@ -29,28 +29,9 @@ from db.models import DocumentSummary, DocumentCoreInfo, Chapter
 from core.constants import EdgeTargetType, EdgeSourceType
 from services.summary_template_service import SummaryTemplateService
 from services.event_bus import publish
+from services.change_detection_service import ChangeDetectionService
 
 logger = logging.getLogger(__name__)
-
-SIMILARITY_THRESHOLD = 0.92
-
-
-async def _is_substantial_change(old_content: str, new_content: str) -> bool:
-    """用 embedding 余弦相似度判断是否实质变更"""
-    if not old_content.strip() or not new_content.strip():
-        return True
-    if old_content.strip() == new_content.strip():
-        return False
-    try:
-        from services.ai_client import get_embedding, cosine_similarity  # 避免循环依赖
-        vec_old = await get_embedding(old_content)
-        vec_new = await get_embedding(new_content)
-        sim = await cosine_similarity(vec_old, vec_new)
-        logger.info("embedding similarity: %.4f (threshold=%.2f)", sim, SIMILARITY_THRESHOLD)
-        return sim <= SIMILARITY_THRESHOLD
-    except Exception as e:
-        logger.warning("embedding 判断失败，降级为字符串比较: %s", e)
-        return old_content.strip() != new_content.strip()
 
 
 async def handle_core_info_change_async(
@@ -124,7 +105,7 @@ async def _handle_summary_downstream(
         logger.info("摘要 %s (mode=0) 已重新生成", summary_id)
 
     elif template.generation_mode == 1:
-        is_substantial = await _is_substantial_change(old_content, new_content)
+        is_substantial = await ChangeDetectionService.is_substantial_change(old_content, new_content)
         if not is_substantial:
             await SummaryMapper.update_summary(db, summary_id, {"is_change": 0})
             logger.info("摘要 %s (mode=1) 内容未实质变更，跳过", summary_id)
@@ -155,7 +136,7 @@ async def _handle_summary_downstream(
 
     elif template.generation_mode == 3:
         # AI修改模式：以 content_template 为草稿重新生成
-        is_substantial = await _is_substantial_change(old_content, new_content)
+        is_substantial = await ChangeDetectionService.is_substantial_change(old_content, new_content)
         if not is_substantial:
             await SummaryMapper.update_summary(db, summary_id, {"is_change": 0})
             logger.info("摘要 %s (mode=3) 内容未实质变更，跳过", summary_id)
@@ -230,7 +211,7 @@ async def _handle_chapter_downstream(
             logger.info("章节 %s 段落[%d] (mode=0) 已重新生成", chapter_id, para_idx)
 
         elif mode in (1, 3):
-            is_substantial = await _is_substantial_change(old_content, new_content)
+            is_substantial = await ChangeDetectionService.is_substantial_change(old_content, new_content)
             if not is_substantial:
                 await ParagraphMapper.update_paragraph(db, target_paragraph.paragraph_id, {"ischange": 0})
                 logger.info("章节 %s 段落[%d] (mode=%d) 内容未实质变更，跳过", chapter_id, para_idx, mode)

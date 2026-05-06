@@ -30,27 +30,9 @@ from db.models import DocumentSummary, Chapter
 from core.constants import EdgeTargetType, EdgeSourceType
 from services.summary_template_service import SummaryTemplateService
 from services.event_bus import publish
+from services.change_detection_service import ChangeDetectionService
 
 logger = logging.getLogger(__name__)
-
-SIMILARITY_THRESHOLD = 0.92
-
-
-async def _is_substantial_change(old_content: str, new_content: str) -> bool:
-    if not old_content.strip() or not new_content.strip():
-        return True
-    if old_content.strip() == new_content.strip():
-        return False
-    try:
-        from services.ai_client import get_embedding, cosine_similarity  # 避免循环依赖
-        vec_old = await get_embedding(old_content)
-        vec_new = await get_embedding(new_content)
-        sim = await cosine_similarity(vec_old, vec_new)
-        logger.info("summary embedding similarity: %.4f (threshold=%.2f)", sim, SIMILARITY_THRESHOLD)
-        return sim <= SIMILARITY_THRESHOLD
-    except Exception as e:
-        logger.warning("embedding 判断失败，降级为字符串比较: %s", e)
-        return old_content.strip() != new_content.strip()
 
 
 async def handle_summary_change_async(
@@ -61,7 +43,7 @@ async def handle_summary_change_async(
     """后台任务入口：处理摘要变更后的下游章节联动更新"""
     async with AsyncSessionLocal() as db:
         try:
-            is_substantial = await _is_substantial_change(old_content, new_content)
+            is_substantial = await ChangeDetectionService.is_substantial_change(old_content, new_content)
             if not is_substantial:
                 await db.execute(
                     update(DocumentSummary)

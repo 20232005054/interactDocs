@@ -20,6 +20,8 @@ from db.mappers.summary_mapper import SummaryMapper
 from db.mappers.structure_template_mapper import StructureTemplateMapper
 from db.mappers.chapter_mapper import ChapterMapper
 from services.ai_client import call_qwen_once
+from core.ai_prompts import SYSTEM_PROMPT_TEMPLATE_RENDER
+from services.ai_context_builder import AIContextBuilder
 
 
 class TemplateRenderService:
@@ -161,28 +163,20 @@ class TemplateRenderService:
 
         core_info_background = ""
         try:
-            structured_text = await TemplateRenderService._get_core_info_structured_text(db, document.document_id)
+            structured_text = await AIContextBuilder.get_core_info_structured_text(db, document.document_id)
             if structured_text:
                 core_info_background = f"\n\n【文档核心信息背景】\n{structured_text}\n"
         except Exception:
             pass
 
-        # 文献 RAG 注入
-        literature_context = ""
-        literature_citations = []
-        try:
-            from services.literature_rag_service import LiteratureRagService
-            if document.template_id and document.user_id:
-                query = f"{title} {base_prompt}"[:500]
-                literature_context, literature_citations = await LiteratureRagService.retrieve_and_format(
-                    db=db,
-                    document_template_id=document.template_id,
-                    user_id=document.user_id,
-                    query=query,
-                )
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).warning("文献 RAG 注入失败，跳过: %s", e)
+        # 文献 RAG 注入（统一入口）
+        literature_context, literature_citations = await AIContextBuilder.inject_literature_context(
+            db=db,
+            document=document,
+            query=f"{title} {base_prompt}",
+            paragraph_id=None,  # 模板级检索
+            top_k=5,
+        )
 
         final_prompt = f"{title_context}{base_prompt}{draft_context}{core_info_background}{sources_text}"
         if literature_context:
@@ -265,27 +259,19 @@ class TemplateRenderService:
 
         core_info_background = ""
         try:
-            structured_text = await TemplateRenderService._get_core_info_structured_text(db, document.document_id)
+            structured_text = await AIContextBuilder.get_core_info_structured_text(db, document.document_id)
             if structured_text:
                 core_info_background = f"\n\n【文档核心信息背景】\n{structured_text}\n"
         except Exception:
             pass
 
-        literature_context = ""
-        literature_citations = []
-        try:
-            from services.literature_rag_service import LiteratureRagService
-            if document.template_id and document.user_id:
-                query = f"{title} {base_prompt}"[:500]
-                literature_context, literature_citations = await LiteratureRagService.retrieve_and_format(
-                    db=db,
-                    document_template_id=document.template_id,
-                    user_id=document.user_id,
-                    query=query,
-                )
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).warning("文献 RAG 注入失败，跳过: %s", e)
+        literature_context, literature_citations = await AIContextBuilder.inject_literature_context(
+            db=db,
+            document=document,
+            query=f"{title} {base_prompt}",
+            paragraph_id=None,
+            top_k=5,
+        )
 
         final_prompt = f"{title_context}{base_prompt}{draft_context}{core_info_background}{sources_text}"
         if literature_context:
@@ -298,16 +284,8 @@ class TemplateRenderService:
 
     @staticmethod
     async def _call_ai_renderer(prompt: str, template_id: str = None, field_key: str = None) -> str:
-        system_prompt = (
-            "你是一位专业的临床研究文档写作专家。\n"
-            "\n"
-            "**文献引用规范**：\n"
-            "- 如果提供了参考文献，只能引用已提供的文献，使用 [编号] 格式标记\n"
-            "- 不要自行编造或添加其他文献\n"
-            "- 不要在生成内容末尾添加参考文献列表，系统会自动管理\n"
-        )
         result = await call_qwen_once(
-            system_prompt,
+            SYSTEM_PROMPT_TEMPLATE_RENDER,
             [],
             prompt,
             template_id=template_id,
@@ -326,33 +304,6 @@ class TemplateRenderService:
         )
         core_infos = result.scalars().all()
         return {info.field_key: info.content for info in core_infos if info.field_key}
-
-    @staticmethod
-    async def _get_core_info_structured_text(db: AsyncSession, document_id: UUID) -> str:
-        result = await db.execute(
-            select(DocumentCoreInfo)
-            .where(DocumentCoreInfo.document_id == document_id)
-            .order_by(DocumentCoreInfo.order_index)
-        )
-        all_nodes = result.scalars().all()
-        if not all_nodes:
-            return ""
-
-        def build_text(parent_id, indent: int) -> str:
-            lines = []
-            children = [n for n in all_nodes if n.parent_id == parent_id]
-            children.sort(key=lambda x: x.order_index)
-            prefix = "  " * indent
-            for node in children:
-                if node.field_type == "group":
-                    lines.append(f"{prefix}{node.title}：")
-                    lines.append(build_text(node.core_info_id, indent + 1))
-                else:
-                    if node.content and node.content.strip():
-                        lines.append(f"{prefix}{node.title}：{node.content.strip()}")
-            return "\n".join(filter(None, lines))
-
-        return build_text(None, 0)
 
     @staticmethod
     async def _get_summary_content_map(db: AsyncSession, document: Document) -> dict:

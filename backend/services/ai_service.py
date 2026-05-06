@@ -21,30 +21,8 @@ from services.ai_client import call_qwen_stream, call_qwen_once
 from services.summary_template_service import SummaryTemplateService
 from services.dependency_service import DependencyService
 from core.constants import EdgeSourceType, EdgeTargetType
-
-SYSTEM_PROMPT_ASSIST = """你是一位资深的临床研究方案撰写专家，请根据提供的文档背景信息，为指定章节生成专业的正文内容。
-
-**文献引用规范**：
-- 如果提供了参考文献，只能引用已提供的文献，使用 [编号] 格式标记
-- 不要自行编造或添加其他文献
-- 不要在生成内容末尾添加参考文献列表，系统会自动管理
-"""
-
-SYSTEM_PROMPT_EVALUATE = """你是一位资深的临床研究方案评估专家，请对提供的段落内容进行专业评估并给出改进建议。
-
-**文献引用规范**：
-- 如果提供了参考文献，只能引用已提供的文献，使用 [编号] 格式标记
-- 不要自行编造或添加其他文献
-- 不要在生成内容末尾添加参考文献列表，系统会自动管理
-"""
-
-SYSTEM_PROMPT_SUMMARY = """你是一位资深的临床研究方案摘要撰写专家，请根据提供的文档信息生成专业的摘要内容。
-
-**文献引用规范**：
-- 如果提供了参考文献，只能引用已提供的文献，使用 [编号] 格式标记
-- 不要自行编造或添加其他文献
-- 不要在生成内容末尾添加参考文献列表，系统会自动管理
-"""
+from core.ai_prompts import SYSTEM_PROMPT_ASSIST, SYSTEM_PROMPT_EVALUATE, SYSTEM_PROMPT_SUMMARY
+from services.ai_context_builder import AIContextBuilder
 
 
 # ----------------------------------------------------------------
@@ -60,8 +38,9 @@ async def _build_assist_prompt(
 ) -> str:
     parts = []
 
+    # 使用统一的核心信息获取
     try:
-        core_info_text = await SummaryTemplateService._get_core_info_structured_text(db, document.document_id)
+        core_info_text = await AIContextBuilder.get_core_info_structured_text(db, document.document_id)
         if core_info_text:
             parts.append(f"【文档核心信息背景】\n{core_info_text}")
     except Exception:
@@ -104,8 +83,9 @@ async def _build_evaluate_prompt(
 ) -> str:
     parts = []
 
+    # 使用统一的核心信息获取
     try:
-        core_info_text = await SummaryTemplateService._get_core_info_structured_text(db, document.document_id)
+        core_info_text = await AIContextBuilder.get_core_info_structured_text(db, document.document_id)
         if core_info_text:
             parts.append(f"【文档核心信息背景】\n{core_info_text}")
     except Exception:
@@ -198,34 +178,21 @@ async def ai_assist_paragraph(
             else:
                 prompt = await _build_assist_prompt(db, paragraph, chapter, document, instruction)
 
-            # 注入文献 RAG 上下文（两级检索：段落文献优先，模板文献补充）
-            try:
-                from services.literature_rag_service import LiteratureRagService
-                if document.template_id and document.user_id:
-                    query = f"{chapter.title} {prompt}"[:500]
-                    literature_context, lit_citations = await LiteratureRagService.retrieve_and_format_for_paragraph(
-                        db=db,
-                        paragraph_id=paragraph_id,
-                        document_template_id=document.template_id,
-                        user_id=document.user_id,
-                        query=query,
-                    )
-                    if literature_context:
-                        prompt = f"{prompt}\n\n{literature_context}"
-                        import logging as _log
-                        _log.getLogger(__name__).info(
-                            "[RAG] 段落帮填注入 %d 篇文献 paragraph_id=%s chapter=%r",
-                            len(lit_citations), paragraph_id, chapter.title
-                        )
-                    else:
-                        import logging as _log
-                        _log.getLogger(__name__).info(
-                            "[RAG] 段落帮填未检索到相关文献 paragraph_id=%s chapter=%r",
-                            paragraph_id, chapter.title
-                        )
-            except Exception as e:
-                import logging
-                logging.getLogger(__name__).warning("段落帮填文献 RAG 注入失败，跳过: %s", e)
+            # 注入文献 RAG 上下文（统一入口：两级检索）
+            literature_context, lit_citations = await AIContextBuilder.inject_literature_context(
+                db=db,
+                document=document,
+                query=f"{chapter.title} {prompt}",
+                paragraph_id=paragraph_id,  # 段落级检索
+                top_k=5,
+            )
+            if literature_context:
+                prompt = f"{prompt}\n\n{literature_context}"
+                import logging as _log
+                _log.getLogger(__name__).info(
+                    "[RAG] 段落帮填注入 %d 篇文献 paragraph_id=%s chapter=%r",
+                    len(lit_citations), paragraph_id, chapter.title
+                )
 
             ctx = _AssistContext(
                 prompt=prompt,
@@ -390,8 +357,9 @@ async def assist_single_summary(db: AsyncSession, summary_id: UUID, downstream_p
 
     parts = []
 
+    # 使用统一的核心信息获取
     try:
-        core_info_text = await SummaryTemplateService._get_core_info_structured_text(db, document.document_id)
+        core_info_text = await AIContextBuilder.get_core_info_structured_text(db, document.document_id)
         if core_info_text:
             parts.append(f"【文档核心信息背景】\n{core_info_text}")
     except Exception:
@@ -412,33 +380,21 @@ async def assist_single_summary(db: AsyncSession, summary_id: UUID, downstream_p
 
     prompt = "\n\n".join(parts)
 
-    # 注入文献 RAG 上下文
-    try:
-        from services.literature_rag_service import LiteratureRagService
-        if document.template_id and document.user_id:
-            query = f"{summary.title} {prompt}"[:500]
-            literature_context, lit_citations = await LiteratureRagService.retrieve_and_format(
-                db=db,
-                document_template_id=document.template_id,
-                user_id=document.user_id,
-                query=query,
-            )
-            if literature_context:
-                prompt = f"{prompt}\n\n{literature_context}"
-                import logging as _log
-                _log.getLogger(__name__).info(
-                    "[RAG] 摘要帮填注入 %d 篇文献 summary_id=%s title=%r",
-                    len(lit_citations), summary_id, summary.title
-                )
-            else:
-                import logging as _log
-                _log.getLogger(__name__).info(
-                    "[RAG] 摘要帮填未检索到相关文献 summary_id=%s title=%r",
-                    summary_id, summary.title
-                )
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning("摘要帮填文献 RAG 注入失败，跳过: %s", e)
+    # 注入文献 RAG 上下文（统一入口）
+    literature_context, lit_citations = await AIContextBuilder.inject_literature_context(
+        db=db,
+        document=document,
+        query=f"{summary.title} {prompt}",
+        paragraph_id=None,  # 模板级检索
+        top_k=5,
+    )
+    if literature_context:
+        prompt = f"{prompt}\n\n{literature_context}"
+        import logging as _log
+        _log.getLogger(__name__).info(
+            "[RAG] 摘要帮填注入 %d 篇文献 summary_id=%s title=%r",
+            len(lit_citations), summary_id, summary.title
+        )
 
     try:
         result = await call_qwen_once(SYSTEM_PROMPT_SUMMARY, [], prompt)
