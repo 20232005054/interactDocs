@@ -29,6 +29,7 @@ export default function CreateCoreInfoDialog({
   const [parentId, setParentId] = useState<string | null>(null)
   const [isRequired, setIsRequired] = useState(true)
   const [options, setOptions] = useState("")
+  const [isComposing, setIsComposing] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -41,7 +42,7 @@ export default function CreateCoreInfoDialog({
   }, [open])
 
   const handleConfirm = () => {
-    if (!title.trim()) return
+    if (!title.trim() || isComposing) return
 
     const data: {
       title: string
@@ -64,7 +65,7 @@ export default function CreateCoreInfoDialog({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey && fieldType !== "select") {
+    if (e.key === "Enter" && !e.shiftKey && fieldType !== "select" && !isComposing) {
       e.preventDefault()
       handleConfirm()
     }
@@ -119,6 +120,10 @@ export default function CreateCoreInfoDialog({
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              onCompositionStart={() => setIsComposing(true)}
+              onCompositionEnd={(e) => {
+                setIsComposing(false)
+              }}
               onKeyDown={handleKeyDown}
               placeholder="请输入核心信息标题"
               className="w-full h-9 rounded border border-gray-200 px-3 text-sm outline-none focus:border-blue-300 transition"
@@ -150,6 +155,10 @@ export default function CreateCoreInfoDialog({
               <textarea
                 value={options}
                 onChange={(e) => setOptions(e.target.value)}
+                onCompositionStart={() => setIsComposing(true)}
+                onCompositionEnd={(e) => {
+                  setIsComposing(false)
+                }}
                 placeholder="选项1&#10;选项2&#10;选项3"
                 rows={4}
                 className="w-full resize-none rounded border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-300 transition"

@@ -85,6 +85,7 @@ function TreeNode({ node, documentId, depth, onReload, dragHandleProps }: TreeNo
   const [menuOpen, setMenuOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [isComposing, setIsComposing] = useState(false)
 
   const isActive = activeChapterId === node.chapter_id
   const hasChildren = node.children.length > 0
@@ -185,10 +186,16 @@ function TreeNode({ node, documentId, depth, onReload, dragHandleProps }: TreeNo
           <input
             autoFocus
             value={editTitle}
-            onChange={e => setEditTitle(e.target.value)}
+            onChange={e => {
+              setEditTitle(e.target.value)
+            }}
+            onCompositionStart={() => setIsComposing(true)}
+            onCompositionEnd={(e) => {
+              setIsComposing(false)
+            }}
             onBlur={handleRename}
             onKeyDown={e => {
-              if (e.key === "Enter") handleRename()
+              if (e.key === "Enter" && !isComposing) handleRename()
               if (e.key === "Escape") { setEditing(false); setEditTitle(node.title) }
             }}
             disabled={saving}

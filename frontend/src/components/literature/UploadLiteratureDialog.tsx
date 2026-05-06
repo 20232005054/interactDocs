@@ -19,6 +19,7 @@ export default function UploadLiteratureDialog({ onClose, onUploaded }: UploadLi
   const [impactFactor, setImpactFactor] = useState("")
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isComposing, setIsComposing] = useState(false)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
@@ -161,6 +162,8 @@ export default function UploadLiteratureDialog({ onClose, onUploaded }: UploadLi
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
+                    onCompositionStart={() => setIsComposing(true)}
+                    onCompositionEnd={() => setIsComposing(false)}
                     placeholder="文献标题"
                     className={inputCls}
                   />
@@ -173,6 +176,8 @@ export default function UploadLiteratureDialog({ onClose, onUploaded }: UploadLi
                     type="text"
                     value={authors}
                     onChange={(e) => setAuthors(e.target.value)}
+                    onCompositionStart={() => setIsComposing(true)}
+                    onCompositionEnd={() => setIsComposing(false)}
                     placeholder="多个作者用逗号分隔"
                     className={inputCls}
                   />
@@ -185,6 +190,8 @@ export default function UploadLiteratureDialog({ onClose, onUploaded }: UploadLi
                     type="text"
                     value={journal}
                     onChange={(e) => setJournal(e.target.value)}
+                    onCompositionStart={() => setIsComposing(true)}
+                    onCompositionEnd={() => setIsComposing(false)}
                     placeholder="期刊名称"
                     className={inputCls}
                   />
@@ -197,6 +204,8 @@ export default function UploadLiteratureDialog({ onClose, onUploaded }: UploadLi
                     type="text"
                     value={doi}
                     onChange={(e) => setDoi(e.target.value)}
+                    onCompositionStart={() => setIsComposing(true)}
+                    onCompositionEnd={() => setIsComposing(false)}
                     placeholder="10.xxxx/xxxxx"
                     className={inputCls}
                   />

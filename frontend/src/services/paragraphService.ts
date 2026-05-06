@@ -131,4 +131,8 @@ export const paragraphService = {
   // 查询段落绑定的文献
   listLiterature: (paragraphId: string): Promise<LiteratureListResponse> =>
     request.get(`/api/v1/paragraphs/${paragraphId}/literature`),
+
+  // 确认段落变更
+  confirmChange: (paragraphId: string): Promise<Paragraph> =>
+    request.post(`/api/v1/paragraphs/${paragraphId}/confirm-change`),
 }

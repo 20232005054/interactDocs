@@ -68,8 +68,31 @@ interface SummaryCardProps {
 function SummaryCard({ summary, onChangeContent, onDelete, dragHandleProps }: SummaryCardProps) {
   const [expanded, setExpanded] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [isComposing, setIsComposing] = useState(false)
+  const [localValue, setLocalValue] = useState(summary.content)
+  const { updateSummary } = useDocumentStore()
+
+  // 同步外部变更到本地状态
+  useEffect(() => {
+    setLocalValue(summary.content)
+  }, [summary.content])
 
   const handleChange = (val: string) => {
+    // 始终更新本地状态（让输入框响应）
+    setLocalValue(val)
+    
+    // 非组合期间才更新 store 和触发保存
+    if (!isComposing) {
+      updateSummary(summary.summary_id, { content: val })
+      onChangeContent(summary.summary_id, val)
+    }
+  }
+
+  const handleCompositionEnd = (e: React.CompositionEvent<HTMLTextAreaElement>) => {
+    setIsComposing(false)
+    const val = (e.target as HTMLTextAreaElement).value
+    // 组合结束时更新 store 和触发保存
+    updateSummary(summary.summary_id, { content: val })
     onChangeContent(summary.summary_id, val)
   }
 
@@ -137,8 +160,10 @@ function SummaryCard({ summary, onChangeContent, onDelete, dragHandleProps }: Su
         {expanded && (
           <div className="px-3 pb-3">
             <textarea
-              value={summary.content}
+              value={localValue}
               onChange={e => handleChange(e.target.value)}
+              onCompositionStart={() => setIsComposing(true)}
+              onCompositionEnd={handleCompositionEnd}
               rows={4}
               className={cn(
                 "w-full resize-none rounded border px-2 py-1.5 text-xs outline-none leading-relaxed transition",

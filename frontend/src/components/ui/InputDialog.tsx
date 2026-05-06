@@ -27,6 +27,7 @@ export default function InputDialog({
   onCancel,
 }: InputDialogProps) {
   const [value, setValue] = useState(defaultValue)
+  const [isComposing, setIsComposing] = useState(false)
 
   // 每次打开时重置为默认值
   useEffect(() => {
@@ -35,7 +36,10 @@ export default function InputDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onConfirm(value)
+    // 中文输入法组合期间不提交
+    if (!isComposing) {
+      onConfirm(value)
+    }
   }
 
   return (
@@ -57,6 +61,16 @@ export default function InputDialog({
               type="text"
               value={value}
               onChange={(e) => setValue(e.target.value)}
+              onCompositionStart={() => setIsComposing(true)}
+              onCompositionEnd={(e) => {
+                setIsComposing(false)
+              }}
+              onKeyDown={(e) => {
+                // 中文输入法组合期间不响应 Enter
+                if (e.key === "Enter" && isComposing) {
+                  e.preventDefault()
+                }
+              }}
               placeholder={placeholder}
               className="h-9 w-full rounded-md border border-gray-300 px-3 text-sm outline-none transition focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
             />

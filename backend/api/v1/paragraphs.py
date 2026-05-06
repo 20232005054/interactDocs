@@ -356,3 +356,13 @@ async def list_paragraph_literature(
         "total": len(items),
     })
 
+
+@router.post("/paragraphs/{paragraph_id}/confirm-change", summary="确认段落变更", response_model=ResponseModel[ParagraphResponse])
+async def confirm_paragraph_change(paragraph_id: UUID, db: AsyncSession = Depends(get_db)):
+    """
+    确认段落变更，将 ischange 重置为 0。
+    用于用户确认已查看并接受段落的变更状态（ischange=1 或 ischange=2）。
+    """
+    updated = await ParagraphService.confirm_change(db, paragraph_id)
+    return success_response(data=_para_response(updated), message="已确认变更")
+

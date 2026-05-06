@@ -231,9 +231,28 @@ function ParagraphRow({
           onFocus={() => setActiveParagraphId(paragraph.paragraph_id)}
         />
 
-        {/* 变更标记 */}
-        {paragraph.ischange === 1 && (
-          <span className="text-xs text-orange-400 ml-1">已变更</span>
+        {/* 变更标记 + 确认按钮 */}
+        {paragraph.ischange !== 0 && (
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-xs text-orange-400">
+              {paragraph.ischange === 1 ? "已变更" : "系统重新生成"}
+            </span>
+            <button
+              type="button"
+              onClick={async (e) => {
+                e.stopPropagation()
+                try {
+                  await paragraphService.confirmChange(paragraph.paragraph_id)
+                  onReload()
+                } catch (err: unknown) {
+                  toastError(err instanceof Error ? err.message : "确认失败")
+                }
+              }}
+              className="text-xs px-2 py-0.5 rounded bg-green-50 text-green-600 hover:bg-green-100 transition"
+            >
+              确认变更
+            </button>
+          </div>
         )}
 
         {/* AI 工具栏（仅正文段落） */}

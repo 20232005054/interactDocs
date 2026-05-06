@@ -301,3 +301,20 @@ class ParagraphService:
             for s in summaries
             if s.summary_id in edge_map
         ]
+
+    @staticmethod
+    async def confirm_change(db: AsyncSession, paragraph_id: UUID):
+        """
+        确认段落变更，将 ischange 重置为 0。
+        用于用户确认已查看并接受段落的变更状态。
+        """
+        paragraph = await ParagraphMapper.get_paragraph_by_id(db, paragraph_id)
+        if not paragraph:
+            raise HTTPException(status_code=404, detail="段落不存在")
+
+        # 重置变更标记
+        update_data = {"ischange": 0}
+        await ParagraphMapper.update_paragraph(db, paragraph_id, update_data)
+        await db.commit()
+
+        return await ParagraphMapper.get_paragraph_by_id(db, paragraph_id)

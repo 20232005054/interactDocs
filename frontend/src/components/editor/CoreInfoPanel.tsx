@@ -73,11 +73,33 @@ function CoreInfoNode({ node, depth, onChangeContent, onDelete, dragHandleProps 
   const { updateCoreInfo } = useDocumentStore()
   const [collapsed, setCollapsed] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [isComposing, setIsComposing] = useState(false)
+  const [localValue, setLocalValue] = useState(node.content)
+
+  // 同步外部变更到本地状态
+  useEffect(() => {
+    setLocalValue(node.content)
+  }, [node.content])
 
   const isGroup = node.field_type === "group"
   const hasChildren = node.children.length > 0
 
   const handleChange = (val: string) => {
+    // 始终更新本地状态（让输入框响应）
+    setLocalValue(val)
+    
+    // 非组合期间才更新 store 和触发保存
+    if (!isComposing) {
+      updateCoreInfo(node.core_info_id, { content: val })
+      onChangeContent(node.core_info_id, val)
+    }
+  }
+
+  const handleCompositionEnd = (e: React.CompositionEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setIsComposing(false)
+    const val = (e.target as HTMLInputElement | HTMLTextAreaElement).value
+    // 组合结束时更新 store 和触发保存
+    updateCoreInfo(node.core_info_id, { content: val })
     onChangeContent(node.core_info_id, val)
   }
 
@@ -187,7 +209,7 @@ function CoreInfoNode({ node, depth, onChangeContent, onDelete, dragHandleProps 
         <div className="mb-2" style={{ paddingLeft: "14px" }}>
           {node.field_type === "select" && node.options?.length ? (
             <select
-              value={node.content}
+              value={localValue}
               onChange={e => handleChange(e.target.value)}
               disabled={node.is_locked}
               className={cn(
@@ -203,8 +225,10 @@ function CoreInfoNode({ node, depth, onChangeContent, onDelete, dragHandleProps 
           ) : node.field_type === "number" ? (
             <input
               type="number"
-              value={node.content}
+              value={localValue}
               onChange={e => handleChange(e.target.value)}
+              onCompositionStart={() => setIsComposing(true)}
+              onCompositionEnd={handleCompositionEnd}
               disabled={node.is_locked}
               className={cn(
                 "w-full h-7 rounded border border-gray-200 bg-white px-2 text-xs outline-none focus:border-blue-300 transition",
@@ -216,8 +240,10 @@ function CoreInfoNode({ node, depth, onChangeContent, onDelete, dragHandleProps 
           ) : (
             // 自适应高度：textarea 根据内容动态调整高度
             <textarea
-              value={node.content}
+              value={localValue}
               onChange={e => handleChange(e.target.value)}
+              onCompositionStart={() => setIsComposing(true)}
+              onCompositionEnd={handleCompositionEnd}
               disabled={node.is_locked}
               rows={1}
               className={cn(

@@ -24,6 +24,7 @@ export default function EditLiteratureDialog({
   )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isComposing, setIsComposing] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -92,6 +93,8 @@ export default function EditLiteratureDialog({
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
+                onCompositionStart={() => setIsComposing(true)}
+                onCompositionEnd={() => setIsComposing(false)}
                 placeholder="文献标题"
                 className={inputCls}
               />
@@ -104,6 +107,8 @@ export default function EditLiteratureDialog({
                 type="text"
                 value={authors}
                 onChange={(e) => setAuthors(e.target.value)}
+                onCompositionStart={() => setIsComposing(true)}
+                onCompositionEnd={() => setIsComposing(false)}
                 placeholder="多个作者用逗号分隔"
                 className={inputCls}
               />
@@ -116,6 +121,8 @@ export default function EditLiteratureDialog({
                 type="text"
                 value={journal}
                 onChange={(e) => setJournal(e.target.value)}
+                onCompositionStart={() => setIsComposing(true)}
+                onCompositionEnd={() => setIsComposing(false)}
                 placeholder="期刊名称"
                 className={inputCls}
               />
@@ -128,6 +135,8 @@ export default function EditLiteratureDialog({
                 type="text"
                 value={doi}
                 onChange={(e) => setDoi(e.target.value)}
+                onCompositionStart={() => setIsComposing(true)}
+                onCompositionEnd={() => setIsComposing(false)}
                 placeholder="10.xxxx/xxxxx"
                 className={inputCls}
               />
