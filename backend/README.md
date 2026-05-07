@@ -109,11 +109,6 @@ backend/
 │   └── mappers/         # 数据访问层
 ├── schemas/             # Pydantic 模型
 ├── services/            # 业务逻辑层
-│   ├── ai_client.py     # AI 客户端
-│   ├── literature_rag_service.py  # RAG 检索
-│   ├── template_apply_service.py  # 模板应用
-│   ├── oss_service.py   # 文件存储
-│   └── event_bus.py     # 事件总线
 └── main.py              # 应用入口
 ```
 
