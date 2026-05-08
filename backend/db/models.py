@@ -281,11 +281,11 @@ class DependencyEdge(Base):
     document_id = Column(UUID(as_uuid=True), ForeignKey("documents.document_id", ondelete="CASCADE"), nullable=False)
 
     # 依赖方 (主体：通常是生成的段落 Paragraph)
-    source_type = Column(String(30), nullable=False)  # 例: 'paragraph', 'chapter', 'document'
+    source_type = Column(String(30), nullable=False)  # 'paragraph', 'chapter', 'summary'
     source_id = Column(UUID(as_uuid=True), nullable=False)
     
-    # 被依赖方 (客体：如 摘要、全局变量、关键词)
-    target_type = Column(String(30), nullable=False)  # 例: 'summary', 'document_entity', 'keyword'
+    # 被依赖方 (客体：如 摘要、核心信息、章节)
+    target_type = Column(String(30), nullable=False)  # 'core_info', 'summary', 'chapter'
     target_id = Column(UUID(as_uuid=True), nullable=False)
     
     # 依赖状态记录 (用于溯源和报警)
