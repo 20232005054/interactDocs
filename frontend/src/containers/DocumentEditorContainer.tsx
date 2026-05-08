@@ -23,6 +23,8 @@ import SummaryPanel from "@/components/editor/SummaryPanel"
 import AIChatPanel from "@/components/editor/AIChatPanel"
 import CitationsPanel from "@/components/editor/CitationsPanel"
 import LiteratureManagementPanel from "@/components/editor/LiteratureManagementPanel"
+import WordCountPanel from "@/components/editor/WordCountPanel"
+import ReadingModeView from "@/components/editor/ReadingModeView"
 import { useDocumentSSE } from "@/hooks/useDocumentSSE"
 
 interface DocumentEditorContainerProps {
@@ -46,6 +48,8 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
   const [isResizingLeft, setIsResizingLeft] = useState(false)
   const [isResizingRight, setIsResizingRight] = useState(false)
   const [refreshingContent, setRefreshingContent] = useState(false) // 内容刷新状态
+  const [showWordCount, setShowWordCount] = useState(false) // 字数统计面板
+  const [readingMode, setReadingMode] = useState(false) // 阅读模式
 
   // SSE 订阅文档变更事件
   useDocumentSSE({ documentId, enabled: !loading && !error })
@@ -63,6 +67,20 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
     {
       ...EDITOR_SHORTCUTS.OPEN_AI_CHAT,
       action: () => setRightPanelTab("chat"),
+    },
+    {
+      ...EDITOR_SHORTCUTS.WORD_COUNT,
+      action: () => setShowWordCount(v => !v),
+    },
+    {
+      ...EDITOR_SHORTCUTS.TOGGLE_READING_MODE,
+      action: () => setReadingMode(v => !v),
+    },
+    {
+      key: "Escape",
+      description: "退出阅读模式",
+      action: () => setReadingMode(false),
+      preventDefault: false,
     },
   ], !loading && !error)
 
@@ -378,6 +396,22 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
           </button>
         )}
       </div>
+
+      {/* 字数统计面板 */}
+      <WordCountPanel
+        tree={tree}
+        visible={showWordCount}
+        onClose={() => setShowWordCount(false)}
+      />
+
+      {/* 阅读模式 */}
+      {readingMode && (
+        <ReadingModeView
+          tree={tree}
+          documentTitle={documentTitle ?? ""}
+          onClose={() => setReadingMode(false)}
+        />
+      )}
     </div>
   )
 }
