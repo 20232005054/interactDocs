@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { FileText, FileEdit, MessageSquare, BookOpen, ArrowLeft, Wand2, RefreshCw, Upload, Download } from "lucide-react"
+import { FileText, FileEdit, MessageSquare, BookOpen, ArrowLeft, Wand2, RefreshCw, Upload, Download, Hash, BookOpenCheck } from "lucide-react"
 import { chapterService } from "@/services/chapterService"
 import { summaryService } from "@/services/summaryService"
 import { coreInfoService } from "@/services/coreInfoService"
@@ -201,7 +201,15 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col">
-        <EditorHeader title="加载中..." onBack={() => router.push("/documents")} userName={user?.name} templateId={null} documentId={documentId} />
+        <EditorHeader 
+          title="加载中..." 
+          onBack={() => router.push("/documents")} 
+          userName={user?.name} 
+          templateId={null} 
+          documentId={documentId}
+          onToggleWordCount={() => {}}
+          onToggleReadingMode={() => {}}
+        />
         <div className="flex flex-1 overflow-hidden">
           <div className="w-56 border-r border-gray-200 bg-white animate-pulse" />
           <div className="flex-1 bg-white animate-pulse" />
@@ -214,7 +222,15 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col">
-        <EditorHeader title="加载失败" onBack={() => router.push("/documents")} userName={user?.name} templateId={null} documentId={documentId} />
+        <EditorHeader 
+          title="加载失败" 
+          onBack={() => router.push("/documents")} 
+          userName={user?.name} 
+          templateId={null} 
+          documentId={documentId}
+          onToggleWordCount={() => {}}
+          onToggleReadingMode={() => {}}
+        />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <p className="text-red-500 mb-4">{error}</p>
@@ -239,6 +255,8 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
         }}
         templateId={templateId}
         documentId={documentId}
+        onToggleWordCount={() => setShowWordCount(v => !v)}
+        onToggleReadingMode={() => setReadingMode(v => !v)}
       />
 
       {/* 三栏主体：左目录 + 中编辑 + 右信息 */}
@@ -426,9 +444,11 @@ interface EditorHeaderProps {
   onApplyTemplate?: () => void
   templateId: string | null
   documentId: string
+  onToggleWordCount: () => void
+  onToggleReadingMode: () => void
 }
 
-function EditorHeader({ title, onBack, userName, onApplyTemplate, templateId, documentId }: EditorHeaderProps) {
+function EditorHeader({ title, onBack, userName, onApplyTemplate, templateId, documentId, onToggleWordCount, onToggleReadingMode }: EditorHeaderProps) {
   return (
     <header className="h-12 shrink-0 bg-white border-b border-gray-200 flex items-center px-4 gap-3">
       <button
@@ -440,6 +460,26 @@ function EditorHeader({ title, onBack, userName, onApplyTemplate, templateId, do
       </button>
       <div className="w-px h-4 bg-gray-200" />
       <h1 className="text-sm font-medium text-gray-800 flex-1 truncate">{title}</h1>
+      
+      {/* 视图工具 */}
+      <div className="flex items-center gap-2 border-r border-gray-200 pr-3">
+        <button
+          onClick={onToggleWordCount}
+          className="h-7 px-3 rounded border border-gray-300 text-gray-600 text-xs font-medium hover:bg-gray-50 transition shrink-0 flex items-center gap-1.5"
+          title="字数统计 (Ctrl+Shift+W)"
+        >
+          <Hash className="w-3.5 h-3.5" />
+          <span>字数</span>
+        </button>
+        <button
+          onClick={onToggleReadingMode}
+          className="h-7 px-3 rounded border border-gray-300 text-gray-600 text-xs font-medium hover:bg-gray-50 transition shrink-0 flex items-center gap-1.5"
+          title="阅读模式 (Ctrl+Shift+R)"
+        >
+          <BookOpenCheck className="w-3.5 h-3.5" />
+          <span>阅读</span>
+        </button>
+      </div>
       
       {/* 模板操作组 */}
       {(onApplyTemplate || templateId) && (

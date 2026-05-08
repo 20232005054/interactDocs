@@ -80,7 +80,7 @@ const ParagraphEditor = forwardRef<ParagraphEditorHandle, ParagraphEditorProps>(
           // 禁用 StarterKit 内置的 heading，统一由 paraType 控制
           heading: headingLevel ? { levels: [1, 2, 3] } : false,
         }),
-        Underline,
+        Underline, // StarterKit 不包含 Underline，需要单独引入
         Table.configure({ resizable: false }),
         TableRow,
         TableCell,

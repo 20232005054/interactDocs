@@ -99,8 +99,10 @@ export default function RichTextEditor({
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
-      StarterKit.configure({ heading: { levels: [1, 2, 3] }, underline: false }),
-      Underline,
+      StarterKit.configure({ 
+        heading: { levels: [1, 2, 3] },
+      }),
+      Underline, // StarterKit 不包含 Underline，需要单独引入
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       Placeholder.configure({ placeholder }),
       Markdown.configure({
