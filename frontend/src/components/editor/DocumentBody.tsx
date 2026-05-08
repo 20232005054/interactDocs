@@ -1,6 +1,10 @@
 "use client"
 
 import { useRef, useState, useCallback } from "react"
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core"
+import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
+import { GripVertical } from "lucide-react"
 import { paragraphService } from "@/services/paragraphService"
 import { useDocumentStore } from "@/store/documentStore"
 import { useEditorStore } from "@/store/editorStore"
@@ -33,6 +37,50 @@ function flattenTree(nodes: ChapterTreeNode[], depth = 0): FlatChapter[] {
 }
 
 // ----------------------------------------------------------------
+// 可拖拽的段落行
+// ----------------------------------------------------------------
+interface SortableParagraphRowProps {
+  paragraph: Paragraph
+  chapterId: string
+  chapterTitle: string
+  prevParagraphId?: string
+  onReload: () => void
+  onRequestFocus?: (paragraphId: string, position: "start" | "end") => void
+}
+
+function SortableParagraphRow(props: SortableParagraphRowProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: props.paragraph.paragraph_id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "touch-none",
+        isDragging && "opacity-50 z-50"
+      )}
+    >
+      <ParagraphRow
+        {...props}
+        dragHandleProps={{ ...attributes, ...listeners }}
+      />
+    </div>
+  )
+}
+
+// ----------------------------------------------------------------
 // 段落行
 // ----------------------------------------------------------------
 interface ParagraphRowProps {
@@ -42,6 +90,7 @@ interface ParagraphRowProps {
   prevParagraphId?: string
   onReload: () => void
   onRequestFocus?: (paragraphId: string, position: "start" | "end") => void
+  dragHandleProps?: React.HTMLAttributes<HTMLDivElement>
 }
 
 function ParagraphRow({
@@ -51,6 +100,7 @@ function ParagraphRow({
   prevParagraphId,
   onReload,
   onRequestFocus,
+  dragHandleProps,
 }: ParagraphRowProps) {
   const { updateParagraph } = useDocumentStore()
   const { setActiveParagraphId, activeParagraphId } = useEditorStore()
@@ -80,6 +130,25 @@ function ParagraphRow({
       }
     }, 800)
   }, [chapterId, paragraph.paragraph_id, updateParagraph, updateParagraphContextContent])
+
+  // AI 改写选中文本
+  const handleAIRewrite = useCallback((selectedText: string) => {
+    // TODO: 实现 AI 改写功能
+    console.log("AI 改写:", selectedText)
+    toastError("AI 改写功能开发中...")
+  }, [])
+
+  // 添加选中文本到对话上下文
+  const handleAddToContext = useCallback((selectedText: string) => {
+    upsertSelectionParagraphContext({
+      paragraph_id: paragraph.paragraph_id,
+      chapter_id: chapterId,
+      chapter_title: chapterTitle,
+      content: localContent,
+      para_type: paragraph.para_type,
+      selected_text: selectedText, // 添加选中的文本片段
+    })
+  }, [paragraph.paragraph_id, chapterId, chapterTitle, localContent, paragraph.para_type, upsertSelectionParagraphContext])
 
   const handleInsertAfter = async () => {
     setMenuOpen(false)
@@ -164,7 +233,20 @@ function ParagraphRow({
     >
       {/* 左侧操作区 */}
       <div className="w-6 shrink-0 flex items-start justify-center pt-2 opacity-0 group-hover/paragraph:opacity-100 transition-opacity duration-200">
-        <div className="relative">
+        <div className="relative flex flex-col gap-1">
+          {/* 拖拽手柄 */}
+          {dragHandleProps && (
+            <div
+              {...dragHandleProps}
+              className="cursor-grab active:cursor-grabbing shrink-0 transition"
+              title="拖动排序"
+              onClick={e => e.stopPropagation()}
+            >
+              <GripVertical className="w-4 h-4 text-gray-300 hover:text-gray-500" />
+            </div>
+          )}
+          
+          {/* 菜单按钮 */}
           <button
             type="button"
             onClick={e => { e.stopPropagation(); setMenuOpen(v => !v) }}
@@ -230,6 +312,8 @@ function ParagraphRow({
           onEnterAtEnd={handleEnterAtEnd}
           onBackspaceAtStart={handleBackspaceAtStart}
           onFocus={() => setActiveParagraphId(paragraph.paragraph_id)}
+          onAIRewrite={handleAIRewrite}
+          onAddToContext={handleAddToContext}
         />
 
         {/* 变更标记 + 确认按钮 */}
@@ -291,16 +375,34 @@ function ParagraphRow({
 interface ChapterBlockProps {
   flatChapter: FlatChapter
   onReload: () => void
+  documentId: string
 }
 
-function ChapterBlock({ flatChapter, onReload }: ChapterBlockProps) {
+function ChapterBlock({ flatChapter, onReload, documentId }: ChapterBlockProps) {
   const { node, depth } = flatChapter
   const { activeChapterId } = useEditorStore()
   const isActive = activeChapterId === node.chapter_id
   const [addingPara, setAddingPara] = useState(false)
+  const [localParagraphs, setLocalParagraphs] = useState<Paragraph[]>([])
 
   // 段落 ref map，用于跨段落焦点控制
   const editorRefs = useRef<Map<string, ParagraphEditorHandle>>(new Map())
+
+  // 拖拽传感器配置
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  // 初始化本地段落状态
+  const sortedParagraphs = [...node.paragraphs].sort((a, b) => a.order_index - b.order_index)
+  
+  // 同步段落列表
+  if (JSON.stringify(localParagraphs.map(p => p.paragraph_id)) !== JSON.stringify(sortedParagraphs.map(p => p.paragraph_id))) {
+    setLocalParagraphs(sortedParagraphs)
+  }
 
   const handleRequestFocus = useCallback((paragraphId: string, position: "start" | "end") => {
     const handle = editorRefs.current.get(paragraphId)
@@ -309,6 +411,42 @@ function ChapterBlock({ flatChapter, onReload }: ChapterBlockProps) {
       else handle.focus()
     }
   }, [])
+
+  // 拖拽结束处理
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (!over || active.id === over.id) return
+
+    const oldIndex = localParagraphs.findIndex((p) => p.paragraph_id === active.id)
+    const newIndex = localParagraphs.findIndex((p) => p.paragraph_id === over.id)
+
+    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return
+
+    // 重新排序
+    const newParagraphs = [...localParagraphs]
+    const [movedParagraph] = newParagraphs.splice(oldIndex, 1)
+    newParagraphs.splice(newIndex, 0, movedParagraph)
+
+    // 更新本地状态
+    setLocalParagraphs(newParagraphs)
+
+    // 调用后端 reorder 接口
+    try {
+      const items = newParagraphs.map((p, index) => ({
+        paragraph_id: p.paragraph_id,
+        chapter_id: node.chapter_id,
+        order_index: index,
+      }))
+      await paragraphService.reorder(documentId, items)
+      // 拖拽成功后刷新
+      onReload()
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : "排序失败")
+      // 失败时恢复原状态
+      setLocalParagraphs(sortedParagraphs)
+    }
+  }, [localParagraphs, node.chapter_id, documentId, onReload, sortedParagraphs])
 
   const handleAddParagraph = async () => {
     setAddingPara(true)
@@ -326,8 +464,6 @@ function ChapterBlock({ flatChapter, onReload }: ChapterBlockProps) {
     depth === 1 && "text-2xl mb-1.5 text-gray-800",
     depth >= 2 && "text-xl text-gray-700",
   )
-
-  const sortedParagraphs = [...node.paragraphs].sort((a, b) => a.order_index - b.order_index)
 
   return (
     <div
@@ -368,7 +504,7 @@ function ChapterBlock({ flatChapter, onReload }: ChapterBlockProps) {
         className="flex flex-col gap-2"
         style={{ paddingLeft: `${depth * 8 + 4}px` }}
       >
-        {sortedParagraphs.length === 0 ? (
+        {localParagraphs.length === 0 ? (
           <button
             onClick={handleAddParagraph}
             disabled={addingPara}
@@ -380,18 +516,27 @@ function ChapterBlock({ flatChapter, onReload }: ChapterBlockProps) {
             </span>
           </button>
         ) : (
-          <>
-            {sortedParagraphs.map((p, idx) => (
-              <ParagraphRow
-                key={p.paragraph_id}
-                paragraph={p}
-                chapterId={node.chapter_id}
-                chapterTitle={node.title}
-                prevParagraphId={idx > 0 ? sortedParagraphs[idx - 1].paragraph_id : undefined}
-                onReload={onReload}
-                onRequestFocus={handleRequestFocus}
-              />
-            ))}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={localParagraphs.map((p) => p.paragraph_id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {localParagraphs.map((p, idx) => (
+                <SortableParagraphRow
+                  key={p.paragraph_id}
+                  paragraph={p}
+                  chapterId={node.chapter_id}
+                  chapterTitle={node.title}
+                  prevParagraphId={idx > 0 ? localParagraphs[idx - 1].paragraph_id : undefined}
+                  onReload={onReload}
+                  onRequestFocus={handleRequestFocus}
+                />
+              ))}
+            </SortableContext>
             <button
               onClick={handleAddParagraph}
               disabled={addingPara}
@@ -399,7 +544,7 @@ function ChapterBlock({ flatChapter, onReload }: ChapterBlockProps) {
             >
               + 添加段落
             </button>
-          </>
+          </DndContext>
         )}
       </div>
     </div>
@@ -409,7 +554,12 @@ function ChapterBlock({ flatChapter, onReload }: ChapterBlockProps) {
 // ----------------------------------------------------------------
 // 主组件
 // ----------------------------------------------------------------
-export default function DocumentBody({ onReload }: DocumentBodyProps) {
+interface DocumentBodyProps {
+  onReload: () => void
+  documentId: string
+}
+
+export default function DocumentBody({ onReload, documentId }: DocumentBodyProps) {
   const { tree } = useDocumentStore()
   const flatList = flattenTree(tree)
 
@@ -431,6 +581,7 @@ export default function DocumentBody({ onReload }: DocumentBodyProps) {
             key={fc.node.chapter_id}
             flatChapter={fc}
             onReload={onReload}
+            documentId={documentId}
           />
         ))}
       </div>

@@ -135,4 +135,8 @@ export const paragraphService = {
   // 确认段落变更
   confirmChange: (paragraphId: string): Promise<Paragraph> =>
     request.post(`/api/v1/paragraphs/${paragraphId}/confirm-change`),
+
+  // 批量重排段落
+  reorder: (documentId: string, items: Array<{ paragraph_id: string; chapter_id: string; order_index: number }>): Promise<void> =>
+    request.post(`/api/v1/documents/${documentId}/paragraphs/reorder`, { items }),
 }

@@ -1,13 +1,15 @@
 "use client"
 
-import { useEffect, useImperativeHandle, forwardRef, useState, useCallback } from "react"
+import { useEffect, useImperativeHandle, forwardRef, useState } from "react"
 import { useEditor, EditorContent } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
+import Underline from "@tiptap/extension-underline"
 import { Table } from "@tiptap/extension-table"
 import { TableRow } from "@tiptap/extension-table-row"
 import { TableCell } from "@tiptap/extension-table-cell"
 import { TableHeader } from "@tiptap/extension-table-header"
 import { Markdown } from "tiptap-markdown"
+import { Bold, Italic, Underline as UnderlineIcon, Code, List, ListOrdered, Copy, Wand2, MessageSquare } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ParaType } from "@/types/api"
 
@@ -25,6 +27,8 @@ interface ParagraphEditorProps {
   onEnterAtEnd?: () => void
   onBackspaceAtStart?: () => void
   onFocus?: () => void
+  onAIRewrite?: (selectedText: string) => void
+  onAddToContext?: (selectedText: string) => void
 }
 
 // paraType → Tiptap heading level（paragraph 不需要）
@@ -64,10 +68,11 @@ function ToolbarButton({
 
 const ParagraphEditor = forwardRef<ParagraphEditorHandle, ParagraphEditorProps>(
   function ParagraphEditor(
-    { paragraphId, content, paraType, isChanged, onChange, onEnterAtEnd, onBackspaceAtStart, onFocus },
+    { paragraphId, content, paraType, isChanged, onChange, onEnterAtEnd, onBackspaceAtStart, onFocus, onAIRewrite, onAddToContext },
     ref
   ) {
     const headingLevel = HEADING_LEVEL[paraType]
+    const [selectedText, setSelectedText] = useState("")
 
     const editor = useEditor({
       extensions: [
@@ -75,6 +80,7 @@ const ParagraphEditor = forwardRef<ParagraphEditorHandle, ParagraphEditorProps>(
           // 禁用 StarterKit 内置的 heading，统一由 paraType 控制
           heading: headingLevel ? { levels: [1, 2, 3] } : false,
         }),
+        Underline,
         Table.configure({ resizable: false }),
         TableRow,
         TableCell,
@@ -123,6 +129,16 @@ const ParagraphEditor = forwardRef<ParagraphEditorHandle, ParagraphEditorProps>(
         const md = e.storage.markdown.getMarkdown()
         onChange(md)
       },
+      onSelectionUpdate({ editor: e }) {
+        // 更新选中文本
+        const { from, to, empty } = e.state.selection
+        if (!empty) {
+          const text = e.state.doc.textBetween(from, to, " ")
+          setSelectedText(text)
+        } else {
+          setSelectedText("")
+        }
+      },
       onFocus() {
         onFocus?.()
       },
@@ -153,6 +169,26 @@ const ParagraphEditor = forwardRef<ParagraphEditorHandle, ParagraphEditorProps>(
       focusEnd: () => editor?.commands.focus("end"),
     }))
 
+    const handleCopy = async () => {
+      try {
+        await navigator.clipboard.writeText(selectedText)
+      } catch (err) {
+        console.error("复制失败:", err)
+      }
+    }
+
+    const handleAIRewrite = () => {
+      if (selectedText && onAIRewrite) {
+        onAIRewrite(selectedText)
+      }
+    }
+
+    const handleAddToContext = () => {
+      if (selectedText && onAddToContext) {
+        onAddToContext(selectedText)
+      }
+    }
+
     return (
       <div
         className={cn(
@@ -165,43 +201,82 @@ const ParagraphEditor = forwardRef<ParagraphEditorHandle, ParagraphEditorProps>(
         )}
       >
         {editor && !editor.state.selection.empty && (
-          <div className="absolute -top-10 left-0 z-50 flex items-center gap-0.5 rounded-lg border border-gray-200 bg-white shadow-lg px-1.5 py-1 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="absolute -top-12 left-0 z-50 flex items-center gap-0.5 rounded-lg border border-gray-200 bg-white shadow-xl px-2 py-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
+            {/* 格式化按钮 */}
             <ToolbarButton
               onClick={() => editor.chain().focus().toggleBold().run()}
               active={editor.isActive("bold")}
               title="加粗 (Ctrl+B)"
             >
-              <strong className="text-sm">B</strong>
+              <Bold className="w-3.5 h-3.5" />
             </ToolbarButton>
             <ToolbarButton
               onClick={() => editor.chain().focus().toggleItalic().run()}
               active={editor.isActive("italic")}
               title="斜体 (Ctrl+I)"
             >
-              <em className="text-sm">I</em>
+              <Italic className="w-3.5 h-3.5" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleUnderline().run()}
+              active={editor.isActive("underline")}
+              title="下划线 (Ctrl+U)"
+            >
+              <UnderlineIcon className="w-3.5 h-3.5" />
             </ToolbarButton>
             <ToolbarButton
               onClick={() => editor.chain().focus().toggleCode().run()}
               active={editor.isActive("code")}
               title="行内代码"
             >
-              <span className="font-mono text-xs">`</span>
+              <Code className="w-3.5 h-3.5" />
             </ToolbarButton>
-            <div className="w-px h-4 bg-gray-200 mx-0.5" />
+            
+            <div className="w-px h-4 bg-gray-200 mx-1" />
+            
+            {/* 列表按钮 */}
             <ToolbarButton
               onClick={() => editor.chain().focus().toggleBulletList().run()}
               active={editor.isActive("bulletList")}
               title="无序列表"
             >
-              <span className="text-sm">≡</span>
+              <List className="w-3.5 h-3.5" />
             </ToolbarButton>
             <ToolbarButton
               onClick={() => editor.chain().focus().toggleOrderedList().run()}
               active={editor.isActive("orderedList")}
               title="有序列表"
             >
-              <span className="text-sm">1.</span>
+              <ListOrdered className="w-3.5 h-3.5" />
             </ToolbarButton>
+            
+            <div className="w-px h-4 bg-gray-200 mx-1" />
+            
+            {/* 操作按钮 */}
+            <ToolbarButton
+              onClick={handleCopy}
+              title="复制"
+            >
+              <Copy className="w-3.5 h-3.5" />
+            </ToolbarButton>
+            
+            {onAIRewrite && (
+              <ToolbarButton
+                onClick={handleAIRewrite}
+                title="AI 改写选中文本"
+              >
+                <Wand2 className="w-3.5 h-3.5" />
+              </ToolbarButton>
+            )}
+            
+            {onAddToContext && (
+              <ToolbarButton
+                onClick={handleAddToContext}
+                title="添加到对话上下文"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+              </ToolbarButton>
+            )}
           </div>
         )}
         <EditorContent editor={editor} />

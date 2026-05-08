@@ -14,6 +14,7 @@ import ConfirmDialog from "@/components/ui/ConfirmDialog"
 import { toastError, toastSuccess } from "@/hooks/useToast"
 import { useChatStore } from "@/store/chatStore"
 import { useAuthStore } from "@/store/authStore"
+import { useKeyboardShortcuts, EDITOR_SHORTCUTS } from "@/hooks/useKeyboardShortcuts"
 import { cn } from "@/lib/utils"
 import ChapterTree from "@/components/editor/ChapterTree"
 import DocumentBody from "@/components/editor/DocumentBody"
@@ -48,6 +49,22 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
 
   // SSE 订阅文档变更事件
   useDocumentSSE({ documentId, enabled: !loading && !error })
+
+  // 快捷键配置
+  useKeyboardShortcuts([
+    {
+      ...EDITOR_SHORTCUTS.TOGGLE_SIDEBAR_LEFT,
+      action: () => setLeftPanelCollapsed(v => !v),
+    },
+    {
+      ...EDITOR_SHORTCUTS.TOGGLE_SIDEBAR_RIGHT,
+      action: () => setRightPanelCollapsed(v => !v),
+    },
+    {
+      ...EDITOR_SHORTCUTS.OPEN_AI_CHAT,
+      action: () => setRightPanelTab("chat"),
+    },
+  ], !loading && !error)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -266,7 +283,7 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
             </div>
           )}
           <div className="h-full overflow-y-auto">
-            <DocumentBody onReload={load} />
+            <DocumentBody onReload={load} documentId={documentId} />
           </div>
         </main>
 
