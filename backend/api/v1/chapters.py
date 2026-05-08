@@ -2,7 +2,6 @@ from core.response import success_response, ResponseModel
 from schemas.document_schemas import ChapterUpdate
 from schemas.response_schemas import ChapterResponse, ChapterTreeResponse, ChapterTocResponse, ChapterTreeNode, ParagraphInChapter, TocItem
 from services.chapter_service import ChapterService
-from services import ai_service
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession

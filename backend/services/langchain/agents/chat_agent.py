@@ -6,17 +6,21 @@
 - 工具调用
 - 建议生成
 - 记忆管理
+
+使用 LangGraph 实现
 """
 
 import logging
 import json
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional, Annotated, Sequence
 from uuid import UUID
 
-from langchain.agents import AgentExecutor, create_openai_functions_agent
+from langgraph.graph import StateGraph, END
+from langgraph.prebuilt import ToolNode
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage, AIMessage, BaseMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
+from typing_extensions import TypedDict
 
 from services.langchain.core.llm_factory import get_qwen_llm
 from services.langchain.core.memory_manager import create_memory_manager
@@ -25,6 +29,12 @@ from services.langchain.tools import create_query_only_tools
 from core.ai_prompts import SYSTEM_PROMPT_CHAT
 
 logger = logging.getLogger(__name__)
+
+
+class AgentState(TypedDict):
+    """Agent 状态"""
+    messages: Annotated[Sequence[BaseMessage], "对话消息列表"]
+    intermediate_steps: List[tuple]
 
 
 class DocumentChatAgent:
@@ -36,6 +46,8 @@ class DocumentChatAgent:
     - 提供编辑建议
     - 搜索文献
     - 验证实体
+    
+    使用 LangGraph 实现
     """
     
     def __init__(
@@ -62,8 +74,11 @@ class DocumentChatAgent:
         # 工具集（查询模式：只读 + 查询）
         self.tools = create_query_only_tools()
         
-        # Agent 执行器
-        self.agent_executor = None
+        # 绑定工具到 LLM
+        self.llm_with_tools = self.llm.bind_tools(self.tools)
+        
+        # Graph
+        self.graph = None
     
     async def initialize(self):
         """初始化 Agent（加载历史对话）"""
@@ -73,37 +88,57 @@ class DocumentChatAgent:
         async with SessionAdapter.query_session() as db:
             await self.memory.load_history(db, limit=10)
         
-        # 创建 Prompt
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", SYSTEM_PROMPT_CHAT),
-            MessagesPlaceholder(variable_name="chat_history"),
-            ("human", "{input}"),
-            MessagesPlaceholder(variable_name="agent_scratchpad"),
-        ])
+        # 创建 Graph
+        workflow = StateGraph(AgentState)
         
-        # 创建 Agent
-        # 注意：通义千问不支持 OpenAI Functions，这里使用简化版本
-        # 实际应该使用 create_react_agent 或自定义 Agent
-        from langchain.agents import create_react_agent
+        # 添加节点
+        workflow.add_node("agent", self._call_model)
+        workflow.add_node("tools", ToolNode(self.tools))
         
-        agent = create_react_agent(
-            llm=self.llm,
-            tools=self.tools,
-            prompt=prompt,
+        # 设置入口
+        workflow.set_entry_point("agent")
+        
+        # 添加条件边
+        workflow.add_conditional_edges(
+            "agent",
+            self._should_continue,
+            {
+                "continue": "tools",
+                "end": END,
+            }
         )
         
-        # 创建执行器
-        self.agent_executor = AgentExecutor(
-            agent=agent,
-            tools=self.tools,
-            memory=self.memory.memory,
-            verbose=True,
-            max_iterations=self.max_iterations,
-            handle_parsing_errors=True,
-            return_intermediate_steps=True,
-        )
+        # 工具执行后返回 agent
+        workflow.add_edge("tools", "agent")
+        
+        # 编译
+        self.graph = workflow.compile()
         
         logger.info(f"对话智能体初始化完成: document_id={self.document_id}")
+    
+    async def _call_model(self, state: AgentState) -> Dict:
+        """调用模型"""
+        messages = state["messages"]
+        
+        # 添加系统提示
+        system_message = {"role": "system", "content": SYSTEM_PROMPT_CHAT}
+        full_messages = [system_message] + list(messages)
+        
+        response = await self.llm_with_tools.ainvoke(full_messages)
+        
+        return {"messages": [response]}
+    
+    def _should_continue(self, state: AgentState) -> str:
+        """判断是否继续"""
+        messages = state["messages"]
+        last_message = messages[-1]
+        
+        # 如果有工具调用，继续
+        if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+            return "continue"
+        
+        # 否则结束
+        return "end"
     
     async def chat(
         self,
@@ -118,27 +153,28 @@ class DocumentChatAgent:
             context: 额外上下文
         
         Returns:
-            响应字典 {response, actions, suggestions, intermediate_steps}
+            响应字典 {response, actions, suggestions}
         """
-        if not self.agent_executor:
+        if not self.graph:
             await self.initialize()
         
         # 准备输入
-        input_data = {
-            "input": message,
-        }
+        user_message = HumanMessage(content=message)
         
-        # 如果有上下文，添加到输入
-        if context:
-            input_data["context"] = context
-        
-        # 执行 Agent
+        # 执行 Graph
         try:
-            result = await self.agent_executor.ainvoke(input_data)
+            result = await self.graph.ainvoke(
+                {"messages": [user_message], "intermediate_steps": []},
+                config={"recursion_limit": self.max_iterations}
+            )
             
-            # 解析响应
-            response_text = result.get("output", "")
-            intermediate_steps = result.get("intermediate_steps", [])
+            # 提取最后的 AI 消息
+            messages = result.get("messages", [])
+            response_text = ""
+            for msg in reversed(messages):
+                if isinstance(msg, AIMessage):
+                    response_text = msg.content
+                    break
             
             # 提取 actions 和 suggestions
             actions, suggestions = self._parse_response(response_text)
@@ -155,7 +191,6 @@ class DocumentChatAgent:
                 "response": response_text,
                 "actions": actions,
                 "suggestions": suggestions,
-                "intermediate_steps": intermediate_steps,
             }
         
         except Exception as e:
@@ -164,7 +199,6 @@ class DocumentChatAgent:
                 "response": f"对话失败：{str(e)}",
                 "actions": [],
                 "suggestions": [],
-                "intermediate_steps": [],
             }
     
     async def chat_stream(
@@ -182,32 +216,27 @@ class DocumentChatAgent:
         Yields:
             响应文本块
         """
-        if not self.agent_executor:
+        if not self.graph:
             await self.initialize()
         
         # 准备输入
-        input_data = {
-            "input": message,
-        }
-        
-        if context:
-            input_data["context"] = context
+        user_message = HumanMessage(content=message)
         
         # 流式执行
         full_response = ""
         
         try:
-            async for chunk in self.agent_executor.astream(input_data):
-                # 提取输出
-                if "output" in chunk:
-                    text = chunk["output"]
-                    full_response += text
-                    yield text
-                
-                # 提取中间步骤
-                elif "intermediate_steps" in chunk:
-                    steps = chunk["intermediate_steps"]
-                    logger.debug(f"中间步骤: {steps}")
+            async for event in self.graph.astream(
+                {"messages": [user_message], "intermediate_steps": []},
+                config={"recursion_limit": self.max_iterations}
+            ):
+                # 提取 agent 节点的输出
+                if "agent" in event:
+                    messages = event["agent"].get("messages", [])
+                    for msg in messages:
+                        if isinstance(msg, AIMessage) and msg.content:
+                            full_response += msg.content
+                            yield msg.content
             
             # 保存对话记录
             await self._save_chat_record(message, full_response)

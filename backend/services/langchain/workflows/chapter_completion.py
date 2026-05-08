@@ -15,8 +15,8 @@ from enum import Enum
 
 from services.langchain.core.session_adapter import SessionAdapter, load_document_context
 from services.langchain.chains.generation_chain import create_paragraph_generation_chain
-from services.langchain.chains.evaluation_chain import create_quality_evaluation_chain
-from services.langchain.chains.refinement_chain import create_content_refinement_chain
+from services.langchain.chains.evaluation_chain import create_evaluation_chain
+from services.langchain.chains.refinement_chain import create_refinement_chain
 from services.langchain.agents.editor_agent import create_editor_agent
 
 logger = logging.getLogger(__name__)
@@ -208,7 +208,7 @@ class ChapterCompletionWorkflow:
             return results
         
         # 使用 QualityEvaluationChain 评估
-        chain = create_quality_evaluation_chain()
+        chain = create_evaluation_chain()
         
         for paragraph in paragraphs:
             try:
@@ -267,7 +267,7 @@ class ChapterCompletionWorkflow:
             return results
         
         # 使用 ContentRefinementChain 优化
-        chain = create_content_refinement_chain()
+        chain = create_refinement_chain()
         
         for item in low_quality_paragraphs:
             paragraph_id = item.get("paragraph_id")

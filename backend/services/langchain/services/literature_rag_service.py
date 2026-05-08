@@ -12,7 +12,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.langchain.core.vector_stores import LiteratureVectorStore
-from services.langchain.chains.rag_chain import create_literature_rag_chain
+from services.langchain.chains.rag_chain import create_rag_chain
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ class LiteratureRagService:
         
         try:
             # 使用 LiteratureRAGChain
-            chain = create_literature_rag_chain()
+            chain = create_rag_chain()
             
             # 准备输入
             input_data = {
@@ -109,7 +109,7 @@ class LiteratureRagService:
         
         try:
             # 使用 LiteratureRAGChain
-            chain = create_literature_rag_chain()
+            chain = create_rag_chain()
             
             # 准备输入
             input_data = {

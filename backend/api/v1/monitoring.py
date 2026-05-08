@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from typing import Optional
 from datetime import datetime
 
-from core.auth import get_current_user, require_admin
+from core.auth import get_current_user, get_admin_user
 from core.response import success_response, ResponseModel
 from core.config import AI_MODEL, LLM_TEMPERATURE, LLM_MAX_TOKENS, RETRIEVAL_TOP_K, MEMORY_TYPE
 from core.observability import (
@@ -46,7 +46,7 @@ router = APIRouter(prefix="/api/v1/monitoring", tags=["性能监控"])
     response_model=ResponseModel[dict],
 )
 async def get_ai_config(
-    current_user=Depends(require_admin),
+    current_user=Depends(get_admin_user),
 ):
     """获取当前 AI 配置"""
     return success_response(data={
@@ -67,7 +67,7 @@ async def get_ai_config(
 )
 async def get_metrics_api(
     operation: Optional[str] = None,
-    current_user=Depends(require_admin),
+    current_user=Depends(get_admin_user),
 ):
     """
     获取指标
@@ -87,7 +87,7 @@ async def get_metrics_api(
 async def get_metrics_timeseries(
     operation: Optional[str] = None,
     window_minutes: int = 60,
-    current_user=Depends(require_admin),
+    current_user=Depends(get_admin_user),
 ):
     """
     获取时间序列数据
@@ -107,7 +107,7 @@ async def get_metrics_timeseries(
 )
 async def get_metrics_errors(
     limit: int = 20,
-    current_user=Depends(require_admin),
+    current_user=Depends(get_admin_user),
 ):
     """
     获取错误摘要
@@ -128,7 +128,7 @@ async def get_metrics_errors(
 )
 async def get_active_alerts_api(
     level: Optional[str] = None,
-    current_user=Depends(require_admin),
+    current_user=Depends(get_admin_user),
 ):
     """
     获取活跃告警
@@ -160,7 +160,7 @@ async def get_active_alerts_api(
 async def get_alert_history_api(
     limit: int = 50,
     alert_type: Optional[str] = None,
-    current_user=Depends(require_admin),
+    current_user=Depends(get_admin_user),
 ):
     """
     获取告警历史
@@ -191,7 +191,7 @@ async def get_alert_history_api(
     response_model=ResponseModel[None],
 )
 async def clear_alerts(
-    current_user=Depends(require_admin),
+    current_user=Depends(get_admin_user),
 ):
     """清空所有告警"""
     alert_system.clear_alerts()
@@ -213,7 +213,7 @@ async def search_logs_api(
     keyword: Optional[str] = None,
     time_range_minutes: Optional[int] = None,
     limit: int = 100,
-    current_user=Depends(require_admin),
+    current_user=Depends(get_admin_user),
 ):
     """
     搜索日志
@@ -260,7 +260,7 @@ async def search_logs_api(
 )
 async def get_log_statistics_api(
     time_range_minutes: int = 60,
-    current_user=Depends(require_admin),
+    current_user=Depends(get_admin_user),
 ):
     """
     获取日志统计

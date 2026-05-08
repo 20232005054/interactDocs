@@ -14,7 +14,7 @@ from uuid import UUID
 from enum import Enum
 
 from services.langchain.core.session_adapter import SessionAdapter, load_document_context
-from services.langchain.chains.evaluation_chain import create_quality_evaluation_chain
+from services.langchain.chains.evaluation_chain import create_evaluation_chain
 from services.langchain.tools.literature_tools import SearchLiteratureTool, ValidateEntityTool
 from services.langchain.workflows.chapter_completion import WorkflowState
 
@@ -136,7 +136,7 @@ class ContentReviewWorkflow:
         summaries = context.get("summaries", [])
         for summary in summaries:
             try:
-                chain = create_quality_evaluation_chain()
+                chain = create_evaluation_chain()
                 result = await chain.ainvoke({
                     "content": summary.get("content", ""),
                     "document_context": context,
@@ -163,7 +163,7 @@ class ContentReviewWorkflow:
             paragraphs = chapter.get("paragraphs", [])
             for paragraph in paragraphs:
                 try:
-                    chain = create_quality_evaluation_chain()
+                    chain = create_evaluation_chain()
                     result = await chain.ainvoke({
                         "content": paragraph.get("content", ""),
                         "document_context": context,
