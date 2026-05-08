@@ -213,9 +213,205 @@ class AlertSystem:
         Args:
             alert: 告警对象
         """
-        # TODO: 集成通知渠道（邮件、钉钉、Slack 等）
-        # 目前只记录日志
+        # 记录日志（始终执行）
         logger.info(f"[告警通知] {alert.level.upper()}: {alert.message}")
+        
+        # 根据告警级别选择通知渠道
+        try:
+            if alert.level in (AlertLevel.CRITICAL, AlertLevel.ERROR):
+                # 严重告警：发送到所有渠道
+                self._send_email_notification(alert)
+                self._send_webhook_notification(alert)
+            elif alert.level == AlertLevel.WARNING:
+                # 警告：只发送 webhook
+                self._send_webhook_notification(alert)
+            # INFO 级别只记录日志
+        except Exception as e:
+            logger.error(f"[告警通知] 发送失败: {e}", exc_info=True)
+    
+    def _send_email_notification(self, alert: Alert):
+        """
+        发送邮件通知
+        
+        Args:
+            alert: 告警对象
+        """
+        # 检查是否配置了邮件
+        from core.config import ALERT_EMAIL_ENABLED, ALERT_EMAIL_TO
+        
+        if not ALERT_EMAIL_ENABLED:
+            return
+        
+        try:
+            import smtplib
+            from email.mime.text import MIMEText
+            from email.mime.multipart import MIMEMultipart
+            from core.config import (
+                ALERT_EMAIL_HOST, ALERT_EMAIL_PORT,
+                ALERT_EMAIL_USER, ALERT_EMAIL_PASSWORD,
+                ALERT_EMAIL_FROM
+            )
+            
+            # 构建邮件
+            msg = MIMEMultipart()
+            msg['From'] = ALERT_EMAIL_FROM
+            msg['To'] = ALERT_EMAIL_TO
+            msg['Subject'] = f"[{alert.level.upper()}] {alert.alert_type.value}"
+            
+            # 邮件正文
+            body = f"""
+告警级别：{alert.level.upper()}
+告警类型：{alert.alert_type.value}
+告警时间：{alert.timestamp.strftime('%Y-%m-%d %H:%M:%S')}
+
+告警信息：
+{alert.message}
+
+详细数据：
+{self._format_metadata(alert.metadata)}
+"""
+            msg.attach(MIMEText(body, 'plain', 'utf-8'))
+            
+            # 发送邮件
+            with smtplib.SMTP(ALERT_EMAIL_HOST, ALERT_EMAIL_PORT) as server:
+                server.starttls()
+                server.login(ALERT_EMAIL_USER, ALERT_EMAIL_PASSWORD)
+                server.send_message(msg)
+            
+            logger.info(f"[告警通知] 邮件发送成功: {ALERT_EMAIL_TO}")
+        
+        except Exception as e:
+            logger.error(f"[告警通知] 邮件发送失败: {e}")
+    
+    def _send_webhook_notification(self, alert: Alert):
+        """
+        发送 Webhook 通知（钉钉、Slack、企业微信等）
+        
+        Args:
+            alert: 告警对象
+        """
+        from core.config import ALERT_WEBHOOK_ENABLED, ALERT_WEBHOOK_URL, ALERT_WEBHOOK_TYPE
+        
+        if not ALERT_WEBHOOK_ENABLED:
+            return
+        
+        try:
+            import httpx
+            
+            # 根据 webhook 类型构建不同的消息格式
+            if ALERT_WEBHOOK_TYPE == "dingtalk":
+                payload = self._build_dingtalk_payload(alert)
+            elif ALERT_WEBHOOK_TYPE == "slack":
+                payload = self._build_slack_payload(alert)
+            elif ALERT_WEBHOOK_TYPE == "wecom":
+                payload = self._build_wecom_payload(alert)
+            else:
+                # 通用格式
+                payload = {
+                    "level": alert.level.value,
+                    "type": alert.alert_type.value,
+                    "message": alert.message,
+                    "timestamp": alert.timestamp.isoformat(),
+                    "metadata": alert.metadata,
+                }
+            
+            # 发送请求
+            response = httpx.post(
+                ALERT_WEBHOOK_URL,
+                json=payload,
+                timeout=5.0
+            )
+            response.raise_for_status()
+            
+            logger.info(f"[告警通知] Webhook 发送成功: {ALERT_WEBHOOK_TYPE}")
+        
+        except Exception as e:
+            logger.error(f"[告警通知] Webhook 发送失败: {e}")
+    
+    def _build_dingtalk_payload(self, alert: Alert) -> dict:
+        """构建钉钉消息格式"""
+        return {
+            "msgtype": "markdown",
+            "markdown": {
+                "title": f"[{alert.level.upper()}] 系统告警",
+                "text": f"""### [{alert.level.upper()}] {alert.alert_type.value}
+
+**告警时间：** {alert.timestamp.strftime('%Y-%m-%d %H:%M:%S')}
+
+**告警信息：**
+{alert.message}
+
+**详细数据：**
+```
+{self._format_metadata(alert.metadata)}
+```
+"""
+            }
+        }
+    
+    def _build_slack_payload(self, alert: Alert) -> dict:
+        """构建 Slack 消息格式"""
+        color = {
+            AlertLevel.INFO: "#36a64f",
+            AlertLevel.WARNING: "#ff9900",
+            AlertLevel.ERROR: "#ff0000",
+            AlertLevel.CRITICAL: "#8b0000",
+        }.get(alert.level, "#808080")
+        
+        return {
+            "attachments": [
+                {
+                    "color": color,
+                    "title": f"[{alert.level.upper()}] {alert.alert_type.value}",
+                    "text": alert.message,
+                    "fields": [
+                        {
+                            "title": "告警时间",
+                            "value": alert.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                            "short": True
+                        },
+                        {
+                            "title": "详细数据",
+                            "value": f"```{self._format_metadata(alert.metadata)}```",
+                            "short": False
+                        }
+                    ],
+                    "footer": "InteractiveDocs 告警系统",
+                    "ts": int(alert.timestamp.timestamp())
+                }
+            ]
+        }
+    
+    def _build_wecom_payload(self, alert: Alert) -> dict:
+        """构建企业微信消息格式"""
+        return {
+            "msgtype": "markdown",
+            "markdown": {
+                "content": f"""### [{alert.level.upper()}] 系统告警
+
+> 类型：{alert.alert_type.value}
+> 时间：{alert.timestamp.strftime('%Y-%m-%d %H:%M:%S')}
+
+**告警信息：**
+{alert.message}
+
+**详细数据：**
+```
+{self._format_metadata(alert.metadata)}
+```
+"""
+            }
+        }
+    
+    def _format_metadata(self, metadata: Dict[str, Any]) -> str:
+        """格式化元数据为可读字符串"""
+        lines = []
+        for key, value in metadata.items():
+            if isinstance(value, float):
+                lines.append(f"{key}: {value:.2f}")
+            else:
+                lines.append(f"{key}: {value}")
+        return "\n".join(lines)
     
     def get_active_alerts(self, level: Optional[AlertLevel] = None) -> List[Alert]:
         """

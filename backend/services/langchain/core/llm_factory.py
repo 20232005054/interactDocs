@@ -22,9 +22,45 @@ from core.config import (
     AI_MODEL, AI_TIMEOUT_SECONDS, AI_MAX_RETRIES, AI_RETRY_BACKOFF_SECONDS, AI_MAX_CONCURRENCY,
     LLM_TEMPERATURE, LLM_MAX_TOKENS
 )
-from services.ai_client import AIClientError, _classify_exception, _ERROR_HINTS
+from services.ai_client import AIClientError
 
 logger = logging.getLogger(__name__)
+
+# 错误分类和提示信息
+_ERROR_HINTS = {
+    "AI_TIMEOUT": "AI 请求超时，请稍后重试",
+    "AI_RATE_LIMIT": "AI 调用频率超限，请稍后重试",
+    "AI_INVALID_REQUEST": "AI 请求参数错误",
+    "AI_AUTH_ERROR": "AI 服务认证失败，请检查 API Key",
+    "AI_SERVER_ERROR": "AI 服务异常，请稍后重试",
+    "AI_REQUEST_ERROR": "AI 请求失败，请检查网络连接",
+}
+
+
+def _classify_exception(exc: Exception) -> str:
+    """
+    分类异常类型，返回错误码
+    
+    Args:
+        exc: 异常对象
+    
+    Returns:
+        错误码字符串
+    """
+    exc_str = str(exc).lower()
+    
+    if "timeout" in exc_str or "timed out" in exc_str:
+        return "AI_TIMEOUT"
+    elif "rate limit" in exc_str or "too many requests" in exc_str:
+        return "AI_RATE_LIMIT"
+    elif "invalid" in exc_str or "bad request" in exc_str:
+        return "AI_INVALID_REQUEST"
+    elif "auth" in exc_str or "unauthorized" in exc_str or "forbidden" in exc_str:
+        return "AI_AUTH_ERROR"
+    elif "server error" in exc_str or "internal error" in exc_str:
+        return "AI_SERVER_ERROR"
+    else:
+        return "AI_REQUEST_ERROR"
 
 # 全局并发控制
 _LLM_SEMAPHORE = asyncio.Semaphore(AI_MAX_CONCURRENCY)

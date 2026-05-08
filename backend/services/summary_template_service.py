@@ -195,19 +195,6 @@ class SummaryTemplateService:
         )
 
     @staticmethod
-    async def _call_ai_renderer(prompt: str, template_id: str = None, field_key: str = None) -> str:
-        """
-        【已删除】此方法已被 TemplateRenderChain 替代
-        
-        如果看到此错误，说明代码中还有地方在调用此方法，请更新为：
-        - 使用 render_ai_content() 方法
-        - 或直接使用 TemplateRenderChain
-        """
-        raise NotImplementedError(
-            "_call_ai_renderer 已删除，请使用 render_ai_content 或 TemplateRenderChain"
-        )
-
-    @staticmethod
     async def _get_core_info_map(db: AsyncSession, document_id: UUID) -> dict:
         return await TemplateRenderService._get_core_info_map(db, document_id)
 

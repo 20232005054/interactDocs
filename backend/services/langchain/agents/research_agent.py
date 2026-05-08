@@ -261,12 +261,18 @@ class ResearchAgent:
             # 提取关键点
             key_points = self._extract_key_points(analysis)
             
-            logger.info(f"文献分析完成: literature_id={literature_id}")
+            # 提取引用建议
+            citations = self._extract_citations_from_analysis(analysis)
+            
+            logger.info(
+                f"文献分析完成: literature_id={literature_id} "
+                f"citations={len(citations)}"
+            )
             
             return {
                 "analysis": analysis,
                 "key_points": key_points,
-                "citations": [],  # TODO: 提取引用建议
+                "citations": citations,
             }
         
         except Exception as e:
@@ -445,6 +451,51 @@ class ResearchAgent:
                     continue
         
         return nodes, edges
+    
+    def _extract_citations_from_analysis(self, analysis: str) -> List[Dict]:
+        """
+        从分析文本中提取引用建议
+        
+        提取格式：[编号] 标题 - 作者 (年份)
+        
+        Args:
+            analysis: 分析文本
+        
+        Returns:
+            引用列表 [{number, title, authors, year, reason}]
+        """
+        import re
+        
+        citations = []
+        
+        # 匹配 [数字] 格式的引用
+        pattern = r'\[(\d+)\]\s*([^\n\-]+?)(?:\s*-\s*([^\n\(]+?))?(?:\s*\((\d{4})\))?'
+        matches = re.finditer(pattern, analysis)
+        
+        for match in matches:
+            number = int(match.group(1))
+            title = match.group(2).strip() if match.group(2) else ""
+            authors = match.group(3).strip() if match.group(3) else ""
+            year = match.group(4) if match.group(4) else ""
+            
+            # 提取引用原因（引用后的文本）
+            reason = ""
+            end_pos = match.end()
+            next_newline = analysis.find("\n", end_pos)
+            if next_newline != -1:
+                reason = analysis[end_pos:next_newline].strip()
+            
+            if title:  # 至少要有标题
+                citations.append({
+                    "number": number,
+                    "title": title,
+                    "authors": authors,
+                    "year": year,
+                    "reason": reason,
+                })
+        
+        logger.info(f"从分析中提取了 {len(citations)} 条引用建议")
+        return citations
 
 
 async def create_research_agent(document_id: UUID) -> ResearchAgent:

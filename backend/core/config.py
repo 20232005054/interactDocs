@@ -70,3 +70,20 @@ RETRIEVAL_FETCH_K: int = int(os.getenv("RETRIEVAL_FETCH_K", "20"))
 MEMORY_TYPE: str = os.getenv("MEMORY_TYPE", "buffer_window")  # buffer_window, summary_buffer
 MEMORY_MAX_TOKEN_LIMIT: int = int(os.getenv("MEMORY_MAX_TOKEN_LIMIT", "2000"))
 MEMORY_BUFFER_WINDOW: int = int(os.getenv("MEMORY_BUFFER_WINDOW", "5"))
+
+# ============================================================
+# 告警系统
+# ============================================================
+# 邮件告警配置
+ALERT_EMAIL_ENABLED: bool = os.getenv("ALERT_EMAIL_ENABLED", "false").lower() == "true"
+ALERT_EMAIL_HOST: str = os.getenv("ALERT_EMAIL_HOST", "smtp.gmail.com")
+ALERT_EMAIL_PORT: int = int(os.getenv("ALERT_EMAIL_PORT", "587"))
+ALERT_EMAIL_USER: str = os.getenv("ALERT_EMAIL_USER", "")
+ALERT_EMAIL_PASSWORD: str = os.getenv("ALERT_EMAIL_PASSWORD", "")
+ALERT_EMAIL_FROM: str = os.getenv("ALERT_EMAIL_FROM", "")
+ALERT_EMAIL_TO: str = os.getenv("ALERT_EMAIL_TO", "")
+
+# Webhook 告警配置（钉钉、Slack、企业微信等）
+ALERT_WEBHOOK_ENABLED: bool = os.getenv("ALERT_WEBHOOK_ENABLED", "false").lower() == "true"
+ALERT_WEBHOOK_URL: str = os.getenv("ALERT_WEBHOOK_URL", "")
+ALERT_WEBHOOK_TYPE: str = os.getenv("ALERT_WEBHOOK_TYPE", "dingtalk")  # dingtalk, slack, wecom, generic

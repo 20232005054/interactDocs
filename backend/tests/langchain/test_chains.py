@@ -40,8 +40,56 @@ class TestRAGChain:
     
     def test_format_context(self):
         """测试格式化上下文"""
-        # 单元测试
-        pass
+        from services.langchain.chains.rag_chain import LiteratureRAGChain
+        from langchain_core.documents import Document
+        
+        # 创建测试文档
+        test_docs = [
+            (
+                Document(
+                    page_content="这是测试文献内容1",
+                    metadata={
+                        "literature_id": "lit-001",
+                        "literature_key": "test_lit_001",
+                        "title": "测试文献1",
+                        "authors": "张三",
+                        "section_type": "摘要",
+                    }
+                ),
+                0.95
+            ),
+            (
+                Document(
+                    page_content="这是测试文献内容2",
+                    metadata={
+                        "literature_id": "lit-002",
+                        "literature_key": "test_lit_002",
+                        "title": "测试文献2",
+                        "authors": "李四",
+                        "section_type": "方法",
+                    }
+                ),
+                0.88
+            ),
+        ]
+        
+        # 创建 RAG Chain 实例
+        from services.langchain.core.vector_stores import LiteratureVectorStore
+        vector_store = LiteratureVectorStore()
+        chain = LiteratureRAGChain(vector_store=vector_store, top_k=5)
+        
+        # 测试格式化
+        context_str, citations = chain._format_context(test_docs)
+        
+        # 验证结果
+        assert "【参考文献】" in context_str
+        assert "测试文献1" in context_str
+        assert "测试文献2" in context_str
+        assert len(citations) == 2
+        assert citations[0]["index"] == 1
+        assert citations[0]["title"] == "测试文献1"
+        assert citations[1]["index"] == 2
+        assert citations[1]["similarity"] == 0.88
 
 
 class TestParagraphGenerationChain:
