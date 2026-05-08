@@ -58,16 +58,55 @@ inclusion: manual
 
 ---
 
-### 🔄 阶段 1：核心组件开发（2 周）- 进行中
+### ✅ 阶段 1：核心组件开发（2 周）- 已完成
 
-**目标：** 开发 LangChain 核心组件
+**完成时间：** 2026-05-08
+
+**完成内容：**
+1. ✅ 实现 `QwenLLM` 适配器
+   - 支持流式/非流式调用
+   - 复用现有 dashscope 调用逻辑
+   - 自动重试和错误处理
+   - LLM 实例缓存
+
+2. ✅ 实现 `LiteratureVectorStore`
+   - 适配 LangChain VectorStore 接口
+   - pgvector 后端支持
+   - 相似度搜索（余弦距离）
+   - 元数据过滤（literature_ids, section_type）
+   - `QwenEmbeddings` 适配器
+
+3. ✅ 实现三阶段 Session 适配器
+   - `SessionAdapter` 核心类
+   - 阶段1：`prepare_document_context()` - 预加载数据
+   - 阶段2：`query_session()` - 临时查询
+   - 阶段3：`save_session()` - 保存结果
+   - 支持文档/章节/段落上下文加载
+
+4. ✅ 实现 `MemoryManager`
+   - 支持多种记忆类型（buffer_window, summary_buffer）
+   - 从数据库加载历史对话
+   - 自动摘要长对话
+   - `EntityMemory` 实体追踪
+
+5. ✅ 单元测试
+   - `test_core.py` - 核心组件测试
+   - 测试覆盖：LLM, Embeddings, SessionAdapter, MemoryManager
+
+**Git Commit：** feat(langchain): 完成阶段1 - 核心组件开发
+
+---
+
+### 🔄 阶段 2：链开发（2 周）- 进行中
+
+**目标：** 开发核心业务链
 
 **任务清单：**
-- [ ] 实现 `QwenLLM` 适配器（支持流式/非流式）
-- [ ] 实现 `LiteratureVectorStore`（pgvector 适配）
-- [ ] 实现三阶段 Session 适配器
-- [ ] 实现 `MemoryManager`（多层记忆）
-- [ ] 单元测试 + 性能测试
+- [ ] 实现 `LiteratureRAGChain`（混合检索 + 重排序）
+- [ ] 实现 `ParagraphGenerationChain`（段落生成）
+- [ ] 实现 `QualityEvaluationChain`（质量评估）
+- [ ] 实现 `ContentRefinementChain`（内容优化）
+- [ ] 端到端测试
 
 ---
 
