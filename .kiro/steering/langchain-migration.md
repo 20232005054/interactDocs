@@ -11,7 +11,27 @@ inclusion: manual
 
 **总时长：** 20 周  
 **总成本：** ¥500,000  
-**团队规模：** 5 人
+**团队规模：** 5 人  
+**当前进度：** 3/12 阶段完成（25%）
+
+---
+
+## 快速开始（新会话）
+
+如果你是新会话，请先了解：
+
+1. **项目目标**：将现有 AI 功能迁移到 LangChain 框架
+2. **当前状态**：已完成阶段 0-2（准备、核心组件、链开发）
+3. **下一步**：阶段 3 - 工具系统开发
+4. **重要规则**：
+   - 每完成一个阶段自动 git commit
+   - 不编写独立 MD 文档，写到 steering 里
+   - 重要决策需先汇报并得到许可
+
+**继续任务的命令：**
+```
+开始阶段3
+```
 
 ---
 
@@ -139,7 +159,7 @@ inclusion: manual
 
 ---
 
-### 🔄 阶段 3：工具系统开发（1 周）- 进行中
+### 🔄 阶段 3：工具系统开发（1 周）- 待开始
 
 **目标：** 开发完整的工具集
 
@@ -149,6 +169,146 @@ inclusion: manual
 - [ ] 写入工具（suggest_create_paragraph, suggest_edit_content, suggest_create_chapter）
 - [ ] 工具调用追踪
 - [ ] 工具测试
+
+---
+
+### 阶段 4-12：待开发
+
+**阶段 4：智能体开发（2 周）**
+- DocumentChatAgent（对话智能体）
+- DocumentEditorAgent（编辑智能体）
+- ResearchAgent（文献研究智能体）
+
+**阶段 5：工作流开发（2 周）**
+- ChapterCompletionWorkflow（章节完善）
+- DocumentGenerationWorkflow（文档生成）
+- ContentReviewWorkflow（内容审核）
+
+**阶段 6：服务层迁移（2 周）**
+- ai_service_v2.py
+- ai_chat_service_v2.py
+- literature_rag_service_v2.py
+- template_apply_service_v2.py
+
+**阶段 7：API 切换（1 周）**
+- Feature Flag 动态切换
+- API 路由更新
+- 降级方案
+
+**阶段 8：测试优化（2 周）**
+- 单元测试（覆盖率 > 80%）
+- 性能测试
+- A/B 测试
+
+**阶段 9：可观测性（1 周）**
+- LangSmith 集成
+- 指标收集
+- 告警系统
+
+**阶段 10：文档培训（1 周）**
+- 技术文档
+- 用户文档
+- 团队培训
+
+**阶段 11：灰度发布（2 周）**
+- 5% → 20% → 50% → 100%
+- 监控指标
+- 快速响应
+
+**阶段 12：代码清理（1 周）**
+- 删除旧代码
+- 重命名文件
+- 最终验证
+
+---
+
+## 已完成功能清单
+
+### 核心组件（阶段 1）
+- ✅ `QwenLLM` - 通义千问 LLM 适配器
+  - 支持流式/非流式调用
+  - 自动重试机制（3 次 + 指数退避）
+  - 全局并发控制（Semaphore）
+  - LLM 实例缓存
+  
+- ✅ `LiteratureVectorStore` - 向量存储
+  - pgvector 后端支持
+  - 余弦相似度搜索
+  - 元数据过滤
+  - `QwenEmbeddings` 适配器
+  
+- ✅ `SessionAdapter` - 三阶段 Session 管理
+  - 阶段1：`prepare_document_context()` - 预加载数据
+  - 阶段2：`query_session()` - 临时查询
+  - 阶段3：`save_session()` - 保存结果
+  - 支持文档/章节/段落三级上下文
+  
+- ✅ `MemoryManager` - 记忆管理
+  - buffer_window（滑动窗口）
+  - summary_buffer（自动摘要）
+  - 从数据库加载历史
+  - `EntityMemory` 实体追踪
+
+### 链系统（阶段 2）
+- ✅ `LiteratureRAGChain` - 文献检索链
+  - 两级检索策略（段落级 + 模板级）
+  - 向量相似度搜索
+  - 上下文格式化
+  - LLM 重排序支持
+  
+- ✅ `ParagraphGenerationChain` - 段落生成链
+  - 基于文档上下文生成
+  - 支持流式/非流式
+  - 自动提取文献引用
+  - 支持用户修改意见
+  
+- ✅ `SummaryGenerationChain` - 摘要生成链
+  - 基于文档上下文生成
+  - 支持文献引用
+  - 格式化核心信息
+  
+- ✅ `QualityEvaluationChain` - 质量评估链
+  - 多维度评估（完整性/准确性/风格/引用）
+  - 自动提取问题和建议
+  - 支持流式评估
+  - 结构化评估结果
+  
+- ✅ `ContentRefinementChain` - 内容优化链
+  - 基于评估结果优化
+  - 支持用户反馈
+  - 支持流式优化
+  - 迭代优化（直到达到目标分数）
+
+---
+
+## 技术架构
+
+### 目录结构
+```
+backend/services/langchain/
+├── core/                    # 核心组件
+│   ├── llm_factory.py       # LLM 工厂
+│   ├── vector_stores.py     # 向量存储
+│   ├── session_adapter.py   # Session 适配器
+│   └── memory_manager.py    # 记忆管理
+├── chains/                  # 链定义
+│   ├── rag_chain.py         # RAG 检索链
+│   ├── generation_chain.py  # 内容生成链
+│   ├── evaluation_chain.py  # 质量评估链
+│   └── refinement_chain.py  # 内容优化链
+├── agents/                  # 智能体（待开发）
+├── tools/                   # 工具集（待开发）
+├── workflows/               # 工作流（待开发）
+├── prompts/                 # Prompt 模板
+├── retrievers/              # 检索器
+├── callbacks/               # 回调处理器
+└── utils/                   # 工具函数
+```
+
+### 配置文件
+- `core/langchain_config.py` - LangChain 配置
+- `core/observability.py` - 可观测性配置
+- `.env` - 环境变量配置
 
 ---
 
@@ -221,4 +381,18 @@ feat(langchain): 完成阶段X - [阶段名称]
 
 ## 下一步
 
-开始阶段 1：核心组件开发
+开始阶段 3：工具系统开发
+
+**任务概述：**
+1. 实现只读工具（从预加载上下文读取）
+2. 实现查询工具（临时 Session 查询）
+3. 实现写入工具（返回建议，不直接执行）
+4. 实现工具调用追踪
+5. 编写工具测试
+
+**预计时间：** 1 周
+
+**命令：**
+```
+开始阶段3
+```
