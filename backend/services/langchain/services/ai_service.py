@@ -13,7 +13,7 @@ from services.langchain.chains.generation_chain import (
     create_paragraph_generation_chain,
     create_summary_generation_chain,
 )
-from services.langchain.chains.evaluation_chain import create_quality_evaluation_chain
+from services.langchain.chains.evaluation_chain import create_evaluation_chain
 
 logger = logging.getLogger(__name__)
 
@@ -184,7 +184,7 @@ class AIService:
             
             # 阶段 2：流式评估
             try:
-                chain = create_quality_evaluation_chain()
+                chain = create_evaluation_chain()
                 
                 # 准备输入
                 input_data = {
