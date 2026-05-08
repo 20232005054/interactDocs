@@ -12,15 +12,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from typing import Optional
 from datetime import datetime
 
-from core.auth import get_current_user, get_admin_user
+from core.auth import get_admin_user
 from core.response import success_response, ResponseModel
 from core.config import AI_MODEL, LLM_TEMPERATURE, LLM_MAX_TOKENS, RETRIEVAL_TOP_K, MEMORY_TYPE
 from core.observability import (
     get_metrics,
     get_time_series,
     get_error_summary,
-    export_metrics,
-    reset_metrics,
 )
 from core.alert_system import (
     alert_system,

@@ -1,10 +1,8 @@
 """
 记忆管理器
 
-提供多层记忆系统：
+提供简化的对话记忆系统：
 - 短期记忆（Buffer）：最近 N 轮对话
-- 中期记忆（Summary）：自动摘要历史对话（简化版）
-- 实体记忆（Entity）：提取和追踪实体
 
 注意：LangGraph 推荐使用 Checkpointer 管理状态，这里提供简化的记忆管理
 """
@@ -125,49 +123,6 @@ class MemoryManager:
         await db.commit()
         
         logger.info(f"保存对话记录: document_id={self.document_id}")
-
-
-class EntityMemory:
-    """
-    实体记忆
-    
-    提取和追踪对话中的实体（章节、段落、摘要等）
-    """
-    
-    def __init__(self):
-        self.entities: Dict[str, Any] = {}
-    
-    def add_entity(self, entity_type: str, entity_id: str, entity_data: Dict[str, Any]):
-        """
-        添加实体
-        
-        Args:
-            entity_type: 实体类型（chapter, paragraph, summary）
-            entity_id: 实体 ID
-            entity_data: 实体数据
-        """
-        key = f"{entity_type}:{entity_id}"
-        self.entities[key] = {
-            "type": entity_type,
-            "id": entity_id,
-            "data": entity_data,
-        }
-    
-    def get_entity(self, entity_type: str, entity_id: str) -> Optional[Dict[str, Any]]:
-        """获取实体"""
-        key = f"{entity_type}:{entity_id}"
-        return self.entities.get(key)
-    
-    def get_entities_by_type(self, entity_type: str) -> List[Dict[str, Any]]:
-        """获取指定类型的所有实体"""
-        return [
-            entity for key, entity in self.entities.items()
-            if entity["type"] == entity_type
-        ]
-    
-    def clear(self):
-        """清空实体"""
-        self.entities.clear()
 
 
 def create_memory_manager(

@@ -5,11 +5,9 @@ GET  /api/v1/documents/{document_id}/chat-history   分页获取对话历史
 DELETE /api/v1/documents/{document_id}/chat-history  清空对话历史
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
-from typing import Optional
-from datetime import datetime
 
 from core.auth import get_current_user
 from core.response import success_response, ResponseModel
