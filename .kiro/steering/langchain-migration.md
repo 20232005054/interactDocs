@@ -12,17 +12,17 @@ inclusion: manual
 **总时长：** 20 周  
 **总成本：** ¥500,000  
 **团队规模：** 5 人  
-**当前进度：** 4/12 阶段完成（33%）
+**当前进度：** 5/12 阶段完成（42%）
 
 ---
 
 ## 快速开始（新会话）
 
-如果你是新会话,请先了解：
+如果你是新会话，请先了解：
 
 1. **项目目标**：将现有 AI 功能迁移到 LangChain 框架
-2. **当前状态**：已完成阶段 0-4（准备、核心组件、链开发、工具系统、智能体）
-3. **下一步**：阶段 5 - 工作流开发
+2. **当前状态**：已完成阶段 0-5（准备、核心组件、链开发、工具系统、智能体、工作流）
+3. **下一步**：阶段 6 - 服务层迁移
 4. **重要规则**：
    - 每完成一个阶段自动 git commit
    - 不编写独立 MD 文档，写到 steering 里
@@ -30,7 +30,7 @@ inclusion: manual
 
 **继续任务的命令：**
 ```
-开始阶段5
+开始阶段6
 ```
 
 ---
@@ -244,7 +244,57 @@ inclusion: manual
 
 ---
 
-### 阶段 5-12：待开发
+### ✅ 阶段 5：工作流开发（2 周）- 已完成
+
+**完成时间：** 2026-05-08
+
+**完成内容：**
+1. ✅ 实现 `ChapterCompletionWorkflow`（章节完善工作流）
+   - 5 步工作流：加载上下文 → 分析结构 → 生成段落 → 评估质量 → 优化内容
+   - 使用 EditorAgent 分析章节
+   - 使用 ParagraphGenerationChain 生成段落
+   - 使用 QualityEvaluationChain 评估质量
+   - 使用 ContentRefinementChain 优化内容
+   - 支持目标质量分数和最大迭代次数
+   - 工作流状态管理（PENDING/RUNNING/COMPLETED/FAILED/CANCELLED）
+
+2. ✅ 实现 `DocumentGenerationWorkflow`（文档生成工作流）
+   - 5 步工作流：核心信息 → 摘要 → 章节结构 → 段落内容 → 依赖关系
+   - 集成现有 TemplateApplyService
+   - 支持多种生成模式（full/core_only/summary_only/structure_only）
+   - 统计生成结果（核心信息数/摘要数/章节数/段落数/依赖边数）
+   - 三阶段 Session 管理
+
+3. ✅ 实现 `ContentReviewWorkflow`（内容审核工作流）
+   - 5 步工作流：加载文档 → 质量评估 → 引用检查 → 格式检查 → 生成报告
+   - 支持三种审核级别（BASIC/STANDARD/STRICT）
+   - 质量评估（使用 QualityEvaluationChain）
+   - 文献引用检查（使用 ValidateEntityTool）
+   - 格式规范检查（标题/内容非空）
+   - 生成审核报告（通过/不通过 + 详细统计）
+
+4. ✅ 工作流状态管理
+   - `WorkflowState` 枚举（PENDING/RUNNING/COMPLETED/FAILED/CANCELLED）
+   - `get_progress()` 方法（获取当前进度）
+   - `_build_result()` 方法（构建工作流结果）
+
+5. ✅ 工厂函数
+   - `create_chapter_completion_workflow()` - 创建章节完善工作流
+   - `create_document_generation_workflow()` - 创建文档生成工作流
+   - `create_content_review_workflow()` - 创建内容审核工作流
+
+6. ✅ 单元测试（test_workflows.py）
+   - 测试工作流创建和初始化
+   - 测试工作流状态管理
+   - 测试进度追踪
+   - 测试结果构建
+   - 测试工厂函数
+
+**Git Commit：** feat(langchain): 完成阶段5 - 工作流开发
+
+---
+
+### 阶段 6-12：待开发
 
 **阶段 4：智能体开发（2 周）**
 - DocumentChatAgent（对话智能体）
@@ -398,6 +448,25 @@ inclusion: manual
   - 使用只读 + 查询工具
   - 提取文献列表和关键点
 
+### 工作流系统（阶段 5）
+- ✅ `ChapterCompletionWorkflow` - 章节完善工作流
+  - 5 步工作流（加载 → 分析 → 生成 → 评估 → 优化）
+  - 使用 EditorAgent + 多个 Chain
+  - 支持目标质量分数
+  - 工作流状态管理
+  
+- ✅ `DocumentGenerationWorkflow` - 文档生成工作流
+  - 5 步工作流（核心信息 → 摘要 → 结构 → 段落 → 依赖）
+  - 集成现有 TemplateApplyService
+  - 支持多种生成模式
+  - 统计生成结果
+  
+- ✅ `ContentReviewWorkflow` - 内容审核工作流
+  - 5 步工作流（加载 → 质量 → 引用 → 格式 → 报告）
+  - 支持三种审核级别
+  - 自动生成审核报告
+  - 文献引用验证
+
 ---
 
 ## 技术架构
@@ -424,7 +493,10 @@ backend/services/langchain/
 │   ├── literature_tools.py  # 文献工具
 │   ├── suggestion_tools.py  # 建议工具
 │   └── tool_tracker.py      # 工具追踪
-├── workflows/               # 工作流（待开发）
+├── workflows/               # 工作流
+│   ├── chapter_completion.py    # 章节完善工作流
+│   ├── document_generation.py   # 文档生成工作流
+│   └── content_review.py        # 内容审核工作流
 ├── prompts/                 # Prompt 模板
 ├── retrievers/              # 检索器
 ├── callbacks/               # 回调处理器
@@ -507,18 +579,18 @@ feat(langchain): 完成阶段X - [阶段名称]
 
 ## 下一步
 
-开始阶段 5：工作流开发
+开始阶段 6：服务层迁移
 
 **任务概述：**
-1. 实现 ChapterCompletionWorkflow（章节完善工作流）
-2. 实现 DocumentGenerationWorkflow（文档生成工作流）
-3. 实现 ContentReviewWorkflow（内容审核工作流）
-4. 实现工作流状态管理
-5. 编写工作流测试
+1. 实现 ai_service_v2.py（AI 服务 v2）
+2. 实现 ai_chat_service_v2.py（对话服务 v2）
+3. 实现 literature_rag_service_v2.py（文献 RAG 服务 v2）
+4. 实现 template_apply_service_v2.py（模板应用服务 v2）
+5. 编写服务层测试
 
 **预计时间：** 2 周
 
 **命令：**
 ```
-开始阶段5
+开始阶段6
 ```
