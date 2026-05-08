@@ -13,7 +13,7 @@ import { Markdown } from "tiptap-markdown"
 import { VariablePlaceholderExtension } from "./VariablePlaceholderExtension"
 import { cn } from "@/lib/utils"
 import { useState, useCallback, useEffect, useMemo, useRef } from "react"
-import { getCoreInfoDragData } from "@/lib/templateDrag"
+import { getCoreInfoDragData, getSummaryDragData } from "@/lib/templateDrag"
 
 interface VariableOption {
   fieldKey: string
@@ -23,7 +23,7 @@ interface VariableOption {
 interface RichTextEditorProps {
   value?: string
   onChange?: (markdown: string) => void
-  onVariableDrop?: (item: VariableOption) => void
+  onVariableDrop?: (item: VariableOption, sourceType: "keyinfo" | "summary") => void
   placeholder?: string
   variables?: VariableOption[]
   className?: string
@@ -153,8 +153,9 @@ export default function RichTextEditor({
         className
       )}
       onDragOver={(event) => {
-        const dropped = getCoreInfoDragData(event)
-        if (!dropped) return
+        const coreInfoDropped = getCoreInfoDragData(event)
+        const summaryDropped = getSummaryDragData(event)
+        if (!coreInfoDropped && !summaryDropped) return
         event.preventDefault()
         if (!dragActive) setDragActive(true)
       }}
@@ -162,12 +163,20 @@ export default function RichTextEditor({
         if (dragActive) setDragActive(false)
       }}
       onDrop={(event) => {
-        const dropped = getCoreInfoDragData(event)
-        if (!dropped) return
-        event.preventDefault()
-        setDragActive(false)
-        insertVariable(dropped.fieldKey, dropped.label)
-        onVariableDrop?.(dropped)
+        const coreInfoDropped = getCoreInfoDragData(event)
+        const summaryDropped = getSummaryDragData(event)
+        
+        if (coreInfoDropped) {
+          event.preventDefault()
+          setDragActive(false)
+          insertVariable(coreInfoDropped.fieldKey, coreInfoDropped.label)
+          onVariableDrop?.(coreInfoDropped, "keyinfo")
+        } else if (summaryDropped) {
+          event.preventDefault()
+          setDragActive(false)
+          insertVariable(summaryDropped.fieldKey, summaryDropped.label)
+          onVariableDrop?.(summaryDropped, "summary")
+        }
       }}
     >
       {/* 工具栏 */}

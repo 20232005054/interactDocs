@@ -56,6 +56,7 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
   })
   const [panelWidths, setPanelWidths] = useState<[number, number, number]>([24, 28, 48])
   const [activeHandle, setActiveHandle] = useState<number | null>(null)
+  const [collapsedPanels, setCollapsedPanels] = useState<Set<ApplyKey>>(new Set())
   const shouldAutoApply = searchParams.get("autoApply") === "1"
 
   // 文献管理状态
@@ -259,13 +260,14 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
 
   const panels = templateId ? [
     {
-      key: "core-info",
+      key: "core-info" as ApplyKey,
       title: "核心信息模板",
       desc: "编辑文档的核心信息字段结构，并作为拖拽填充源（创建文档时已自动应用）",
       accentColor: "bg-blue-500",
       bgColor: "bg-blue-50/30",
       borderColor: "border-blue-200",
       status: applyStatus["core-info"],
+      collapsible: true,
       children: (
         <CoreInfoTemplateStep
           templateId={templateId}
@@ -275,13 +277,14 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
       ),
     },
     {
-      key: "summary",
+      key: "summary" as ApplyKey,
       title: "摘要模板",
       desc: "摘要卡片支持接收核心信息拖拽，快速填入来源、内容模板和提示词",
       accentColor: "bg-green-500",
       bgColor: "bg-green-50/30",
       borderColor: "border-green-200",
       status: applyStatus.summary,
+      collapsible: true,
       children: (
         <SummaryTemplateStep
           templateId={templateId}
@@ -290,13 +293,14 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
       ),
     },
     {
-      key: "structure",
+      key: "structure" as ApplyKey,
       title: "章节结构模板",
-      desc: "定义文档章节结构，支持拖拽核心信息到章节配置区",
+      desc: "定义文档章节结构，支持拖拽核心信息和摘要到章节配置区",
       accentColor: "bg-purple-500",
       bgColor: "bg-purple-50/30",
       borderColor: "border-purple-200",
       status: applyStatus.structure,
+      collapsible: false,
       children: (
         <StructureTemplateStep
           templateId={templateId}
@@ -545,41 +549,61 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
             ref={panelContainerRef}
             className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden xl:flex-row xl:gap-0"
           >
-            {panels.map((panel, index) => (
-              <Fragment key={panel.key}>
-                {/* CSS 变量：使用 flex-grow 实现可调整宽度的面板布局，通过 CSS 变量传递动态计算的比例值 */}
-                <div
-                  className="min-w-0 xl:h-full xl:basis-0 xl:shrink-0 xl:[flex-grow:var(--panel-grow)]"
-                  style={{ ["--panel-grow" as string]: panelWidths[index] }}
-                >
-                  <BoardShell
-                    title={panel.title}
-                    desc={panel.desc}
-                    accentColor={panel.accentColor}
-                    bgColor={panel.bgColor}
-                    borderColor={panel.borderColor}
-                    status={panel.status}
-                    className="xl:h-full"
+            {panels.map((panel, index) => {
+              const isCollapsed = collapsedPanels.has(panel.key)
+              
+              return (
+                <Fragment key={panel.key}>
+                  {/* CSS 变量：使用 flex-grow 实现可调整宽度的面板布局，通过 CSS 变量传递动态计算的比例值 */}
+                  <div
+                    className={cn(
+                      "min-w-0 xl:h-full xl:basis-0 xl:shrink-0 transition-all",
+                      isCollapsed ? "xl:w-12" : "xl:[flex-grow:var(--panel-grow)]"
+                    )}
+                    style={isCollapsed ? {} : { ["--panel-grow" as string]: panelWidths[index] }}
                   >
-                    {panel.children}
-                  </BoardShell>
-                </div>
+                    <BoardShell
+                      title={panel.title}
+                      desc={panel.desc}
+                      accentColor={panel.accentColor}
+                      bgColor={panel.bgColor}
+                      borderColor={panel.borderColor}
+                      status={panel.status}
+                      className="xl:h-full"
+                      collapsed={isCollapsed}
+                      collapsible={panel.collapsible}
+                      onToggleCollapse={panel.collapsible ? () => {
+                        setCollapsedPanels(prev => {
+                          const next = new Set(prev)
+                          if (next.has(panel.key)) {
+                            next.delete(panel.key)
+                          } else {
+                            next.add(panel.key)
+                          }
+                          return next
+                        })
+                      } : undefined}
+                    >
+                      {panel.children}
+                    </BoardShell>
+                  </div>
 
-                {index < panels.length - 1 && (
-                  <ResizeHandle
-                    active={activeHandle === index}
-                    onPointerDown={(event) => {
-                      resizeStateRef.current = {
-                        handleIndex: index,
-                        startX: event.clientX,
-                        startWidths: panelWidths,
-                      }
-                      setActiveHandle(index)
-                    }}
-                  />
-                )}
-              </Fragment>
-            ))}
+                  {index < panels.length - 1 && !isCollapsed && !collapsedPanels.has(panels[index + 1].key) && (
+                    <ResizeHandle
+                      active={activeHandle === index}
+                      onPointerDown={(event) => {
+                        resizeStateRef.current = {
+                          handleIndex: index,
+                          startX: event.clientX,
+                          startWidths: panelWidths,
+                        }
+                        setActiveHandle(index)
+                      }}
+                    />
+                  )}
+                </Fragment>
+              )
+            })}
           </div>
         )}
       </main>
@@ -608,6 +632,9 @@ function BoardShell({
   contentClassName,
   children,
   status,
+  collapsed = false,
+  collapsible = false,
+  onToggleCollapse,
 }: {
   title: string
   desc: string
@@ -618,6 +645,9 @@ function BoardShell({
   contentClassName?: string
   children: ReactNode
   status?: ApplyStatus
+  collapsed?: boolean
+  collapsible?: boolean
+  onToggleCollapse?: () => void
 }) {
   const statusConfig = {
     done: { text: "✓ 完成", color: "bg-green-500", textColor: "text-green-700", bgColor: "bg-green-50" },
@@ -628,6 +658,26 @@ function BoardShell({
   
   const currentStatus = status && status !== "idle" ? statusConfig[status] : null
 
+  if (collapsed) {
+    return (
+      <section className={cn("flex h-full min-h-0 flex-col overflow-hidden rounded-xl border-2 shadow-md", borderColor, bgColor, className)}>
+        <button
+          onClick={onToggleCollapse}
+          className="h-full flex items-center justify-center hover:bg-white/50 transition-colors group"
+          title={`展开${title}`}
+        >
+          <div className="flex flex-col items-center gap-2">
+            <span className={cn("h-3 w-3 rounded-full shadow-sm", accentColor)} />
+            <div className="writing-mode-vertical text-sm font-bold text-gray-700 group-hover:text-gray-900">
+              {title}
+            </div>
+            <span className="text-gray-400 group-hover:text-gray-600 text-lg">→</span>
+          </div>
+        </button>
+      </section>
+    )
+  }
+
   return (
     <section className={cn("flex h-full min-h-0 flex-col overflow-hidden rounded-xl border-2 shadow-md transition-shadow hover:shadow-lg", borderColor, bgColor, className)}>
       <div className={cn("border-b-2 px-4 py-3.5 bg-white/80 backdrop-blur-sm", borderColor)}>
@@ -635,6 +685,15 @@ function BoardShell({
           <div className="flex items-center gap-2.5">
             <span className={cn("h-3 w-3 rounded-full shadow-sm", accentColor)} />
             <h2 className="text-base font-bold text-gray-800">{title}</h2>
+            {collapsible && (
+              <button
+                onClick={onToggleCollapse}
+                className="ml-1 text-xs text-gray-400 hover:text-gray-600 transition px-2 py-1 rounded hover:bg-gray-100"
+                title="收起面板"
+              >
+                ←
+              </button>
+            )}
           </div>
           {currentStatus && (
             <span className={cn("px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1.5", currentStatus.bgColor, currentStatus.textColor)}>

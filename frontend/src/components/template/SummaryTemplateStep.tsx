@@ -13,6 +13,8 @@ import {
   getCoreInfoDragData,
   pruneCoreInfoSourcesByKeys,
   upsertCoreInfoSource,
+  setSummaryDragData,
+  type SummaryDragItem,
 } from "@/lib/templateDrag"
 
 interface SummaryTemplateStepProps {
@@ -180,9 +182,18 @@ function SummaryCard({
       >
         <button
           type="button"
+          draggable
+          onDragStart={(event) => {
+            const dragItem: SummaryDragItem = {
+              fieldKey: item.field_key,
+              label: title || "未命名摘要",
+            }
+            setSummaryDragData(event, dragItem)
+          }}
           onClick={onToggle}
-          className="flex min-w-0 flex-1 items-start justify-between gap-3 rounded-md px-2 py-1 text-left transition hover:bg-gray-50"
+          className="flex min-w-0 flex-1 items-start justify-between gap-3 rounded-md px-2 py-1 text-left transition hover:bg-gray-50 cursor-move"
           aria-label={isExpanded ? "折叠摘要模板" : "展开摘要模板"}
+          title="可拖拽到章节结构"
         >
           <div className="min-w-0">
             <div className="truncate text-sm font-medium text-gray-700">

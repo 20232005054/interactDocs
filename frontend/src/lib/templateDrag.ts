@@ -8,7 +8,13 @@ export interface CoreInfoDragItem {
   groupChildren?: Array<{ value: string; label: string }>
 }
 
+export interface SummaryDragItem {
+  fieldKey: string
+  label: string
+}
+
 const CORE_INFO_DRAG_MIME = "application/x-interactivedocs-core-info"
+const SUMMARY_DRAG_MIME = "application/x-interactivedocs-summary"
 
 export function buildVariablePlaceholder(item: CoreInfoDragItem): string {
   return `{{${item.fieldKey}}}`
@@ -205,4 +211,65 @@ export function pruneCoreInfoSourcesByKeys(
       target_field: nextTarget,
     }]
   })
+}
+
+// ============================================================
+// 摘要拖拽支持
+// ============================================================
+
+export function setSummaryDragData(event: DragEvent<HTMLElement>, item: SummaryDragItem) {
+  const payload = JSON.stringify(item)
+  event.dataTransfer.effectAllowed = "copy"
+  event.dataTransfer.setData(SUMMARY_DRAG_MIME, payload)
+  event.dataTransfer.setData("text/plain", `{{${item.fieldKey}}}`)
+}
+
+export function getSummaryDragData(event: Pick<DragEvent<HTMLElement>, "dataTransfer">): SummaryDragItem | null {
+  const raw = event.dataTransfer.getData(SUMMARY_DRAG_MIME)
+  if (!raw) return null
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<SummaryDragItem>
+    if (!parsed.fieldKey || !parsed.label) return null
+    return {
+      fieldKey: parsed.fieldKey,
+      label: parsed.label,
+    }
+  } catch {
+    return null
+  }
+}
+
+export function createSummarySource(item: SummaryDragItem): SourceInfo {
+  return {
+    source: { value: "summary", label: "摘要", ui_type: "select" },
+    match_type: "summary_match",
+    match_keys: [{ value: item.fieldKey, label: item.label, ui_type: "select" }],
+    target_field: item.fieldKey,
+  }
+}
+
+export function upsertSummarySource(sources: SourceInfo[], item: SummaryDragItem): SourceInfo[] {
+  const existingIndex = sources.findIndex((source) =>
+    source.source.value === "summary" && source.match_keys.some((key) => key.value === item.fieldKey)
+  )
+
+  if (existingIndex >= 0) {
+    return sources
+  }
+
+  const emptySummaryIndex = sources.findIndex(
+    (source) =>
+      source.source.value === "summary" &&
+      !source.target_field &&
+      source.match_keys.length === 0
+  )
+
+  if (emptySummaryIndex >= 0) {
+    return sources.map((source, index) =>
+      index === emptySummaryIndex ? createSummarySource(item) : source
+    )
+  }
+
+  return [...sources, createSummarySource(item)]
 }

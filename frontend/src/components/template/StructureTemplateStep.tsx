@@ -21,6 +21,8 @@ import {
   getCoreInfoDragData,
   pruneCoreInfoSourcesByKeys,
   upsertCoreInfoSource,
+  getSummaryDragData,
+  upsertSummarySource,
 } from "@/lib/templateDrag"
 import { toastError } from "@/hooks/useToast"
 
@@ -118,8 +120,12 @@ function ParagraphEditor({ index, total, para, variables, variableLabelMap, onCh
     patch({ sources: next })
   }, [patch])
 
-  const syncDroppedSource = useCallback((dropped: { fieldKey: string; label: string }) => {
-    handleSourcesChange(upsertCoreInfoSource(sources, dropped))
+  const syncDroppedSource = useCallback((dropped: { fieldKey: string; label: string }, sourceType: "keyinfo" | "summary") => {
+    if (sourceType === "keyinfo") {
+      handleSourcesChange(upsertCoreInfoSource(sources, dropped))
+    } else {
+      handleSourcesChange(upsertSummarySource(sources, dropped))
+    }
   }, [handleSourcesChange, sources])
 
   const showSources = generationMode !== 2
@@ -209,14 +215,24 @@ function ParagraphEditor({ index, total, para, variables, variableLabelMap, onCh
                     sources: JSON.stringify(nextSources) !== JSON.stringify(sources) ? nextSources : sources,
                   })
                 }}
-                onDragOver={(event) => { if (getCoreInfoDragData(event)) event.preventDefault() }}
+                onDragOver={(event) => { 
+                  if (getCoreInfoDragData(event) || getSummaryDragData(event)) event.preventDefault() 
+                }}
                 onDrop={(event) => {
-                  const dropped = getCoreInfoDragData(event)
-                  if (!dropped) return
-                  event.preventDefault()
-                  const next = appendVariableText(defaultPrompt, dropped)
-                  patch({ default_prompt: next })
-                  syncDroppedSource(dropped)
+                  const coreInfoDropped = getCoreInfoDragData(event)
+                  const summaryDropped = getSummaryDragData(event)
+                  
+                  if (coreInfoDropped) {
+                    event.preventDefault()
+                    const next = appendVariableText(defaultPrompt, coreInfoDropped)
+                    patch({ default_prompt: next })
+                    syncDroppedSource(coreInfoDropped, "keyinfo")
+                  } else if (summaryDropped) {
+                    event.preventDefault()
+                    const next = appendVariableText(defaultPrompt, summaryDropped)
+                    patch({ default_prompt: next })
+                    syncDroppedSource(summaryDropped, "summary")
+                  }
                 }}
                 rows={5}
                 className="w-full resize-none rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm outline-none focus:border-green-400"
@@ -235,14 +251,24 @@ function ParagraphEditor({ index, total, para, variables, variableLabelMap, onCh
                     sources: JSON.stringify(nextSources) !== JSON.stringify(sources) ? nextSources : sources,
                   })
                 }}
-                onDragOver={(event) => { if (getCoreInfoDragData(event)) event.preventDefault() }}
+                onDragOver={(event) => { 
+                  if (getCoreInfoDragData(event) || getSummaryDragData(event)) event.preventDefault() 
+                }}
                 onDrop={(event) => {
-                  const dropped = getCoreInfoDragData(event)
-                  if (!dropped) return
-                  event.preventDefault()
-                  const next = appendVariableText(customPrompt, dropped)
-                  patch({ custom_prompt: next })
-                  syncDroppedSource(dropped)
+                  const coreInfoDropped = getCoreInfoDragData(event)
+                  const summaryDropped = getSummaryDragData(event)
+                  
+                  if (coreInfoDropped) {
+                    event.preventDefault()
+                    const next = appendVariableText(customPrompt, coreInfoDropped)
+                    patch({ custom_prompt: next })
+                    syncDroppedSource(coreInfoDropped, "keyinfo")
+                  } else if (summaryDropped) {
+                    event.preventDefault()
+                    const next = appendVariableText(customPrompt, summaryDropped)
+                    patch({ custom_prompt: next })
+                    syncDroppedSource(summaryDropped, "summary")
+                  }
                 }}
                 rows={5}
                 className="w-full resize-none rounded border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-green-400"

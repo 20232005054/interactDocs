@@ -365,3 +365,11 @@
   pointer-events: none;
   height: 0;
 }
+
+/* ============================================================
+   垂直文字样式（用于折叠面板）
+   ============================================================ */
+.writing-mode-vertical {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
