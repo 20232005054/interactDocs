@@ -12,7 +12,7 @@ inclusion: manual
 **总时长：** 20 周  
 **总成本：** ¥500,000  
 **团队规模：** 5 人  
-**当前进度：** 6/12 阶段完成（50%）
+**当前进度：** 7/12 阶段完成（58%）
 
 ---
 
@@ -21,8 +21,8 @@ inclusion: manual
 如果你是新会话，请先了解：
 
 1. **项目目标**：将现有 AI 功能迁移到 LangChain 框架
-2. **当前状态**：已完成阶段 0-6（准备、核心组件、链开发、工具系统、智能体、工作流、服务层）
-3. **下一步**：阶段 7 - API 切换
+2. **当前状态**：已完成阶段 0-7（准备、核心组件、链开发、工具系统、智能体、工作流、服务层、API切换）
+3. **下一步**：阶段 8 - 测试优化
 4. **重要规则**：
    - 每完成一个阶段自动 git commit
    - 不编写独立 MD 文档，写到 steering 里
@@ -30,7 +30,7 @@ inclusion: manual
 
 **继续任务的命令：**
 ```
-开始阶段7
+开始阶段8
 ```
 
 ---
@@ -345,7 +345,57 @@ inclusion: manual
 
 ---
 
-### 阶段 7-12：待开发
+### ✅ 阶段 7：API 切换（1 周）- 已完成
+
+**完成时间：** 2026-05-08
+
+**完成内容：**
+1. ✅ 实现 `ServiceRouter`（服务路由器）
+   - `route_service()` - 根据 Feature Flag 动态选择 v1/v2
+   - 降级方案（v2 失败时自动回退到 v1）
+   - 便捷函数（get_ai_service/get_chat_service 等）
+   - 包装器模式（透明切换）
+
+2. ✅ 实现 `PerformanceMonitor`（性能监控器）
+   - `record()` - 记录性能指标
+   - `get_statistics()` - 获取统计信息
+   - `compare_versions()` - 对比 v1/v2 性能
+   - `get_recent_failures()` - 获取最近失败记录
+   - 支持过滤（service_version/feature/method）
+
+3. ✅ 实现监控 API（/api/v1/monitoring）
+   - `GET /performance` - 获取性能统计
+   - `GET /compare` - 对比 v1/v2 性能
+   - `GET /failures` - 获取最近失败记录
+   - `POST /clear` - 清空监控数据
+   - `GET /config` - 获取 LangChain 配置
+
+4. ✅ Feature Flag 配置
+   - `ENABLE_LANGCHAIN` - 总开关
+   - `ENABLE_LANGCHAIN_RAG` - RAG 功能
+   - `ENABLE_LANGCHAIN_CHAT` - 对话功能
+   - `ENABLE_LANGCHAIN_PARAGRAPH` - 段落生成功能
+   - `ENABLE_LANGCHAIN_WORKFLOW` - 工作流功能
+
+5. ✅ 单元测试（test_service_router.py）
+   - 测试服务路由（v1/v2 切换）
+   - 测试降级方案
+   - 测试性能监控
+   - 测试版本对比
+
+6. ✅ 切换指南（SWITCHING_GUIDE.md）
+   - 快速开始
+   - 服务路由器使用
+   - 性能监控
+   - 切换策略（灰度发布）
+   - 回滚策略
+   - 常见问题
+
+**Git Commit：** feat(langchain): 完成阶段7 - API 切换
+
+---
+
+### 阶段 8-12：待开发
 
 **阶段 4：智能体开发（2 周）**
 - DocumentChatAgent（对话智能体）
@@ -660,18 +710,18 @@ feat(langchain): 完成阶段X - [阶段名称]
 
 ## 下一步
 
-开始阶段 7：API 切换
+开始阶段 8：测试优化
 
 **任务概述：**
-1. Feature Flag 动态切换
-2. API 路由更新（支持 v1/v2 切换）
-3. 降级方案（v2 失败时回退到 v1）
-4. 性能监控和日志
-5. 编写切换测试
+1. 单元测试（覆盖率 > 80%）
+2. 集成测试
+3. 性能测试
+4. A/B 测试
+5. 测试报告
 
-**预计时间：** 1 周
+**预计时间：** 2 周
 
 **命令：**
 ```
-开始阶段7
+开始阶段8
 ```
