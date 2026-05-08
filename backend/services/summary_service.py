@@ -167,7 +167,7 @@ class SummaryService:
         # 内容有变化时启动下游联动后台任务（与 update_summary 保持一致）
         if new_content != old_content:
             import asyncio
-            from services.summary_change_service import handle_summary_change_async
+            from services.change_handler import handle_summary_change_async
             from core.utils import log_task_exception
             task = asyncio.create_task(
                 handle_summary_change_async(summary_id, old_content, new_content),

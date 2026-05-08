@@ -8,7 +8,7 @@ import asyncio
 import uuid
 from sqlalchemy import select, func, update
 from sqlalchemy import update as sa_update
-from services.core_info_change_service import handle_core_info_change_async
+from services.change_handler import handle_core_info_change_async
 from core.utils import log_task_exception
 
 class CoreInfoService:
