@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.mappers.summary_mapper import SummaryMapper
 from db.mappers.dependency_edge_mapper import DependencyEdgeMapper
-from db.models import DocumentSummary, DocumentSummaryHistory
+from db.models import DocumentSummary
 from schemas.document_schemas import DocumentSummaryUpdate
 from uuid import UUID
 from sqlalchemy import func, select, update
@@ -29,16 +29,6 @@ class SummaryService:
 
         new_content = summary_in.content if summary_in.content is not None else old_summary.content
         new_title = summary_in.title if summary_in.title is not None else old_summary.title
-
-        # 创建历史记录
-        history = DocumentSummaryHistory(
-            summary_id=summary_id,
-            version=old_summary.version,
-            title=old_summary.title,
-            field_key=old_summary.field_key,
-            content=old_summary.content,
-        )
-        db.add(history)
 
         # 乐观标记 is_change=1，立即保存
         update_data = {
@@ -166,17 +156,6 @@ class SummaryService:
         old_content = summary.content
         new_content = summary.ai_generate
 
-        # 创建历史记录
-        from db.models import DocumentSummaryHistory
-        history = DocumentSummaryHistory(
-            summary_id=summary_id,
-            version=summary.version,
-            title=summary.title,
-            field_key=summary.field_key,
-            content=old_content,
-        )
-        db.add(history)
-
         update_data = {
             "content": new_content,
             "version": summary.version + 1,
@@ -227,15 +206,6 @@ class SummaryService:
             raise HTTPException(status_code=400, detail="当前摘要没有待确认的 AI 生成内容")
         if not summary.ai_generate:
             raise HTTPException(status_code=400, detail="AI 生成内容为空")
-
-        history = DocumentSummaryHistory(
-            summary_id=summary_id,
-            version=summary.version,
-            title=summary.title,
-            field_key=summary.field_key,
-            content=summary.content,
-        )
-        db.add(history)
 
         await SummaryMapper.update_summary(db, summary_id, {
             "content": summary.ai_generate,

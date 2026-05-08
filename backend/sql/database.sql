@@ -129,18 +129,7 @@ CREATE TABLE IF NOT EXISTS document_summaries (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 4.2 摘要历史
-CREATE TABLE IF NOT EXISTS document_summary_history (
-    history_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    summary_id UUID NOT NULL REFERENCES document_summaries(summary_id) ON DELETE CASCADE,
-    version INTEGER NOT NULL,
-    title VARCHAR(200) NOT NULL,
-    field_key VARCHAR(50) NOT NULL,
-    content TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 4.3 文档核心信息
+-- 4.2 文档核心信息
 CREATE TABLE IF NOT EXISTS document_core_info (
     core_info_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     document_id UUID NOT NULL REFERENCES documents(document_id) ON DELETE CASCADE,

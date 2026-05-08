@@ -127,21 +127,6 @@ class DocumentSummary(Base):
 
     # 关系
     document = relationship("Document", back_populates="summaries")
-    history = relationship("DocumentSummaryHistory", back_populates="summary", cascade="all, delete-orphan")
-
-
-class DocumentSummaryHistory(Base):
-    __tablename__ = "document_summary_history"
-    history_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    summary_id = Column(UUID(as_uuid=True), ForeignKey("document_summaries.summary_id", ondelete="CASCADE"), nullable=False)
-    version = Column(Integer, nullable=False)
-    title = Column(String(200), nullable=False)
-    field_key = Column(String(50), nullable=False)
-    content = Column(Text, nullable=False)
-    created_at = Column(TIMESTAMP, server_default=func.now())
-
-    # 关系
-    summary = relationship("DocumentSummary", back_populates="history")
 
 
 class DocumentCoreInfo(Base):
