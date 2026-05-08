@@ -12,7 +12,7 @@ inclusion: manual
 **总时长：** 20 周  
 **总成本：** ¥500,000  
 **团队规模：** 5 人  
-**当前进度：** 5/12 阶段完成（42%）
+**当前进度：** 6/12 阶段完成（50%）
 
 ---
 
@@ -21,8 +21,8 @@ inclusion: manual
 如果你是新会话，请先了解：
 
 1. **项目目标**：将现有 AI 功能迁移到 LangChain 框架
-2. **当前状态**：已完成阶段 0-5（准备、核心组件、链开发、工具系统、智能体、工作流）
-3. **下一步**：阶段 6 - 服务层迁移
+2. **当前状态**：已完成阶段 0-6（准备、核心组件、链开发、工具系统、智能体、工作流、服务层）
+3. **下一步**：阶段 7 - API 切换
 4. **重要规则**：
    - 每完成一个阶段自动 git commit
    - 不编写独立 MD 文档，写到 steering 里
@@ -30,7 +30,7 @@ inclusion: manual
 
 **继续任务的命令：**
 ```
-开始阶段6
+开始阶段7
 ```
 
 ---
@@ -294,7 +294,58 @@ inclusion: manual
 
 ---
 
-### 阶段 6-12：待开发
+### ✅ 阶段 6：服务层迁移（2 周）- 已完成
+
+**完成时间：** 2026-05-08
+
+**完成内容：**
+1. ✅ 实现 `AIServiceV2`（AI 辅助编辑服务 v2）
+   - `ai_assist_paragraph()` - 段落帮填（流式）
+   - `ai_evaluate_paragraph()` - 段落评估（流式）
+   - `assist_single_summary()` - 摘要帮填（非流式）
+   - 使用 ParagraphGenerationChain 生成段落
+   - 使用 SummaryGenerationChain 生成摘要
+   - 使用 QualityEvaluationChain 评估质量
+   - 三阶段 Session 管理
+
+2. ✅ 实现 `AIChatServiceV2`（AI 对话服务 v2）
+   - `chat_stream()` - 流式对话
+   - `chat()` - 非流式对话
+   - 使用 DocumentChatAgent 处理对话
+   - 使用 MemoryManager 管理历史
+   - 支持工具调用（只读 + 查询）
+   - 自动解析 [ACTION] 和 [SUGGESTION]
+
+3. ✅ 实现 `LiteratureRagServiceV2`（文献 RAG 检索服务 v2）
+   - `retrieve_and_format()` - 模板级检索
+   - `retrieve_and_format_for_paragraph()` - 段落级检索（两级策略）
+   - `inject_into_prompt()` - 注入 prompt
+   - `save_citations()` - 保存引用记录
+   - `get_document_reference_list()` - 获取参考文献列表
+   - `format_vancouver_reference()` - 温哥华引文格式
+   - 使用 LiteratureVectorStore 向量检索
+   - 使用 LiteratureRAGChain RAG 链
+
+4. ✅ 实现 `TemplateApplyServiceV2`（模板应用服务 v2）
+   - `apply_core_info_template()` - 应用核心信息模板
+   - `apply_core_info_template_as_tree()` - 应用核心信息模板（树形）
+   - `apply_summary_template()` - 应用摘要模板
+   - `apply_structure_template()` - 应用章节结构模板
+   - 使用 DocumentGenerationWorkflow 文档生成工作流
+   - 支持多种生成模式
+   - 保持与原服务接口兼容
+
+5. ✅ 单元测试（test_services.py）
+   - 测试所有服务接口存在性
+   - 测试接口兼容性
+   - 测试工具函数
+   - 测试服务集成
+
+**Git Commit：** feat(langchain): 完成阶段6 - 服务层迁移
+
+---
+
+### 阶段 7-12：待开发
 
 **阶段 4：智能体开发（2 周）**
 - DocumentChatAgent（对话智能体）
@@ -467,6 +518,31 @@ inclusion: manual
   - 自动生成审核报告
   - 文献引用验证
 
+### 服务层 v2（阶段 6）
+- ✅ `AIServiceV2` - AI 辅助编辑服务 v2
+  - ai_assist_paragraph() - 段落帮填（流式）
+  - ai_evaluate_paragraph() - 段落评估（流式）
+  - assist_single_summary() - 摘要帮填（非流式）
+  - 使用 Generation/Evaluation Chain
+  
+- ✅ `AIChatServiceV2` - AI 对话服务 v2
+  - chat_stream() - 流式对话
+  - chat() - 非流式对话
+  - 使用 DocumentChatAgent
+  - 自动解析建议
+  
+- ✅ `LiteratureRagServiceV2` - 文献 RAG 检索服务 v2
+  - retrieve_and_format() - 模板级检索
+  - retrieve_and_format_for_paragraph() - 段落级检索
+  - 使用 LiteratureVectorStore + RAGChain
+  - 两级检索策略
+  
+- ✅ `TemplateApplyServiceV2` - 模板应用服务 v2
+  - apply_core_info_template() - 应用核心信息模板
+  - apply_summary_template() - 应用摘要模板
+  - apply_structure_template() - 应用章节结构模板
+  - 使用 DocumentGenerationWorkflow
+
 ---
 
 ## 技术架构
@@ -497,6 +573,11 @@ backend/services/langchain/
 │   ├── chapter_completion.py    # 章节完善工作流
 │   ├── document_generation.py   # 文档生成工作流
 │   └── content_review.py        # 内容审核工作流
+├── services/                # 服务层 v2
+│   ├── ai_service_v2.py         # AI 辅助编辑服务 v2
+│   ├── ai_chat_service_v2.py    # AI 对话服务 v2
+│   ├── literature_rag_service_v2.py  # 文献 RAG 服务 v2
+│   └── template_apply_service_v2.py  # 模板应用服务 v2
 ├── prompts/                 # Prompt 模板
 ├── retrievers/              # 检索器
 ├── callbacks/               # 回调处理器
@@ -579,18 +660,18 @@ feat(langchain): 完成阶段X - [阶段名称]
 
 ## 下一步
 
-开始阶段 6：服务层迁移
+开始阶段 7：API 切换
 
 **任务概述：**
-1. 实现 ai_service_v2.py（AI 服务 v2）
-2. 实现 ai_chat_service_v2.py（对话服务 v2）
-3. 实现 literature_rag_service_v2.py（文献 RAG 服务 v2）
-4. 实现 template_apply_service_v2.py（模板应用服务 v2）
-5. 编写服务层测试
+1. Feature Flag 动态切换
+2. API 路由更新（支持 v1/v2 切换）
+3. 降级方案（v2 失败时回退到 v1）
+4. 性能监控和日志
+5. 编写切换测试
 
-**预计时间：** 2 周
+**预计时间：** 1 周
 
 **命令：**
 ```
-开始阶段6
+开始阶段7
 ```
