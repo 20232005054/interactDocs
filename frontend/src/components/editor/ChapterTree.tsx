@@ -326,6 +326,8 @@ export default function ChapterTree({ documentId, onReload, onRefreshContent }: 
   const { tree } = useDocumentStore()
   const [adding, setAdding] = useState(false)
   const [localTree, setLocalTree] = useState<ChapterTreeNode[]>([])
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false)
+  const [deletingAll, setDeletingAll] = useState(false)
 
   // 拖拽传感器配置
   const sensors = useSensors(
@@ -438,19 +440,60 @@ export default function ChapterTree({ documentId, onReload, onRefreshContent }: 
     }
   }, [documentId, onReload])
 
+  const handleDeleteAll = useCallback(async () => {
+    setDeletingAll(true)
+    try {
+      // 递归收集所有章节 ID
+      const collectAllIds = (nodes: ChapterTreeNode[]): string[] => {
+        const ids: string[] = []
+        for (const node of nodes) {
+          ids.push(node.chapter_id)
+          if (node.children.length > 0) {
+            ids.push(...collectAllIds(node.children))
+          }
+        }
+        return ids
+      }
+
+      const allIds = collectAllIds(localTree)
+      
+      // 批量删除（并发执行）
+      await Promise.all(allIds.map(id => chapterService.delete(id)))
+      
+      onReload()
+    } catch (err: unknown) {
+      toastError(err instanceof Error ? err.message : "删除失败")
+    } finally {
+      setDeletingAll(false)
+      setConfirmDeleteAll(false)
+    }
+  }, [localTree, onReload])
+
   return (
     <div className="flex flex-col h-full">
       {/* 标题栏 */}
       <div className="flex items-center justify-between px-3 py-3 border-b border-gray-100 shrink-0">
         <span className="text-base font-semibold text-gray-700">章节目录</span>
-        <button
-          onClick={handleAddRoot}
-          disabled={adding}
-          className="text-base text-gray-400 hover:text-blue-500 transition disabled:opacity-50 font-medium"
-          title="添加章节"
-        >
-          +
-        </button>
+        <div className="flex items-center gap-2">
+          {localTree.length > 0 && (
+            <button
+              onClick={() => setConfirmDeleteAll(true)}
+              disabled={deletingAll}
+              className="text-xs text-red-400 hover:text-red-600 transition disabled:opacity-50 font-medium px-2 py-1 rounded hover:bg-red-50"
+              title="删除全部章节"
+            >
+              {deletingAll ? "删除中..." : "删除全部"}
+            </button>
+          )}
+          <button
+            onClick={handleAddRoot}
+            disabled={adding}
+            className="text-base text-gray-400 hover:text-blue-500 transition disabled:opacity-50 font-medium"
+            title="添加章节"
+          >
+            +
+          </button>
+        </div>
       </div>
 
       {/* 树列表 */}
@@ -480,6 +523,17 @@ export default function ChapterTree({ documentId, onReload, onRefreshContent }: 
           </DndContext>
         )}
       </div>
+
+      {/* 删除全部确认对话框 */}
+      <ConfirmDialog
+        open={confirmDeleteAll}
+        title="删除全部章节？"
+        description={`此操作将删除 ${localTree.length} 个顶级章节及其所有子章节和段落，不可撤销。`}
+        confirmLabel="删除全部"
+        destructive
+        onConfirm={handleDeleteAll}
+        onCancel={() => setConfirmDeleteAll(false)}
+      />
     </div>
   )
 }

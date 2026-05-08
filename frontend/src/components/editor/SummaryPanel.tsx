@@ -217,6 +217,8 @@ export default function SummaryPanel({ onAfterSave }: SummaryPanelProps) {
   const [saving, setSaving] = useState(false)
   const [localSummaries, setLocalSummaries] = useState<Summary[]>([])
   const [creating, setCreating] = useState(false)
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false)
+  const [deletingAll, setDeletingAll] = useState(false)
 
   const orderedSummaries = useMemo(
     () => summaries.slice().sort((a, b) => a.order_index - b.order_index),
@@ -373,6 +375,27 @@ export default function SummaryPanel({ onAfterSave }: SummaryPanelProps) {
     }
   }, [documentId, setSummaries])
 
+  const handleDeleteAll = useCallback(async () => {
+    setDeletingAll(true)
+    try {
+      const allIds = localSummaries.map(s => s.summary_id)
+      await Promise.all(allIds.map(id => summaryService.delete(id)))
+      
+      // 刷新摘要列表
+      if (documentId) {
+        const summariesRes = await summaryService.getByDocument(documentId)
+        setSummaries(summariesRes.summaries)
+      }
+      
+      toastSuccess("已删除所有摘要")
+    } catch (err: unknown) {
+      toastError(err instanceof Error ? err.message : "删除失败")
+    } finally {
+      setDeletingAll(false)
+      setConfirmDeleteAll(false)
+    }
+  }, [localSummaries, documentId, setSummaries])
+
   if (summaries.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full px-6 py-8">
@@ -397,15 +420,28 @@ export default function SummaryPanel({ onAfterSave }: SummaryPanelProps) {
       {/* 顶部操作栏 */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium text-gray-700">摘要列表</h3>
-        <button
-          type="button"
-          onClick={handleCreate}
-          disabled={!documentId || creating}
-          className="h-7 px-3 rounded bg-blue-500 text-white text-xs font-medium hover:bg-blue-600 disabled:opacity-50 transition flex items-center gap-1.5"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>{creating ? "创建中..." : "新建"}</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {localSummaries.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setConfirmDeleteAll(true)}
+              disabled={deletingAll}
+              className="text-xs text-red-400 hover:text-red-600 transition disabled:opacity-50 font-medium px-2 py-1 rounded hover:bg-red-50"
+              title="删除全部摘要"
+            >
+              {deletingAll ? "删除中..." : "删除全部"}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleCreate}
+            disabled={!documentId || creating}
+            className="h-7 px-3 rounded bg-blue-500 text-white text-xs font-medium hover:bg-blue-600 disabled:opacity-50 transition flex items-center gap-1.5"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>{creating ? "创建中..." : "新建"}</span>
+          </button>
+        </div>
       </div>
 
       {dirtyIds.size > 0 && (
@@ -450,6 +486,17 @@ export default function SummaryPanel({ onAfterSave }: SummaryPanelProps) {
           ))}
         </SortableContext>
       </DndContext>
+
+      {/* 删除全部确认对话框 */}
+      <ConfirmDialog
+        open={confirmDeleteAll}
+        title="删除全部摘要？"
+        description={`此操作将删除所有 ${localSummaries.length} 条摘要，不可撤销。`}
+        confirmLabel="删除全部"
+        destructive
+        onConfirm={handleDeleteAll}
+        onCancel={() => setConfirmDeleteAll(false)}
+      />
     </div>
   )
 }

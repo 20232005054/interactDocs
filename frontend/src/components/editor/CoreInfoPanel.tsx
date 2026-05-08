@@ -320,6 +320,8 @@ export default function CoreInfoPanel({ onAfterSave }: CoreInfoPanelProps) {
   const [localCoreInfoTree, setLocalCoreInfoTree] = useState<CoreInfo[]>([])
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false)
+  const [deletingAll, setDeletingAll] = useState(false)
 
   // 拖拽传感器配置
   const sensors = useSensors(
@@ -570,6 +572,40 @@ export default function CoreInfoPanel({ onAfterSave }: CoreInfoPanelProps) {
     }
   }, [documentId, setCoreInfoTree])
 
+  const handleDeleteAll = useCallback(async () => {
+    setDeletingAll(true)
+    try {
+      // 递归收集所有核心信息 ID
+      const collectAllIds = (nodes: CoreInfo[]): string[] => {
+        const ids: string[] = []
+        for (const node of nodes) {
+          ids.push(node.core_info_id)
+          if (node.children.length > 0) {
+            ids.push(...collectAllIds(node.children))
+          }
+        }
+        return ids
+      }
+
+      const allIds = collectAllIds(localCoreInfoTree)
+      
+      // 批量删除（并发执行）
+      await Promise.all(allIds.map(id => coreInfoService.delete(id)))
+      
+      // 刷新核心信息树
+      const treeRes = await coreInfoService.getByDocument(documentId!)
+      setCoreInfoTree(treeRes.items)
+      setLocalCoreInfoTree(treeRes.items)
+      
+      toastSuccess("已删除所有核心信息")
+    } catch (err: unknown) {
+      toastError(err instanceof Error ? err.message : "删除失败")
+    } finally {
+      setDeletingAll(false)
+      setConfirmDeleteAll(false)
+    }
+  }, [localCoreInfoTree, documentId, setCoreInfoTree])
+
   if (localCoreInfoTree.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full px-6 py-8">
@@ -598,15 +634,28 @@ export default function CoreInfoPanel({ onAfterSave }: CoreInfoPanelProps) {
       {/* 顶部操作栏 */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium text-gray-700">核心信息</h3>
-        <button
-          type="button"
-          onClick={() => setShowCreateDialog(true)}
-          disabled={!documentId || creating}
-          className="h-7 px-3 rounded bg-blue-500 text-white text-xs font-medium hover:bg-blue-600 disabled:opacity-50 transition flex items-center gap-1.5"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>新建</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {localCoreInfoTree.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setConfirmDeleteAll(true)}
+              disabled={deletingAll}
+              className="text-xs text-red-400 hover:text-red-600 transition disabled:opacity-50 font-medium px-2 py-1 rounded hover:bg-red-50"
+              title="删除全部核心信息"
+            >
+              {deletingAll ? "删除中..." : "删除全部"}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowCreateDialog(true)}
+            disabled={!documentId || creating}
+            className="h-7 px-3 rounded bg-blue-500 text-white text-xs font-medium hover:bg-blue-600 disabled:opacity-50 transition flex items-center gap-1.5"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>新建</span>
+          </button>
+        </div>
       </div>
 
       {saving && (
@@ -644,6 +693,17 @@ export default function CoreInfoPanel({ onAfterSave }: CoreInfoPanelProps) {
         onConfirm={handleCreate}
         onCancel={() => setShowCreateDialog(false)}
         coreInfoTree={localCoreInfoTree}
+      />
+
+      {/* 删除全部确认对话框 */}
+      <ConfirmDialog
+        open={confirmDeleteAll}
+        title="删除全部核心信息？"
+        description={`此操作将删除所有核心信息字段及其内容，不可撤销。`}
+        confirmLabel="删除全部"
+        destructive
+        onConfirm={handleDeleteAll}
+        onCancel={() => setConfirmDeleteAll(false)}
       />
     </div>
   )
