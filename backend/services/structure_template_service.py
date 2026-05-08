@@ -185,7 +185,9 @@ class StructureTemplateService:
     ) -> str:
         """为单个段落定义调用 AI 生成内容"""
         prompt = para_def.get("custom_prompt") or para_def.get("default_prompt")
-        draft = para_def.get("content_template") if para_def.get("generation_mode") == 3 else None
+        generation_mode = para_def.get("generation_mode", 2)
+        draft = para_def.get("content_template") if generation_mode == 3 else None
+        
         return await TemplateRenderService.render_ai_content(
             db=db,
             document=document,
@@ -196,6 +198,7 @@ class StructureTemplateService:
             template_id=template_id,
             source_data_map=source_data_map,
             draft=draft,
+            generation_mode=generation_mode,  # 传入 generation_mode
         )
 
     @staticmethod
@@ -212,7 +215,9 @@ class StructureTemplateService:
         Returns: (content: str, citations: list)
         """
         prompt = para_def.get("custom_prompt") or para_def.get("default_prompt")
-        draft = para_def.get("content_template") if para_def.get("generation_mode") == 3 else None
+        generation_mode = para_def.get("generation_mode", 2)
+        draft = para_def.get("content_template") if generation_mode == 3 else None
+        
         return await TemplateRenderService.render_ai_content_with_citations(
             db=db,
             document=document,
@@ -223,4 +228,5 @@ class StructureTemplateService:
             template_id=template_id,
             source_data_map=source_data_map,
             draft=draft,
+            generation_mode=generation_mode,  # 传入 generation_mode
         )

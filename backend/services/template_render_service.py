@@ -3,13 +3,14 @@
 
 提供 SummaryTemplate 和 StructureTemplate 共用的渲染逻辑：
 - build_sources_data_map：根据 sources 配置从数据库取值，构建变量映射
-- render_ai_content：调用 AI 生成内容
-- generate_content_copy_mode：复制模式变量替换
-- render_template_variables：正则替换 {{var}} 变量
+- render_ai_content：调用 AI 生成内容（已迁移到 LangChain）
+- generate_content_copy_mode：复制模式变量替换（已废弃，由 TemplateRenderChain 处理）
+- render_template_variables：正则替换 {{var}} 变量（已废弃，由 TemplateRenderChain 处理）
 """
 
+import logging
 import re
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from uuid import UUID
 
 from sqlalchemy import select
@@ -19,9 +20,10 @@ from db.models import Document, DocumentCoreInfo, Paragraph
 from db.mappers.summary_mapper import SummaryMapper
 from db.mappers.structure_template_mapper import StructureTemplateMapper
 from db.mappers.chapter_mapper import ChapterMapper
-from services.ai_client import call_qwen_once
-from core.ai_prompts import SYSTEM_PROMPT_TEMPLATE_RENDER
 from services.ai_context_builder import AIContextBuilder
+from services.langchain.chains.template_render_chain import create_template_render_chain
+
+logger = logging.getLogger(__name__)
 
 
 class TemplateRenderService:
@@ -116,13 +118,33 @@ class TemplateRenderService:
         generated_summary_map: Dict[str, str] = None,
         source_data_map: Dict[str, str] = None,
         draft: str = None,
+        generation_mode: int = 1,  # 默认 AI 生成模式
     ) -> str:
-        if not prompt and not draft:
-            return ""
-
-        print(f"\n========== 开始生成 AI 内容: [{title}] ==========")
-        print(f"-> 原始 sources 配置: {sources}")
-
+        """
+        渲染 AI 内容（已迁移到 LangChain TemplateRenderChain）
+        
+        Args:
+            db: 数据库会话
+            document: 文档对象
+            title: 标题
+            sources: 来源配置
+            prompt: AI 提示词
+            field_key: 字段 key
+            template_id: 模板 ID
+            generated_summary_map: 已生成的摘要映射
+            source_data_map: 来源数据映射（可选，不传则自动构建）
+            draft: 草稿内容（mode=3 时使用）
+            generation_mode: 生成模式（默认 1=AI生成）
+        
+        Returns:
+            生成的内容
+        """
+        logger.info(
+            f"[模板渲染] 开始 title={title} mode={generation_mode} "
+            f"template_id={template_id} field_key={field_key}"
+        )
+        
+        # 构建变量映射
         if source_data_map is not None:
             variable_map = source_data_map
         else:
@@ -132,74 +154,48 @@ class TemplateRenderService:
                 sources=sources or [],
                 generated_summary_map=generated_summary_map,
             )
-
-        print(f"-> 提取到的 source_data_map: {variable_map}")
-
-        sources_text = ""
-        if sources:
-            sources_text = "\n\n请严格结合以下参考数据进行总结和生成：\n"
-            has_data = False
-            for source in sources:
-                match_keys = source.get("match_keys") or []
-                for mk in match_keys:
-                    mk_value = mk.get("value") if isinstance(mk, dict) else None
-                    mk_label = (mk.get("label") if isinstance(mk, dict) else None) or mk_value
-                    if not mk_value:
-                        continue
-                    value = variable_map.get(mk_value)
-                    if value and str(value).strip():
-                        sources_text += f"【{mk_label}】:\n{value}\n\n"
-                        has_data = True
-            if not has_data:
-                sources_text = ""
-
-        base_prompt = TemplateRenderService.render_template_variables(prompt or "", variable_map)
-        title_context = f"当前需要生成的摘要/内容模块名称为：【{title}】\n"
-
-        # mode 3：草稿润色，把草稿拼入 prompt
-        draft_context = ""
-        if draft and draft.strip():
-            draft_context = f"\n\n【当前草稿内容】\n{draft.strip()}\n请在以上草稿基础上进行修改完善，使其更专业、更符合临床研究规范。\n"
-
+        
+        # 获取核心信息背景
         core_info_background = ""
         try:
-            structured_text = await AIContextBuilder.get_core_info_structured_text(db, document.document_id)
+            structured_text = await AIContextBuilder.get_core_info_structured_text(
+                db, document.document_id
+            )
             if structured_text:
-                core_info_background = f"\n\n【文档核心信息背景】\n{structured_text}\n"
-        except Exception:
-            pass
-
-        # 文献 RAG 注入（统一入口）
+                core_info_background = f"【文档核心信息背景】\n{structured_text}"
+        except Exception as e:
+            logger.warning(f"获取核心信息背景失败: {e}")
+        
+        # 文献 RAG 注入
         literature_context, literature_citations = await AIContextBuilder.inject_literature_context(
             db=db,
             document=document,
-            query=f"{title} {base_prompt}",
+            query=f"{title} {prompt}",
             paragraph_id=None,  # 模板级检索
             top_k=5,
         )
-
-        final_prompt = f"{title_context}{base_prompt}{draft_context}{core_info_background}{sources_text}"
-        if literature_context:
-            final_prompt = f"{final_prompt}\n\n{literature_context}"
-        print(f"-> 最终构建的 AI 提示词 (final_prompt):\n{final_prompt}")
-
-        content = await TemplateRenderService._call_ai_renderer(
-            final_prompt, template_id=template_id, field_key=field_key
+        
+        # 调用 TemplateRenderChain
+        chain = create_template_render_chain()
+        content, citation_indices = await chain.render(
+            generation_mode=generation_mode,
+            title=title,
+            content_template=draft if generation_mode == 3 else None,
+            sources=sources,
+            prompt=prompt,
+            variable_map=variable_map,
+            core_info_background=core_info_background,
+            literature_context=literature_context,
+            draft=draft,
+            template_id=template_id,
+            field_key=field_key,
         )
-        print(f"-> AI 生成的内容结果:\n{content}\n========================================================\n")
-
-        # 保存引用记录（异步，不阻塞主流程）
-        if literature_citations and content and field_key:
-            try:
-                import asyncio
-                from core.utils import log_task_exception
-                # source_id 暂时无法在此层获取，由调用方负责保存引用
-                # 此处仅把 citations 附加到返回值的方式传递给调用方
-                # 通过在 content 末尾附加隐藏标记传递（调用方解析后清除）
-                pass
-            except Exception:
-                pass
-
+        
+        logger.info(
+            f"[模板渲染] 完成 title={title} "
+            f"content_length={len(content)} citations={len(citation_indices)}"
+        )
+        
         return content
 
     @staticmethod
@@ -214,84 +210,72 @@ class TemplateRenderService:
         generated_summary_map: Dict[str, str] = None,
         source_data_map: Dict[str, str] = None,
         draft: str = None,
-    ) -> tuple[str, list]:
+        generation_mode: int = 1,
+    ) -> Tuple[str, list]:
         """
-        与 render_ai_content 相同，但额外返回文献引用列表。
-        Returns: (content, citations)
-        citations 格式同 LiteratureRagService.retrieve_and_format 的返回值
+        渲染 AI 内容并返回文献引用列表（已迁移到 LangChain）
+        
+        Returns:
+            (content, citations)
         """
-        # 复用 render_ai_content 的逻辑，但需要拿到 citations
-        # 通过直接调用内部逻辑实现，避免重复代码
-        if not prompt and not draft:
-            return "", []
-
+        logger.info(
+            f"[模板渲染+引用] 开始 title={title} mode={generation_mode} "
+            f"template_id={template_id} field_key={field_key}"
+        )
+        
+        # 构建变量映射
         if source_data_map is not None:
             variable_map = source_data_map
         else:
             variable_map = await TemplateRenderService.build_sources_data_map(
-                db=db, document=document, sources=sources or [],
+                db=db,
+                document=document,
+                sources=sources or [],
                 generated_summary_map=generated_summary_map,
             )
-
-        sources_text = ""
-        if sources:
-            sources_text = "\n\n请严格结合以下参考数据进行总结和生成：\n"
-            has_data = False
-            for source in sources:
-                match_keys = source.get("match_keys") or []
-                for mk in match_keys:
-                    mk_value = mk.get("value") if isinstance(mk, dict) else None
-                    mk_label = (mk.get("label") if isinstance(mk, dict) else None) or mk_value
-                    if not mk_value:
-                        continue
-                    value = variable_map.get(mk_value)
-                    if value and str(value).strip():
-                        sources_text += f"【{mk_label}】:\n{value}\n\n"
-                        has_data = True
-            if not has_data:
-                sources_text = ""
-
-        base_prompt = TemplateRenderService.render_template_variables(prompt or "", variable_map)
-        title_context = f"当前需要生成的摘要/内容模块名称为：【{title}】\n"
-        draft_context = ""
-        if draft and draft.strip():
-            draft_context = f"\n\n【当前草稿内容】\n{draft.strip()}\n请在以上草稿基础上进行修改完善，使其更专业、更符合临床研究规范。\n"
-
+        
+        # 获取核心信息背景
         core_info_background = ""
         try:
-            structured_text = await AIContextBuilder.get_core_info_structured_text(db, document.document_id)
+            structured_text = await AIContextBuilder.get_core_info_structured_text(
+                db, document.document_id
+            )
             if structured_text:
-                core_info_background = f"\n\n【文档核心信息背景】\n{structured_text}\n"
-        except Exception:
-            pass
-
+                core_info_background = f"【文档核心信息背景】\n{structured_text}"
+        except Exception as e:
+            logger.warning(f"获取核心信息背景失败: {e}")
+        
+        # 文献 RAG 注入
         literature_context, literature_citations = await AIContextBuilder.inject_literature_context(
             db=db,
             document=document,
-            query=f"{title} {base_prompt}",
+            query=f"{title} {prompt}",
             paragraph_id=None,
             top_k=5,
         )
-
-        final_prompt = f"{title_context}{base_prompt}{draft_context}{core_info_background}{sources_text}"
-        if literature_context:
-            final_prompt = f"{final_prompt}\n\n{literature_context}"
-
-        content = await TemplateRenderService._call_ai_renderer(
-            final_prompt, template_id=template_id, field_key=field_key
-        )
-        return content, literature_citations
-
-    @staticmethod
-    async def _call_ai_renderer(prompt: str, template_id: str = None, field_key: str = None) -> str:
-        result = await call_qwen_once(
-            SYSTEM_PROMPT_TEMPLATE_RENDER,
-            [],
-            prompt,
+        
+        # 调用 TemplateRenderChain
+        chain = create_template_render_chain()
+        content, citation_indices = await chain.render(
+            generation_mode=generation_mode,
+            title=title,
+            content_template=draft if generation_mode == 3 else None,
+            sources=sources,
+            prompt=prompt,
+            variable_map=variable_map,
+            core_info_background=core_info_background,
+            literature_context=literature_context,
+            draft=draft,
             template_id=template_id,
             field_key=field_key,
         )
-        return result["content"]
+        
+        logger.info(
+            f"[模板渲染+引用] 完成 title={title} "
+            f"content_length={len(content)} citations={len(literature_citations)}"
+        )
+        
+        return content, literature_citations
 
     # ------------------------------------------------------------------
     # 私有数据查询辅助
