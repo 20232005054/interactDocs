@@ -97,16 +97,58 @@ inclusion: manual
 
 ---
 
-### 🔄 阶段 2：链开发（2 周）- 进行中
+### ✅ 阶段 2：链开发（2 周）- 已完成
 
-**目标：** 开发核心业务链
+**完成时间：** 2026-05-08
+
+**完成内容：**
+1. ✅ 实现 `LiteratureRAGChain`
+   - 两级检索策略（段落级 + 模板级）
+   - 向量相似度搜索
+   - 上下文格式化
+   - LLM 重排序支持
+
+2. ✅ 实现 `ParagraphGenerationChain`
+   - 基于文档上下文生成段落
+   - 支持流式/非流式生成
+   - 自动提取文献引用
+   - 支持用户修改意见
+
+3. ✅ 实现 `SummaryGenerationChain`
+   - 基于文档上下文生成摘要
+   - 支持文献引用
+   - 格式化核心信息
+
+4. ✅ 实现 `QualityEvaluationChain`
+   - 多维度评估（完整性/准确性/风格/引用）
+   - 自动提取问题和建议
+   - 支持流式评估
+   - 结构化评估结果
+
+5. ✅ 实现 `ContentRefinementChain`
+   - 基于评估结果优化内容
+   - 支持用户反馈
+   - 支持流式优化
+   - 迭代优化（直到达到目标分数）
+
+6. ✅ 单元测试
+   - `test_chains.py` - 链测试
+   - 测试覆盖：RAG, Generation, Evaluation, Refinement
+
+**Git Commit：** feat(langchain): 完成阶段2 - 链开发
+
+---
+
+### 🔄 阶段 3：工具系统开发（1 周）- 进行中
+
+**目标：** 开发完整的工具集
 
 **任务清单：**
-- [ ] 实现 `LiteratureRAGChain`（混合检索 + 重排序）
-- [ ] 实现 `ParagraphGenerationChain`（段落生成）
-- [ ] 实现 `QualityEvaluationChain`（质量评估）
-- [ ] 实现 `ContentRefinementChain`（内容优化）
-- [ ] 端到端测试
+- [ ] 只读工具（get_core_info, get_summaries, get_chapter_content）
+- [ ] 查询工具（search_literature, validate_entity, get_dependency_graph）
+- [ ] 写入工具（suggest_create_paragraph, suggest_edit_content, suggest_create_chapter）
+- [ ] 工具调用追踪
+- [ ] 工具测试
 
 ---
 
