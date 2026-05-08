@@ -125,32 +125,45 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
   useEffect(() => {
     if (activeHandle === null) return
 
+    let rafId: number | null = null
+
     const handlePointerMove = (event: PointerEvent) => {
       const resizeState = resizeStateRef.current
       const container = panelContainerRef.current
       if (!resizeState || !container) return
 
-      const contentWidth = container.getBoundingClientRect().width - HANDLE_WIDTH_PX * 2
-      if (contentWidth <= 0) return
+      // 使用 RAF 优化渲染性能
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId)
+      }
 
-      const deltaRatio = ((event.clientX - resizeState.startX) / contentWidth) * 100
-      const next = [...resizeState.startWidths] as [number, number, number]
-      const leftIndex = resizeState.handleIndex
-      const rightIndex = resizeState.handleIndex + 1
-      const pairTotal = resizeState.startWidths[leftIndex] + resizeState.startWidths[rightIndex]
+      rafId = requestAnimationFrame(() => {
+        const contentWidth = container.getBoundingClientRect().width - HANDLE_WIDTH_PX * 2
+        if (contentWidth <= 0) return
 
-      const nextLeft = clamp(
-        resizeState.startWidths[leftIndex] + deltaRatio,
-        PANEL_MIN_RATIOS[leftIndex],
-        pairTotal - PANEL_MIN_RATIOS[rightIndex]
-      )
+        const deltaRatio = ((event.clientX - resizeState.startX) / contentWidth) * 100
+        const next = [...resizeState.startWidths] as [number, number, number]
+        const leftIndex = resizeState.handleIndex
+        const rightIndex = resizeState.handleIndex + 1
+        const pairTotal = resizeState.startWidths[leftIndex] + resizeState.startWidths[rightIndex]
 
-      next[leftIndex] = nextLeft
-      next[rightIndex] = pairTotal - nextLeft
-      setPanelWidths(next)
+        const nextLeft = clamp(
+          resizeState.startWidths[leftIndex] + deltaRatio,
+          PANEL_MIN_RATIOS[leftIndex],
+          pairTotal - PANEL_MIN_RATIOS[rightIndex]
+        )
+
+        next[leftIndex] = nextLeft
+        next[rightIndex] = pairTotal - nextLeft
+        setPanelWidths(next)
+      })
     }
 
     const handlePointerUp = () => {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId)
+        rafId = null
+      }
       setActiveHandle(null)
       resizeStateRef.current = null
     }
@@ -158,10 +171,13 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
     document.body.style.cursor = "col-resize"
     document.body.style.userSelect = "none"
 
-    window.addEventListener("pointermove", handlePointerMove)
+    window.addEventListener("pointermove", handlePointerMove, { passive: true })
     window.addEventListener("pointerup", handlePointerUp)
 
     return () => {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId)
+      }
       document.body.style.cursor = ""
       document.body.style.userSelect = ""
       window.removeEventListener("pointermove", handlePointerMove)
@@ -557,8 +573,10 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
                   {/* CSS 变量：使用 flex-grow 实现可调整宽度的面板布局，通过 CSS 变量传递动态计算的比例值 */}
                   <div
                     className={cn(
-                      "min-w-0 xl:h-full xl:basis-0 xl:shrink-0 transition-all",
-                      isCollapsed ? "xl:w-12" : "xl:[flex-grow:var(--panel-grow)]"
+                      "min-w-0 shrink-0",
+                      isCollapsed 
+                        ? "w-16 xl:w-16" // 所有屏幕都是 64px
+                        : "flex-1 xl:basis-0 xl:[flex-grow:var(--panel-grow)]"
                     )}
                     style={isCollapsed ? {} : { ["--panel-grow" as string]: panelWidths[index] }}
                   >
@@ -660,18 +678,20 @@ function BoardShell({
 
   if (collapsed) {
     return (
-      <section className={cn("flex h-full min-h-0 flex-col overflow-hidden rounded-xl border-2 shadow-md", borderColor, bgColor, className)}>
+      <section className={cn(
+        "flex h-full min-h-0 flex-col overflow-visible rounded-xl border-2 shadow-md bg-white",
+        borderColor,
+        className
+      )}>
         <button
           onClick={onToggleCollapse}
-          className="h-full flex items-center justify-center hover:bg-white/50 transition-colors group"
+          className="h-full w-full flex flex-col items-center justify-center hover:bg-gray-50 transition-all group cursor-pointer py-8"
           title={`展开${title}`}
         >
+          <span className={cn("h-5 w-5 rounded-full shadow-lg mb-4", accentColor)} />
           <div className="flex flex-col items-center gap-2">
-            <span className={cn("h-3 w-3 rounded-full shadow-sm", accentColor)} />
-            <div className="writing-mode-vertical text-sm font-bold text-gray-700 group-hover:text-gray-900">
-              {title}
-            </div>
-            <span className="text-gray-400 group-hover:text-gray-600 text-lg">→</span>
+            <span className="text-3xl text-gray-500 group-hover:text-gray-800 transition-colors font-bold">»</span>
+            <span className="text-xs text-gray-400 group-hover:text-gray-600 transition-colors">展开</span>
           </div>
         </button>
       </section>
