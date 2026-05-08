@@ -1,7 +1,7 @@
 """
-文献 RAG 检索服务 v2
+文献 RAG 检索服务
 
-使用 LangChain 框架重新实现，提供与原服务相同的接口
+使用 LangChain 框架实现文献检索和引用功能
 """
 
 import logging
@@ -17,9 +17,9 @@ from services.langchain.chains.rag_chain import create_literature_rag_chain
 logger = logging.getLogger(__name__)
 
 
-class LiteratureRagServiceV2:
+class LiteratureRagService:
     """
-    文献 RAG 检索服务 v2
+    文献 RAG 检索服务
     
     使用 LangChain 框架实现：
     - LiteratureVectorStore 向量检索

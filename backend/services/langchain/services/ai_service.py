@@ -1,7 +1,7 @@
 """
-AI 辅助编辑服务 v2
+AI 辅助编辑服务
 
-使用 LangChain 框架重新实现，提供与原服务相同的接口
+使用 LangChain 框架实现，提供段落生成、评估、摘要生成等功能
 """
 
 import logging
@@ -18,9 +18,9 @@ from services.langchain.chains.evaluation_chain import create_quality_evaluation
 logger = logging.getLogger(__name__)
 
 
-class AIServiceV2:
+class AIService:
     """
-    AI 辅助编辑服务 v2
+    AI 辅助编辑服务
     
     使用 LangChain 框架实现：
     - ParagraphGenerationChain 生成段落

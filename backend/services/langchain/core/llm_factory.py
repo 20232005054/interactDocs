@@ -18,15 +18,16 @@ from langchain_core.language_models.llms import LLM
 from langchain_core.callbacks.manager import CallbackManagerForLLMRun, AsyncCallbackManagerForLLMRun
 from langchain_core.outputs import GenerationChunk
 
-from core.config import AI_MODEL, AI_TIMEOUT_SECONDS, AI_MAX_RETRIES, AI_RETRY_BACKOFF_SECONDS, AI_MAX_CONCURRENCY
-from core.langchain_config import langchain_config
+from core.config import (
+    AI_MODEL, AI_TIMEOUT_SECONDS, AI_MAX_RETRIES, AI_RETRY_BACKOFF_SECONDS, AI_MAX_CONCURRENCY,
+    LLM_TEMPERATURE, LLM_MAX_TOKENS
+)
 from services.ai_client import AIClientError, _classify_exception, _ERROR_HINTS
 
 logger = logging.getLogger(__name__)
 
 # 全局并发控制
 _LLM_SEMAPHORE = asyncio.Semaphore(AI_MAX_CONCURRENCY)
-
 
 class QwenLLM(LLM):
     """
@@ -36,8 +37,8 @@ class QwenLLM(LLM):
     """
     
     model_name: str = AI_MODEL
-    temperature: float = langchain_config.llm_temperature
-    max_tokens: int = langchain_config.llm_max_tokens
+    temperature: float = LLM_TEMPERATURE
+    max_tokens: int = LLM_MAX_TOKENS
     timeout: int = AI_TIMEOUT_SECONDS
     max_retries: int = AI_MAX_RETRIES
     
@@ -261,13 +262,13 @@ def get_qwen_llm(
     Returns:
         QwenLLM 实例
     """
-    cache_key = f"{model_name or AI_MODEL}_{temperature or langchain_config.llm_temperature}_{max_tokens or langchain_config.llm_max_tokens}"
+    cache_key = f"{model_name or AI_MODEL}_{temperature or LLM_TEMPERATURE}_{max_tokens or LLM_MAX_TOKENS}"
     
     if cache_key not in _llm_cache:
         _llm_cache[cache_key] = QwenLLM(
             model_name=model_name or AI_MODEL,
-            temperature=temperature or langchain_config.llm_temperature,
-            max_tokens=max_tokens or langchain_config.llm_max_tokens,
+            temperature=temperature or LLM_TEMPERATURE,
+            max_tokens=max_tokens or LLM_MAX_TOKENS,
         )
     
     return _llm_cache[cache_key]

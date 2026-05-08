@@ -82,8 +82,6 @@ def main():
                 "pytest",
                 "tests/",
                 "--cov=services/langchain",
-                "--cov=services/service_router",
-                "--cov=core/performance_monitor",
                 "--cov-report=html",
                 "--cov-report=term",
                 "--cov-report=json",

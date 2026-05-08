@@ -1,5 +1,5 @@
 """
-服务层 v2 测试
+服务层测试
 
 测试 LangChain 框架实现的服务层
 """
@@ -8,15 +8,15 @@ import pytest
 from uuid import uuid4
 
 from services.langchain.services import (
-    AIServiceV2,
-    AIChatServiceV2,
-    LiteratureRagServiceV2,
-    TemplateApplyServiceV2,
+    AIService,
+    AIChatService,
+    LiteratureRagService,
+    TemplateApplyService,
 )
 
 
-class TestAIServiceV2:
-    """测试 AI 辅助编辑服务 v2"""
+class TestAIService:
+    """测试 AI 辅助编辑服务"""
     
     @pytest.mark.asyncio
     async def test_ai_assist_paragraph_interface(self):
@@ -24,8 +24,8 @@ class TestAIServiceV2:
         paragraph_id = uuid4()
         
         # 测试接口存在
-        assert hasattr(AIServiceV2, "ai_assist_paragraph")
-        assert callable(AIServiceV2.ai_assist_paragraph)
+        assert hasattr(AIService, "ai_assist_paragraph")
+        assert callable(AIService.ai_assist_paragraph)
     
     @pytest.mark.asyncio
     async def test_ai_evaluate_paragraph_interface(self):
@@ -33,8 +33,8 @@ class TestAIServiceV2:
         paragraph_id = uuid4()
         
         # 测试接口存在
-        assert hasattr(AIServiceV2, "ai_evaluate_paragraph")
-        assert callable(AIServiceV2.ai_evaluate_paragraph)
+        assert hasattr(AIService, "ai_evaluate_paragraph")
+        assert callable(AIService.ai_evaluate_paragraph)
     
     @pytest.mark.asyncio
     async def test_assist_single_summary_interface(self):
@@ -42,12 +42,12 @@ class TestAIServiceV2:
         summary_id = uuid4()
         
         # 测试接口存在
-        assert hasattr(AIServiceV2, "assist_single_summary")
-        assert callable(AIServiceV2.assist_single_summary)
+        assert hasattr(AIService, "assist_single_summary")
+        assert callable(AIService.assist_single_summary)
 
 
-class TestAIChatServiceV2:
-    """测试 AI 对话服务 v2"""
+class TestAIChatService:
+    """测试 AI 对话服务"""
     
     @pytest.mark.asyncio
     async def test_chat_stream_interface(self):
@@ -55,8 +55,8 @@ class TestAIChatServiceV2:
         document_id = uuid4()
         
         # 测试接口存在
-        assert hasattr(AIChatServiceV2, "chat_stream")
-        assert callable(AIChatServiceV2.chat_stream)
+        assert hasattr(AIChatService, "chat_stream")
+        assert callable(AIChatService.chat_stream)
     
     @pytest.mark.asyncio
     async def test_chat_interface(self):
@@ -64,12 +64,12 @@ class TestAIChatServiceV2:
         document_id = uuid4()
         
         # 测试接口存在
-        assert hasattr(AIChatServiceV2, "chat")
-        assert callable(AIChatServiceV2.chat)
+        assert hasattr(AIChatService, "chat")
+        assert callable(AIChatService.chat)
 
 
-class TestLiteratureRagServiceV2:
-    """测试文献 RAG 检索服务 v2"""
+class TestLiteratureRagService:
+    """测试文献 RAG 检索服务"""
     
     @pytest.mark.asyncio
     async def test_retrieve_and_format_interface(self):
@@ -78,8 +78,8 @@ class TestLiteratureRagServiceV2:
         user_id = uuid4()
         
         # 测试接口存在
-        assert hasattr(LiteratureRagServiceV2, "retrieve_and_format")
-        assert callable(LiteratureRagServiceV2.retrieve_and_format)
+        assert hasattr(LiteratureRagService, "retrieve_and_format")
+        assert callable(LiteratureRagService.retrieve_and_format)
     
     @pytest.mark.asyncio
     async def test_retrieve_and_format_for_paragraph_interface(self):
@@ -89,8 +89,8 @@ class TestLiteratureRagServiceV2:
         user_id = uuid4()
         
         # 测试接口存在
-        assert hasattr(LiteratureRagServiceV2, "retrieve_and_format_for_paragraph")
-        assert callable(LiteratureRagServiceV2.retrieve_and_format_for_paragraph)
+        assert hasattr(LiteratureRagService, "retrieve_and_format_for_paragraph")
+        assert callable(LiteratureRagService.retrieve_and_format_for_paragraph)
     
     @pytest.mark.asyncio
     async def test_inject_into_prompt(self):
@@ -98,7 +98,7 @@ class TestLiteratureRagServiceV2:
         base_prompt = "这是基础 prompt"
         context_str = "这是文献上下文"
         
-        result = LiteratureRagServiceV2.inject_into_prompt(base_prompt, context_str)
+        result = LiteratureRagService.inject_into_prompt(base_prompt, context_str)
         
         assert base_prompt in result
         assert context_str in result
@@ -114,7 +114,7 @@ class TestLiteratureRagServiceV2:
             "doi": "10.1234/test",
         }
         
-        result = LiteratureRagServiceV2.format_vancouver_reference(citation, 1)
+        result = LiteratureRagService.format_vancouver_reference(citation, 1)
         
         assert "[1]" in result
         assert "张三, 李四" in result
@@ -123,8 +123,8 @@ class TestLiteratureRagServiceV2:
         assert "10.1234/test" in result
 
 
-class TestTemplateApplyServiceV2:
-    """测试模板应用服务 v2"""
+class TestTemplateApplyService:
+    """测试模板应用服务"""
     
     @pytest.mark.asyncio
     async def test_apply_core_info_template_interface(self):
@@ -132,8 +132,8 @@ class TestTemplateApplyServiceV2:
         document_id = uuid4()
         
         # 测试接口存在
-        assert hasattr(TemplateApplyServiceV2, "apply_core_info_template")
-        assert callable(TemplateApplyServiceV2.apply_core_info_template)
+        assert hasattr(TemplateApplyService, "apply_core_info_template")
+        assert callable(TemplateApplyService.apply_core_info_template)
     
     @pytest.mark.asyncio
     async def test_apply_core_info_template_as_tree_interface(self):
@@ -141,8 +141,8 @@ class TestTemplateApplyServiceV2:
         document_id = uuid4()
         
         # 测试接口存在
-        assert hasattr(TemplateApplyServiceV2, "apply_core_info_template_as_tree")
-        assert callable(TemplateApplyServiceV2.apply_core_info_template_as_tree)
+        assert hasattr(TemplateApplyService, "apply_core_info_template_as_tree")
+        assert callable(TemplateApplyService.apply_core_info_template_as_tree)
     
     @pytest.mark.asyncio
     async def test_apply_summary_template_interface(self):
@@ -150,8 +150,8 @@ class TestTemplateApplyServiceV2:
         document_id = uuid4()
         
         # 测试接口存在
-        assert hasattr(TemplateApplyServiceV2, "apply_summary_template")
-        assert callable(TemplateApplyServiceV2.apply_summary_template)
+        assert hasattr(TemplateApplyService, "apply_summary_template")
+        assert callable(TemplateApplyService.apply_summary_template)
     
     @pytest.mark.asyncio
     async def test_apply_structure_template_interface(self):
@@ -159,8 +159,8 @@ class TestTemplateApplyServiceV2:
         document_id = uuid4()
         
         # 测试接口存在
-        assert hasattr(TemplateApplyServiceV2, "apply_structure_template")
-        assert callable(TemplateApplyServiceV2.apply_structure_template)
+        assert hasattr(TemplateApplyService, "apply_structure_template")
+        assert callable(TemplateApplyService.apply_structure_template)
 
 
 class TestServiceIntegration:
@@ -170,33 +170,33 @@ class TestServiceIntegration:
     async def test_all_services_exist(self):
         """测试所有服务都存在"""
         # 验证服务类存在
-        assert AIServiceV2 is not None
-        assert AIChatServiceV2 is not None
-        assert LiteratureRagServiceV2 is not None
-        assert TemplateApplyServiceV2 is not None
+        assert AIService is not None
+        assert AIChatService is not None
+        assert LiteratureRagService is not None
+        assert TemplateApplyService is not None
     
     @pytest.mark.asyncio
     async def test_service_interfaces_compatible(self):
         """测试服务接口兼容性"""
-        # AIServiceV2 接口
-        assert hasattr(AIServiceV2, "ai_assist_paragraph")
-        assert hasattr(AIServiceV2, "ai_evaluate_paragraph")
-        assert hasattr(AIServiceV2, "assist_single_summary")
+        # AIService 接口
+        assert hasattr(AIService, "ai_assist_paragraph")
+        assert hasattr(AIService, "ai_evaluate_paragraph")
+        assert hasattr(AIService, "assist_single_summary")
         
-        # AIChatServiceV2 接口
-        assert hasattr(AIChatServiceV2, "chat_stream")
-        assert hasattr(AIChatServiceV2, "chat")
+        # AIChatService 接口
+        assert hasattr(AIChatService, "chat_stream")
+        assert hasattr(AIChatService, "chat")
         
-        # LiteratureRagServiceV2 接口
-        assert hasattr(LiteratureRagServiceV2, "retrieve_and_format")
-        assert hasattr(LiteratureRagServiceV2, "retrieve_and_format_for_paragraph")
-        assert hasattr(LiteratureRagServiceV2, "inject_into_prompt")
-        assert hasattr(LiteratureRagServiceV2, "save_citations")
-        assert hasattr(LiteratureRagServiceV2, "get_document_reference_list")
-        assert hasattr(LiteratureRagServiceV2, "format_vancouver_reference")
+        # LiteratureRagService 接口
+        assert hasattr(LiteratureRagService, "retrieve_and_format")
+        assert hasattr(LiteratureRagService, "retrieve_and_format_for_paragraph")
+        assert hasattr(LiteratureRagService, "inject_into_prompt")
+        assert hasattr(LiteratureRagService, "save_citations")
+        assert hasattr(LiteratureRagService, "get_document_reference_list")
+        assert hasattr(LiteratureRagService, "format_vancouver_reference")
         
-        # TemplateApplyServiceV2 接口
-        assert hasattr(TemplateApplyServiceV2, "apply_core_info_template")
-        assert hasattr(TemplateApplyServiceV2, "apply_core_info_template_as_tree")
-        assert hasattr(TemplateApplyServiceV2, "apply_summary_template")
-        assert hasattr(TemplateApplyServiceV2, "apply_structure_template")
+        # TemplateApplyService 接口
+        assert hasattr(TemplateApplyService, "apply_core_info_template")
+        assert hasattr(TemplateApplyService, "apply_core_info_template_as_tree")
+        assert hasattr(TemplateApplyService, "apply_summary_template")
+        assert hasattr(TemplateApplyService, "apply_structure_template")

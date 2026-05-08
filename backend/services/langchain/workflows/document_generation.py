@@ -125,7 +125,7 @@ class DocumentGenerationWorkflow:
     
     async def _apply_core_info_template(self):
         """应用核心信息模板"""
-        from services.template_apply_service import TemplateApplyService
+        from services.langchain.services.template_apply_service import TemplateApplyService
         
         async with SessionAdapter.save_session() as db:
             tree, count = await TemplateApplyService.apply_core_info_template_as_tree(
@@ -136,7 +136,7 @@ class DocumentGenerationWorkflow:
     
     async def _apply_summary_template(self):
         """应用摘要模板"""
-        from services.template_apply_service import TemplateApplyService
+        from services.langchain.services.template_apply_service import TemplateApplyService
         
         async with SessionAdapter.save_session() as db:
             items = await TemplateApplyService.apply_summary_template(
@@ -147,7 +147,7 @@ class DocumentGenerationWorkflow:
     
     async def _apply_structure_template(self):
         """应用章节结构模板"""
-        from services.template_apply_service import TemplateApplyService
+        from services.langchain.services.template_apply_service import TemplateApplyService
         
         async with SessionAdapter.save_session() as db:
             items = await TemplateApplyService.apply_structure_template(

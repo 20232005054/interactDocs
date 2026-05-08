@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
 from schemas.document_schemas import AIChatRequest
-from services.ai_chat_service import AIChatService
+from services.langchain.services.ai_chat_service import AIChatService
 
 router = APIRouter(prefix="/api/v1/ai")
 

@@ -1,7 +1,7 @@
 """
-模板应用服务 v2
+模板应用服务
 
-使用 LangChain 框架重新实现，提供与原服务相同的接口
+使用 LangChain 框架实现模板应用功能
 """
 
 import logging
@@ -15,13 +15,13 @@ from services.langchain.workflows.document_generation import create_document_gen
 logger = logging.getLogger(__name__)
 
 
-class TemplateApplyServiceV2:
+class TemplateApplyService:
     """
-    模板应用服务 v2
+    模板应用服务
     
     使用 LangChain 框架实现：
     - DocumentGenerationWorkflow 文档生成工作流
-    - 集成现有 TemplateApplyService 的逻辑
+    - 支持核心信息、摘要、结构模板应用
     """
     
     @staticmethod
@@ -85,7 +85,7 @@ class TemplateApplyServiceV2:
         """
         try:
             # 应用模板
-            items = await TemplateApplyServiceV2.apply_core_info_template(db, document_id)
+            items = await TemplateApplyService.apply_core_info_template(db, document_id)
             
             # 构建树形结构（复用原逻辑）
             from schemas.response_schemas import ApplyCoreInfoItem

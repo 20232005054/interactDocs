@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from db.models import ChatRecord
-from core.langchain_config import langchain_config
+from core.config import MEMORY_TYPE, MEMORY_MAX_TOKEN_LIMIT, MEMORY_BUFFER_WINDOW
 from services.langchain.core.llm_factory import get_qwen_llm
 
 logger = logging.getLogger(__name__)
@@ -194,7 +194,7 @@ def create_memory_manager(
     """
     return MemoryManager(
         document_id=document_id,
-        memory_type=memory_type or langchain_config.memory_type,
-        max_token_limit=langchain_config.memory_max_token_limit,
-        buffer_window=langchain_config.memory_buffer_window,
+        memory_type=memory_type or MEMORY_TYPE,
+        max_token_limit=MEMORY_MAX_TOKEN_LIMIT,
+        buffer_window=MEMORY_BUFFER_WINDOW,
     )

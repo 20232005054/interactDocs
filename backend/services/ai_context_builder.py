@@ -241,7 +241,7 @@ class AIContextBuilder:
             return "", []
         
         try:
-            from services.literature_rag_service import LiteratureRagService
+            from services.langchain.services.literature_rag_service import LiteratureRagService
             
             # 段落级检索（两级策略）
             if paragraph_id:
@@ -311,7 +311,7 @@ class AIContextBuilder:
             return
         
         try:
-            from services.literature_rag_service import LiteratureRagService
+            from services.langchain.services.literature_rag_service import LiteratureRagService
             
             await LiteratureRagService.save_citations(
                 db=db,

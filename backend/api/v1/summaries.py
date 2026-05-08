@@ -9,7 +9,7 @@ from uuid import UUID
 from db.session import get_db
 from pydantic import BaseModel, Field
 from typing import Optional, List
-from services import ai_service
+from services.langchain.services import ai_service
 from core.auth import get_current_user
 
 router = APIRouter(prefix="/api/v1", tags=["摘要管理"])
@@ -88,16 +88,19 @@ async def ai_generate_summaries(document_id: UUID, db: AsyncSession = Depends(ge
     summaries = await SummaryService.get_summaries_by_document_id(db, document_id)
     if not summaries:
         raise HTTPException(status_code=404, detail="文档不存在或无摘要")
+    
+    service = ai_service.AIService()
     results = []
     for s in summaries:
-        content = await ai_service.assist_single_summary(db, s.summary_id)
+        content = await service.assist_single_summary(db, s.summary_id)
         results.append(SummaryAIGenerateItem(summary_id=s.summary_id, ai_generate=content))
     return success_response(data=SummaryAIGenerateResponse(summaries=results))
 
 
 @router.post("/summaries/{summary_id}/ai/assist", summary="AI 帮填摘要", response_model=ResponseModel[SummaryAIAssistResponse])
 async def ai_assist_summary(summary_id: UUID, db: AsyncSession = Depends(get_db)):
-    content = await ai_service.assist_single_summary(db, summary_id)
+    service = ai_service.AIService()
+    content = await service.assist_single_summary(db, summary_id)
     if content is None:
         raise HTTPException(status_code=404, detail="摘要不存在")
     return success_response(data=SummaryAIAssistResponse(summary_id=summary_id, ai_generate=content))

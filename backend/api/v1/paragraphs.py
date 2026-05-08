@@ -9,7 +9,7 @@ from core.response import success_response, ResponseModel
 from core.auth import get_current_user
 from db.session import get_db
 from services.paragraph_service import ParagraphService
-from services import ai_service
+from services.langchain.services import ai_service
 from schemas.document_schemas import ParagraphCreate, ParagraphUpdate, AIAssistRequest
 from schemas.response_schemas import ParagraphResponse, ParagraphListResponse, ParagraphRelatedSummariesResponse, RelatedSummaryItem
 
@@ -94,8 +94,9 @@ async def ai_assist_paragraph(paragraph_id: UUID, assist_request: AIAssistReques
     instruction = assist_request.instruction if assist_request.instruction else None
     print(f"[AI帮填] paragraph_id={paragraph_id}, instruction={instruction!r}")
     
+    service = ai_service.AIService()
     return StreamingResponse(
-        ai_service.ai_assist_paragraph(paragraph_id, assist_request, instruction=instruction),
+        service.ai_assist_paragraph(paragraph_id, instruction=instruction),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
     )
@@ -103,10 +104,10 @@ async def ai_assist_paragraph(paragraph_id: UUID, assist_request: AIAssistReques
 
 @router.post("/paragraphs/{paragraph_id}/ai/evaluate", summary="AI 评估段落内容")
 async def ai_evaluate_paragraph(paragraph_id: UUID, db: AsyncSession = Depends(get_db)):
-    evaluate_and_save_func = ai_service.ai_evaluate_paragraph(paragraph_id)
-
+    service = ai_service.AIService()
+    
     async def generate_evaluation():
-        async for chunk in evaluate_and_save_func():
+        async for chunk in service.ai_evaluate_paragraph(paragraph_id):
             yield chunk
 
     return StreamingResponse(

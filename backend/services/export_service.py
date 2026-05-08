@@ -59,7 +59,7 @@ def extract_image_urls_from_md(content: str) -> list[str]:
 async def _build_references(db: AsyncSession, document_id: UUID) -> list[dict]:
     """获取文档参考文献列表，格式化为温哥华引文"""
     try:
-        from services.literature_rag_service import LiteratureRagService
+        from services.langchain.services.literature_rag_service import LiteratureRagService
         citations = await LiteratureRagService.get_document_reference_list(db, document_id)
         return [
             {

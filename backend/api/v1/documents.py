@@ -1,5 +1,5 @@
 from services.document_service import DocumentService
-from services.template_apply_service import TemplateApplyService
+from services.langchain.services.template_apply_service import TemplateApplyService
 from services.document_snapshot_service import DocumentSnapshotService
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession

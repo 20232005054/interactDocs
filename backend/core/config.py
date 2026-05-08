@@ -54,3 +54,19 @@ AI_TIMEOUT_SECONDS: float = float(os.getenv("AI_TIMEOUT_SECONDS", "30.0"))
 AI_MAX_RETRIES: int = max(int(os.getenv("AI_MAX_RETRIES", "2")), 0)
 AI_RETRY_BACKOFF_SECONDS: float = max(float(os.getenv("AI_RETRY_BACKOFF_SECONDS", "0.8")), 0.0)
 AI_MAX_CONCURRENCY: int = max(int(os.getenv("AI_MAX_CONCURRENCY", "5")), 1)
+
+# ============================================================
+# LangChain 配置
+# ============================================================
+# LLM 配置
+LLM_TEMPERATURE: float = float(os.getenv("LLM_TEMPERATURE", "0.7"))
+LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "2000"))
+
+# 检索配置
+RETRIEVAL_TOP_K: int = int(os.getenv("RETRIEVAL_TOP_K", "5"))
+RETRIEVAL_FETCH_K: int = int(os.getenv("RETRIEVAL_FETCH_K", "20"))
+
+# 记忆配置
+MEMORY_TYPE: str = os.getenv("MEMORY_TYPE", "buffer_window")  # buffer_window, summary_buffer
+MEMORY_MAX_TOKEN_LIMIT: int = int(os.getenv("MEMORY_MAX_TOKEN_LIMIT", "2000"))
+MEMORY_BUFFER_WINDOW: int = int(os.getenv("MEMORY_BUFFER_WINDOW", "5"))

@@ -1,7 +1,7 @@
 """
-AI 对话服务 v2
+AI 对话服务
 
-使用 LangChain 框架重新实现，提供与原服务相同的接口
+使用 LangChain 框架实现对话功能
 """
 
 import logging
@@ -13,9 +13,9 @@ from services.langchain.agents.chat_agent import create_chat_agent
 logger = logging.getLogger(__name__)
 
 
-class AIChatServiceV2:
+class AIChatService:
     """
-    AI 对话服务 v2
+    AI 对话服务
     
     使用 LangChain 框架实现：
     - DocumentChatAgent 处理对话
