@@ -159,16 +159,56 @@ inclusion: manual
 
 ---
 
-### 🔄 阶段 3：工具系统开发（1 周）- 待开始
+### ✅ 阶段 3：工具系统开发（1 周）- 已完成
 
-**目标：** 开发完整的工具集
+**完成时间：** 2026-05-08
+
+**完成内容：**
+1. ✅ 只读工具（document_tools.py）
+   - `GetCoreInfoTool` - 获取核心信息（树形结构）
+   - `GetSummariesTool` - 获取摘要列表
+   - `GetChapterContentTool` - 获取章节内容
+
+2. ✅ 查询工具（literature_tools.py）
+   - `SearchLiteratureTool` - 搜索文献（临时 Session）
+   - `ValidateEntityTool` - 验证实体存在性
+   - `GetDependencyGraphTool` - 获取依赖图谱
+
+3. ✅ 建议工具（suggestion_tools.py）
+   - `SuggestCreateParagraphTool` - 建议创建段落
+   - `SuggestEditContentTool` - 建议修改内容
+   - `SuggestCreateChapterTool` - 建议创建章节
+   - `SuggestInsertTextTool` - 建议插入文本
+
+4. ✅ 工具调用追踪（tool_tracker.py）
+   - `ToolCallTracker` - 追踪器类
+   - `ToolCallRecord` - 调用记录
+   - 统计信息（总调用数/成功率/平均时间）
+
+5. ✅ 工具集合（__init__.py）
+   - `create_all_tools()` - 创建所有工具
+   - `create_readonly_only_tools()` - 只读模式
+   - `create_query_only_tools()` - 查询模式
+
+6. ✅ 单元测试（test_tools.py）
+   - 测试所有工具的创建和运行
+   - 测试工具追踪器
+   - 测试建议格式解析
+
+**Git Commit：** feat(langchain): 完成阶段3 - 工具系统开发
+
+---
+
+### 🔄 阶段 4：智能体开发（2 周）- 待开始
+
+**目标：** 开发智能体系统
 
 **任务清单：**
-- [ ] 只读工具（get_core_info, get_summaries, get_chapter_content）
-- [ ] 查询工具（search_literature, validate_entity, get_dependency_graph）
-- [ ] 写入工具（suggest_create_paragraph, suggest_edit_content, suggest_create_chapter）
-- [ ] 工具调用追踪
-- [ ] 工具测试
+- [ ] DocumentChatAgent（对话智能体）
+- [ ] DocumentEditorAgent（编辑智能体）
+- [ ] ResearchAgent（文献研究智能体）
+- [ ] 流式输出适配
+- [ ] 智能体测试
 
 ---
 
@@ -278,6 +318,28 @@ inclusion: manual
   - 支持用户反馈
   - 支持流式优化
   - 迭代优化（直到达到目标分数）
+
+### 工具系统（阶段 3）
+- ✅ 只读工具（3 个）
+  - GetCoreInfoTool - 获取核心信息
+  - GetSummariesTool - 获取摘要
+  - GetChapterContentTool - 获取章节内容
+  
+- ✅ 查询工具（3 个）
+  - SearchLiteratureTool - 搜索文献
+  - ValidateEntityTool - 验证实体
+  - GetDependencyGraphTool - 获取依赖图谱
+  
+- ✅ 建议工具（4 个）
+  - SuggestCreateParagraphTool - 建议创建段落
+  - SuggestEditContentTool - 建议修改内容
+  - SuggestCreateChapterTool - 建议创建章节
+  - SuggestInsertTextTool - 建议插入文本
+  
+- ✅ 工具追踪器
+  - ToolCallTracker - 调用追踪
+  - ToolCallRecord - 调用记录
+  - 统计信息收集
 
 ---
 
