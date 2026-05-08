@@ -12,17 +12,17 @@ inclusion: manual
 **总时长：** 20 周  
 **总成本：** ¥500,000  
 **团队规模：** 5 人  
-**当前进度：** 7/12 阶段完成（58%）
+**当前进度：** 8/12 阶段完成（67%）
 
 ---
 
 ## 快速开始（新会话）
 
-如果你是新会话，请先了解：
+如果你是新会话,请先了解：
 
 1. **项目目标**：将现有 AI 功能迁移到 LangChain 框架
-2. **当前状态**：已完成阶段 0-7（准备、核心组件、链开发、工具系统、智能体、工作流、服务层、API切换）
-3. **下一步**：阶段 8 - 测试优化
+2. **当前状态**：已完成阶段 0-8（准备、核心组件、链开发、工具系统、智能体、工作流、服务层、API切换、测试优化）
+3. **下一步**：阶段 9 - 可观测性
 4. **重要规则**：
    - 每完成一个阶段自动 git commit
    - 不编写独立 MD 文档，写到 steering 里
@@ -30,7 +30,7 @@ inclusion: manual
 
 **继续任务的命令：**
 ```
-开始阶段8
+开始阶段9
 ```
 
 ---
@@ -395,33 +395,93 @@ inclusion: manual
 
 ---
 
-### 阶段 8-12：待开发
+### ✅ 阶段 8：测试优化（2 周）- 已完成
 
-**阶段 4：智能体开发（2 周）**
-- DocumentChatAgent（对话智能体）
-- DocumentEditorAgent（编辑智能体）
-- ResearchAgent（文献研究智能体）
+**完成时间：** 2026-05-08
 
-**阶段 5：工作流开发（2 周）**
-- ChapterCompletionWorkflow（章节完善）
-- DocumentGenerationWorkflow（文档生成）
-- ContentReviewWorkflow（内容审核）
+**完成内容：**
+1. ✅ 集成测试（test_integration.py）
+   - 服务切换测试（v1 ↔ v2）
+   - 降级方案测试（v2 失败 → v1）
+   - 端到端工作流测试
+   - 并发请求测试
+   - 错误处理测试
 
-**阶段 6：服务层迁移（2 周）**
-- ai_service_v2.py
-- ai_chat_service_v2.py
-- literature_rag_service_v2.py
-- template_apply_service_v2.py
+2. ✅ 性能测试（test_performance.py）
+   - 响应时间对比（v1 vs v2）
+   - 吞吐量对比
+   - 高并发测试（100 并发）
+   - 持续负载测试
+   - 延迟百分位（P50/P95/P99）
+   - 失败率对比
+   - 基准测试
 
-**阶段 7：API 切换（1 周）**
-- Feature Flag 动态切换
-- API 路由更新
-- 降级方案
+3. ✅ A/B 测试框架（test_ab.py）
+   - 用户分组（随机/哈希）
+   - 指标收集（响应时间/成功率/满意度）
+   - 统计分析（均值/标准差/改进百分比）
+   - 与服务路由器集成
+   - A/B 测试场景（响应时间/成功率/满意度）
 
-**阶段 8：测试优化（2 周）**
-- 单元测试（覆盖率 > 80%）
-- 性能测试
-- A/B 测试
+4. ✅ 测试工具
+   - `run_tests.py` - 测试运行脚本
+   - `pytest.ini` - Pytest 配置
+   - `TEST_REPORT.md` - 测试报告文档
+
+5. ✅ 测试覆盖率
+   - 单元测试：~60 个测试用例
+   - 集成测试：~15 个测试用例
+   - 性能测试：~10 个测试用例
+   - A/B 测试：~8 个测试用例
+   - 目标覆盖率：> 80%
+
+**测试目录结构：**
+```
+backend/tests/
+├── langchain/              # 单元测试（阶段 1-6）
+│   ├── test_core.py        # 核心组件
+│   ├── test_chains.py      # 链
+│   ├── test_tools.py       # 工具
+│   ├── test_agents.py      # 智能体
+│   ├── test_workflows.py   # 工作流
+│   └── test_services.py    # 服务层
+├── integration/            # 集成测试（阶段 8）
+│   └── test_integration.py
+├── performance/            # 性能测试（阶段 8）
+│   └── test_performance.py
+├── ab_testing/             # A/B 测试（阶段 8）
+│   └── test_ab.py
+├── test_service_router.py  # 服务路由器测试（阶段 7）
+├── run_tests.py            # 测试运行脚本
+└── TEST_REPORT.md          # 测试报告
+```
+
+**测试运行命令：**
+```bash
+# 运行所有测试
+python tests/run_tests.py all
+
+# 运行单元测试
+python tests/run_tests.py unit
+
+# 运行集成测试
+python tests/run_tests.py integration
+
+# 运行性能测试
+python tests/run_tests.py performance
+
+# 运行 A/B 测试
+python tests/run_tests.py ab
+
+# 生成覆盖率报告
+python tests/run_tests.py coverage
+```
+
+**Git Commit：** feat(langchain): 完成阶段8 - 测试优化
+
+---
+
+### 阶段 9-12：待开发
 
 **阶段 9：可观测性（1 周）**
 - LangSmith 集成
@@ -710,18 +770,18 @@ feat(langchain): 完成阶段X - [阶段名称]
 
 ## 下一步
 
-开始阶段 8：测试优化
+开始阶段 9：可观测性
 
 **任务概述：**
-1. 单元测试（覆盖率 > 80%）
-2. 集成测试
-3. 性能测试
-4. A/B 测试
-5. 测试报告
+1. LangSmith 集成
+2. 指标收集和监控
+3. 告警系统
+4. 日志聚合
+5. 性能追踪
 
-**预计时间：** 2 周
+**预计时间：** 1 周
 
 **命令：**
 ```
-开始阶段8
+开始阶段9
 ```
