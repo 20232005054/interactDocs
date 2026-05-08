@@ -51,10 +51,10 @@ function ToolbarButton({
       onMouseDown={e => { e.preventDefault(); onClick() }}
       title={title}
       className={cn(
-        "h-6 min-w-6 px-1.5 rounded text-xs font-medium transition",
+        "h-7 min-w-7 px-2 rounded-md text-xs font-medium transition-all duration-200",
         active
-          ? "bg-blue-100 text-blue-700"
-          : "text-gray-600 hover:bg-gray-100"
+          ? "bg-blue-500 text-white shadow-sm"
+          : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
       )}
     >
       {children}
@@ -156,29 +156,29 @@ const ParagraphEditor = forwardRef<ParagraphEditorHandle, ParagraphEditorProps>(
     return (
       <div
         className={cn(
-          "w-full relative",
+          "w-full relative paragraph-editor",
           isChanged && "border-l-2 border-orange-400 pl-2",
-          paraType === "heading1" && "[&_.tiptap]:text-2xl [&_.tiptap]:font-bold [&_.tiptap]:text-gray-900",
-          paraType === "heading2" && "[&_.tiptap]:text-xl [&_.tiptap]:font-semibold [&_.tiptap]:text-gray-800",
-          paraType === "heading3" && "[&_.tiptap]:text-lg [&_.tiptap]:font-medium [&_.tiptap]:text-gray-700",
-          paraType === "paragraph" && "[&_.tiptap]:text-base [&_.tiptap]:text-gray-700 [&_.tiptap]:leading-relaxed",
+          paraType === "heading1" && "[&_.tiptap]:text-3xl [&_.tiptap]:font-bold [&_.tiptap]:text-gray-900 [&_.tiptap]:leading-tight",
+          paraType === "heading2" && "[&_.tiptap]:text-2xl [&_.tiptap]:font-semibold [&_.tiptap]:text-gray-800 [&_.tiptap]:leading-tight",
+          paraType === "heading3" && "[&_.tiptap]:text-xl [&_.tiptap]:font-medium [&_.tiptap]:text-gray-700 [&_.tiptap]:leading-tight",
+          paraType === "paragraph" && "[&_.tiptap]:text-base [&_.tiptap]:text-gray-700 [&_.tiptap]:leading-8 [&_.tiptap]:tracking-wide",
         )}
       >
         {editor && !editor.state.selection.empty && (
-          <div className="absolute -top-8 left-0 z-50 flex items-center gap-0.5 rounded-md border border-gray-200 bg-white shadow-md px-1 py-0.5">
+          <div className="absolute -top-10 left-0 z-50 flex items-center gap-0.5 rounded-lg border border-gray-200 bg-white shadow-lg px-1.5 py-1 animate-in fade-in slide-in-from-top-2 duration-200">
             <ToolbarButton
               onClick={() => editor.chain().focus().toggleBold().run()}
               active={editor.isActive("bold")}
               title="加粗 (Ctrl+B)"
             >
-              <strong>B</strong>
+              <strong className="text-sm">B</strong>
             </ToolbarButton>
             <ToolbarButton
               onClick={() => editor.chain().focus().toggleItalic().run()}
               active={editor.isActive("italic")}
               title="斜体 (Ctrl+I)"
             >
-              <em>I</em>
+              <em className="text-sm">I</em>
             </ToolbarButton>
             <ToolbarButton
               onClick={() => editor.chain().focus().toggleCode().run()}
@@ -193,14 +193,14 @@ const ParagraphEditor = forwardRef<ParagraphEditorHandle, ParagraphEditorProps>(
               active={editor.isActive("bulletList")}
               title="无序列表"
             >
-              ≡
+              <span className="text-sm">≡</span>
             </ToolbarButton>
             <ToolbarButton
               onClick={() => editor.chain().focus().toggleOrderedList().run()}
               active={editor.isActive("orderedList")}
               title="有序列表"
             >
-              1.
+              <span className="text-sm">1.</span>
             </ToolbarButton>
           </div>
         )}

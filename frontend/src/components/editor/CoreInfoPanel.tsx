@@ -160,8 +160,8 @@ function CoreInfoNode({ node, depth, onChangeContent, onDelete, dragHandleProps 
 
           {/* 字段名 */}
           <span className={cn(
-            "text-xs shrink-0",
-            isGroup ? "font-medium text-gray-700" : "text-gray-500",
+            "text-base shrink-0",
+            isGroup ? "font-medium text-gray-700" : "text-gray-600",
             node.is_change === 1 && "text-orange-500"
           )}>
             {node.title}
@@ -213,7 +213,7 @@ function CoreInfoNode({ node, depth, onChangeContent, onDelete, dragHandleProps 
               onChange={e => handleChange(e.target.value)}
               disabled={node.is_locked}
               className={cn(
-                "w-full h-7 rounded border border-gray-200 bg-white px-2 text-xs outline-none focus:border-blue-300 transition",
+                "w-full h-9 rounded border border-gray-200 bg-white px-3 text-base outline-none focus:border-blue-300 transition",
                 node.is_locked && "bg-gray-50 text-gray-400 cursor-not-allowed"
               )}
             >
@@ -231,7 +231,7 @@ function CoreInfoNode({ node, depth, onChangeContent, onDelete, dragHandleProps 
               onCompositionEnd={handleCompositionEnd}
               disabled={node.is_locked}
               className={cn(
-                "w-full h-7 rounded border border-gray-200 bg-white px-2 text-xs outline-none focus:border-blue-300 transition",
+                "w-full h-9 rounded border border-gray-200 bg-white px-3 text-base outline-none focus:border-blue-300 transition",
                 node.is_locked && "bg-gray-50 text-gray-400 cursor-not-allowed",
                 node.is_change === 1 && "border-orange-300 bg-orange-50/30"
               )}
@@ -247,7 +247,7 @@ function CoreInfoNode({ node, depth, onChangeContent, onDelete, dragHandleProps 
               disabled={node.is_locked}
               rows={1}
               className={cn(
-                "w-full resize-none rounded border border-gray-200 bg-white px-2 py-1 text-xs outline-none focus:border-blue-300 transition leading-relaxed",
+                "w-full resize-none rounded border border-gray-200 bg-white px-3 py-2 text-base outline-none focus:border-blue-300 transition leading-relaxed",
                 node.is_locked && "bg-gray-50 text-gray-400 cursor-not-allowed",
                 node.is_change === 1 && "border-orange-300 bg-orange-50/30"
               )}

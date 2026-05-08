@@ -154,42 +154,43 @@ function ParagraphRow({
   return (
     <div
       className={cn(
-        "group/paragraph relative flex gap-2 py-0.5",
-        isActive && "bg-blue-50/40 rounded"
+        "group/paragraph relative flex gap-2 py-2 px-2 rounded-lg transition-all duration-200",
+        isActive && "paragraph-active shadow-sm",
+        rowHovered && !isActive && "paragraph-hover"
       )}
       onClick={() => setActiveParagraphId(paragraph.paragraph_id)}
       onMouseEnter={() => setRowHovered(true)}
       onMouseLeave={() => setRowHovered(false)}
     >
       {/* 左侧操作区 */}
-      <div className="w-6 shrink-0 flex items-start justify-center pt-1.5 opacity-0 group-hover/paragraph:opacity-100 transition">
+      <div className="w-6 shrink-0 flex items-start justify-center pt-2 opacity-0 group-hover/paragraph:opacity-100 transition-opacity duration-200">
         <div className="relative">
           <button
             type="button"
             onClick={e => { e.stopPropagation(); setMenuOpen(v => !v) }}
-            className="w-5 h-5 flex items-center justify-center text-gray-300 hover:text-gray-500 hover:bg-gray-100 rounded text-xs"
+            className="w-5 h-5 flex items-center justify-center text-gray-300 hover:text-gray-600 hover:bg-gray-100 rounded text-xs transition-colors"
           >
             ⋮
           </button>
           {menuOpen && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-              <div className="absolute left-full top-0 ml-1 z-50 bg-white border border-gray-200 rounded-md shadow-md py-1 min-w-32 text-xs">
-                <div className="px-3 py-1 text-gray-400 text-xs">段落类型</div>
+              <div className="absolute left-full top-0 ml-1 z-50 bg-white border border-gray-200 rounded-md shadow-lg py-1 min-w-32 text-xs">
+                <div className="px-3 py-1 text-gray-400 text-xs font-medium">段落类型</div>
                 {(["paragraph", "heading1", "heading2", "heading3"] as Paragraph["para_type"][]).map(t => (
                   <button key={t} onClick={() => handleTypeChange(t)}
                     className={cn(
-                      "w-full text-left px-3 py-1.5 hover:bg-gray-50",
-                      paragraph.para_type === t ? "text-blue-600 font-medium" : "text-gray-700"
+                      "w-full text-left px-3 py-1.5 hover:bg-gray-50 transition-colors",
+                      paragraph.para_type === t ? "text-blue-600 font-medium bg-blue-50" : "text-gray-700"
                     )}>
                     {paraTypeLabel[t]}
                   </button>
                 ))}
                 <div className="border-t border-gray-100 my-1" />
                 <button onClick={handleInsertAfter}
-                  className="w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700">在后面插入段落</button>
+                  className="w-full text-left px-3 py-1.5 hover:bg-gray-50 text-gray-700 transition-colors">在后面插入段落</button>
                 <button onClick={handleDelete}
-                  className="w-full text-left px-3 py-1.5 hover:bg-red-50 text-red-500">删除段落</button>
+                  className="w-full text-left px-3 py-1.5 hover:bg-red-50 text-red-500 transition-colors">删除段落</button>
               </div>
             </>
           )}
@@ -233,10 +234,13 @@ function ParagraphRow({
 
         {/* 变更标记 + 确认按钮 */}
         {paragraph.ischange !== 0 && (
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-xs text-orange-400">
-              {paragraph.ischange === 1 ? "已变更" : "系统重新生成"}
-            </span>
+          <div className="flex items-center gap-2 mt-2 animate-in fade-in slide-in-from-top-1 duration-300">
+            <div className="flex items-center gap-1.5 text-xs text-amber-600 px-2 py-1 rounded-md border border-amber-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+              <span className="font-medium">
+                {paragraph.ischange === 1 ? "已变更" : "系统重新生成"}
+              </span>
+            </div>
             <button
               type="button"
               onClick={async (e) => {
@@ -248,7 +252,7 @@ function ParagraphRow({
                   toastError(err instanceof Error ? err.message : "确认失败")
                 }
               }}
-              className="text-xs px-2 py-0.5 rounded bg-green-50 text-green-600 hover:bg-green-100 transition"
+              className="text-xs px-3 py-1 rounded-md bg-green-500 text-white hover:bg-green-600 transition-colors shadow-sm font-medium"
             >
               确认变更
             </button>
@@ -257,7 +261,7 @@ function ParagraphRow({
 
         {/* AI 工具栏（仅正文段落） */}
         {paragraph.para_type === "paragraph" && (
-          <div className="mt-1">
+          <div className="mt-2 opacity-0 group-hover/paragraph:opacity-100 transition-opacity duration-200">
             <ParagraphToolbar
               paragraphId={paragraph.paragraph_id}
               chapterId={chapterId}
@@ -273,7 +277,9 @@ function ParagraphRow({
 
       {/* 保存状态 */}
       {saving && (
-        <span className="absolute right-2 top-2 text-xs text-gray-300">保存中</span>
+        <div className="absolute right-3 top-3 save-indicator saving">
+          保存中
+        </div>
       )}
     </div>
   )
@@ -315,10 +321,10 @@ function ChapterBlock({ flatChapter, onReload }: ChapterBlockProps) {
   }
 
   const titleCls = cn(
-    "font-bold text-gray-900 leading-relaxed",
-    depth === 0 && "text-2xl mb-1",
-    depth === 1 && "text-xl mb-0.5",
-    depth >= 2 && "text-lg",
+    "font-bold leading-tight transition-colors",
+    depth === 0 && "text-3xl mb-2 text-gray-900",
+    depth === 1 && "text-2xl mb-1.5 text-gray-800",
+    depth >= 2 && "text-xl text-gray-700",
   )
 
   const sortedParagraphs = [...node.paragraphs].sort((a, b) => a.order_index - b.order_index)
@@ -327,39 +333,51 @@ function ChapterBlock({ flatChapter, onReload }: ChapterBlockProps) {
     <div
       id={`chapter-${node.chapter_id}`}
       className={cn(
-        "mb-6 scroll-mt-4",
-        isActive && "ring-1 ring-blue-200 ring-offset-2 rounded-lg"
+        "mb-8 scroll-mt-4 transition-all duration-200",
+        isActive && "ring-2 ring-blue-200 ring-offset-4 rounded-xl p-4 bg-blue-50/30"
       )}
     >
       {/* 章节标题 */}
       {/* 动态缩进：树形结构深度不可预测，使用内联 style 计算 paddingLeft */}
       <div
         className={cn(
-          "flex items-center gap-2 mb-2 pb-1.5",
-          depth === 0 && "border-b border-gray-200",
-          depth === 1 && "border-b border-gray-100",
+          "flex items-center gap-3 mb-3 pb-2 group/title",
+          depth === 0 && "border-b-2 border-gray-200 chapter-title-decoration",
+          depth === 1 && "border-b border-gray-100 pl-1",
         )}
-        style={{ paddingLeft: `${depth * 8}px` }}
+        style={{ paddingLeft: depth >= 2 ? `${depth * 8}px` : undefined }}
       >
+        {depth === 1 && (
+          <div className="w-1 h-6 bg-gradient-to-b from-blue-500 to-blue-300 rounded-full" />
+        )}
+        {depth >= 2 && (
+          <div className="w-2 h-2 rounded-full bg-blue-400" />
+        )}
         <h2 className={titleCls}>{node.title}</h2>
         {node.status === 1 && (
-          <span className="text-xs px-1.5 py-0.5 rounded-full bg-green-100 text-green-600">已完成</span>
+          <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 font-medium flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+            已完成
+          </span>
         )}
       </div>
 
       {/* 段落列表 */}
       {/* 动态缩进：树形结构深度不可预测，使用内联 style 计算 paddingLeft */}
       <div
-        className="flex flex-col gap-1.5"
+        className="flex flex-col gap-2"
         style={{ paddingLeft: `${depth * 8 + 4}px` }}
       >
         {sortedParagraphs.length === 0 ? (
           <button
             onClick={handleAddParagraph}
             disabled={addingPara}
-            className="text-sm text-gray-300 hover:text-gray-500 text-left py-2 transition"
+            className="text-sm text-gray-400 hover:text-gray-600 hover:bg-gray-50 text-left py-3 px-4 rounded-lg border-2 border-dashed border-gray-200 hover:border-gray-300 transition-all duration-200"
           >
-            + 点击添加段落
+            <span className="flex items-center gap-2">
+              <span className="text-lg">+</span>
+              <span>点击添加段落</span>
+            </span>
           </button>
         ) : (
           <>
@@ -377,7 +395,7 @@ function ChapterBlock({ flatChapter, onReload }: ChapterBlockProps) {
             <button
               onClick={handleAddParagraph}
               disabled={addingPara}
-              className="text-xs text-gray-300 hover:text-gray-400 text-left py-1 transition opacity-0 hover:opacity-100 group-hover/paragraph:opacity-100"
+              className="text-xs text-gray-300 hover:text-gray-500 hover:bg-gray-50 text-left py-2 px-3 rounded-md transition-all duration-200 opacity-0 hover:opacity-100 group-hover/paragraph:opacity-100"
             >
               + 添加段落
             </button>
@@ -398,21 +416,24 @@ export default function DocumentBody({ onReload }: DocumentBodyProps) {
   if (flatList.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-gray-400 py-24">
-        <p className="text-base mb-2">文档暂无章节</p>
-        <p className="text-sm">在左侧章节树点击 + 添加章节</p>
+        <div className="text-6xl mb-4 opacity-20">📝</div>
+        <p className="text-base mb-2 font-medium">文档暂无章节</p>
+        <p className="text-sm text-gray-400">在左侧章节树点击 + 添加章节</p>
       </div>
     )
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-6">
-      {flatList.map(fc => (
-        <ChapterBlock
-          key={fc.node.chapter_id}
-          flatChapter={fc}
-          onReload={onReload}
-        />
-      ))}
+    <div className="editor-content-area h-full">
+      <div className="h-full px-16 py-8">
+        {flatList.map(fc => (
+          <ChapterBlock
+            key={fc.node.chapter_id}
+            flatChapter={fc}
+            onReload={onReload}
+          />
+        ))}
+      </div>
     </div>
   )
 }

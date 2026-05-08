@@ -40,8 +40,10 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
   const [templateId, setTemplateId] = useState<string | null>(null)
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false)
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false)
+  const [leftPanelWidth, setLeftPanelWidth] = useState(280) // 默认 280px（从 224px 增加）
   const [rightPanelWidth, setRightPanelWidth] = useState(420) // 默认 420px
-  const [isResizing, setIsResizing] = useState(false)
+  const [isResizingLeft, setIsResizingLeft] = useState(false)
+  const [isResizingRight, setIsResizingRight] = useState(false)
   const [refreshingContent, setRefreshingContent] = useState(false) // 内容刷新状态
 
   // SSE 订阅文档变更事件
@@ -115,22 +117,34 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
   }, [load, reset, resetChat])
 
   // 拖动调整右侧面板宽度
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  const handleMouseDownRight = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
-    setIsResizing(true)
+    setIsResizingRight(true)
+  }, [])
+
+  // 拖动调整左侧面板宽度
+  const handleMouseDownLeft = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsResizingLeft(true)
   }, [])
 
   useEffect(() => {
-    if (!isResizing) return
+    if (!isResizingRight && !isResizingLeft) return
 
     const handleMouseMove = (e: MouseEvent) => {
-      const newWidth = window.innerWidth - e.clientX
-      // 限制宽度范围：最小 320px，最大 800px
-      setRightPanelWidth(Math.max(320, Math.min(800, newWidth)))
+      if (isResizingRight) {
+        const newWidth = window.innerWidth - e.clientX
+        setRightPanelWidth(Math.max(320, Math.min(800, newWidth)))
+      }
+      if (isResizingLeft) {
+        const newWidth = e.clientX
+        setLeftPanelWidth(Math.max(200, Math.min(500, newWidth)))
+      }
     }
 
     const handleMouseUp = () => {
-      setIsResizing(false)
+      setIsResizingRight(false)
+      setIsResizingLeft(false)
     }
 
     document.addEventListener("mousemove", handleMouseMove)
@@ -140,7 +154,7 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
       document.removeEventListener("mousemove", handleMouseMove)
       document.removeEventListener("mouseup", handleMouseUp)
     }
-  }, [isResizing])
+  }, [isResizingRight, isResizingLeft])
 
   const tabs: { key: RightPanelTab; label: string; icon: typeof FileText }[] = [
     { key: "core-info", label: "核心信息", icon: FileText },
@@ -194,15 +208,28 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
 
       {/* 三栏主体：左目录 + 中编辑 + 右信息 */}
       <div className="flex flex-1 overflow-hidden">
-        {/* 左侧：章节树（可折叠） */}
+        {/* 左侧：章节树（可折叠、可调整宽度） */}
         {!leftPanelCollapsed && (
-          <aside className="w-56 shrink-0 border-r border-gray-200 bg-white flex flex-col overflow-hidden relative">
+          <aside 
+            className="shrink-0 border-r border-gray-200 bg-white flex flex-col overflow-hidden relative"
+            style={{ width: `${leftPanelWidth}px` }}
+          >
             <ChapterTree documentId={documentId} onReload={load} onRefreshContent={refreshChapterTree} />
+            
+            {/* 右侧拖动手柄 */}
+            <div
+              className={cn(
+                "absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 transition z-30",
+                isResizingLeft && "bg-blue-400"
+              )}
+              onMouseDown={handleMouseDownLeft}
+            />
+            
             {/* 折叠按钮 */}
             <button
               type="button"
               onClick={() => setLeftPanelCollapsed(true)}
-              className="absolute right-0 top-1/2 z-20 translate-x-1/2 -translate-y-1/2 rounded-md border border-gray-300 bg-white px-1.5 py-0.5 text-xs text-gray-500 shadow-sm hover:bg-gray-50 hover:text-gray-700 transition"
+              className="absolute right-0 top-1/2 z-20 translate-x-1/2 -translate-y-1/2 rounded-md border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-500 shadow-sm hover:bg-gray-50 hover:text-gray-700 transition"
               title="收起目录"
               aria-label="收起目录"
             >
@@ -216,16 +243,16 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
           <button
             type="button"
             onClick={() => setLeftPanelCollapsed(false)}
-            className="w-8 shrink-0 border-r border-gray-200 bg-white hover:bg-gray-50 transition flex items-center justify-center text-gray-400 hover:text-gray-600"
+            className="w-10 shrink-0 border-r border-gray-200 bg-white hover:bg-gray-50 transition flex items-center justify-center text-gray-400 hover:text-gray-600 text-base"
             title="展开目录"
             aria-label="展开目录"
           >
-            <span className="text-xs">⟩</span>
+            <span>⟩</span>
           </button>
         )}
 
         {/* 中间：主编辑区（视觉中心） */}
-        <main className="flex-1 overflow-hidden bg-white relative">
+        <main className="flex-1 overflow-hidden bg-[#fafaf9] relative">
           {/* 刷新加载动画 */}
           {refreshingContent && (
             <div className="absolute inset-0 bg-white/90 backdrop-blur-sm z-10 flex items-center justify-center">
@@ -254,9 +281,9 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
             <div
               className={cn(
                 "absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 transition z-30",
-                isResizing && "bg-blue-400"
+                isResizingRight && "bg-blue-400"
               )}
-              onMouseDown={handleMouseDown}
+              onMouseDown={handleMouseDownRight}
             />
             
             {/* Tab 切换 */}
@@ -312,7 +339,7 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
             <button
               type="button"
               onClick={() => setRightPanelCollapsed(true)}
-              className="absolute left-0 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-md border border-gray-300 bg-white px-1.5 py-0.5 text-xs text-gray-500 shadow-sm hover:bg-gray-50 hover:text-gray-700 transition"
+              className="absolute left-0 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-md border border-gray-300 bg-white px-3 py-2.5 text-base text-gray-500 shadow-sm hover:bg-gray-50 hover:text-gray-700 transition"
               title="收起信息面板"
               aria-label="收起信息面板"
             >
@@ -326,11 +353,11 @@ export default function DocumentEditorContainer({ documentId }: DocumentEditorCo
           <button
             type="button"
             onClick={() => setRightPanelCollapsed(false)}
-            className="w-8 shrink-0 border-l border-gray-200 bg-white hover:bg-gray-50 transition flex items-center justify-center text-gray-400 hover:text-gray-600"
+            className="w-10 shrink-0 border-l border-gray-200 bg-white hover:bg-gray-50 transition flex items-center justify-center text-gray-400 hover:text-gray-600 text-base"
             title="展开信息面板"
             aria-label="展开信息面板"
           >
-            <span className="text-xs">⟨</span>
+            <span>⟨</span>
           </button>
         )}
       </div>

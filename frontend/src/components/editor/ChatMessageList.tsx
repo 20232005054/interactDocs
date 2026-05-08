@@ -42,8 +42,8 @@ export default function ChatMessageList({
   if (messages.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-gray-400">
-        <p className="text-sm">AI 助手</p>
-        <p className="text-xs">点击段落或使用"添加上下文"，再向 AI 提问</p>
+        <p className="text-base">AI 助手</p>
+        <p className="text-sm">点击段落或使用"添加上下文"，再向 AI 提问</p>
       </div>
     )
   }
@@ -66,7 +66,7 @@ export default function ChatMessageList({
           >
             <div
               className={cn(
-                "w-fit max-w-full rounded-xl px-3 py-2 text-xs leading-relaxed",
+                "w-fit max-w-full rounded-xl px-4 py-2.5 text-sm leading-relaxed",
                 message.role === "user"
                   ? "rounded-br-sm bg-blue-500 text-white whitespace-pre-wrap break-words"
                   : "rounded-bl-sm bg-gray-100 text-gray-800"
@@ -94,7 +94,7 @@ export default function ChatMessageList({
 
             {/* AI 消息操作按钮 */}
             {message.role === "assistant" && !message.streaming && !!message.content.trim() && (
-              <div className="mt-1 flex items-center gap-2 pl-1 text-[11px] text-gray-400">
+              <div className="mt-1.5 flex items-center gap-2.5 pl-1 text-xs text-gray-400">
                 <button
                   type="button"
                   onClick={() => onCopy(message)}

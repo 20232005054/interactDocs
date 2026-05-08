@@ -129,7 +129,7 @@ function SummaryCard({ summary, onChangeContent, onDelete, dragHandleProps }: Su
           </button>
 
           <span className={cn(
-            "flex-1 text-xs font-medium truncate cursor-pointer",
+            "flex-1 text-base font-medium truncate cursor-pointer",
             isChanged ? "text-orange-600" : "text-gray-700"
           )}
           onClick={() => setExpanded(v => !v)}
@@ -139,7 +139,7 @@ function SummaryCard({ summary, onChangeContent, onDelete, dragHandleProps }: Su
 
           {/* 变更标记 */}
           {isChanged && (
-            <span className="shrink-0 text-xs px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-500">
+            <span className="shrink-0 text-sm px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 font-medium">
               已变更
             </span>
           )}
@@ -166,7 +166,7 @@ function SummaryCard({ summary, onChangeContent, onDelete, dragHandleProps }: Su
               onCompositionEnd={handleCompositionEnd}
               rows={4}
               className={cn(
-                "w-full resize-none rounded border px-2 py-1.5 text-xs outline-none leading-relaxed transition",
+                "w-full resize-none rounded border px-3 py-2 text-base outline-none leading-relaxed transition",
                 isChanged
                   ? "border-orange-200 bg-orange-50/50 focus:border-orange-300"
                   : "border-gray-200 bg-gray-50 focus:border-blue-300 focus:bg-white"
@@ -174,9 +174,9 @@ function SummaryCard({ summary, onChangeContent, onDelete, dragHandleProps }: Su
               placeholder="摘要内容..."
             />
             {/* 版本信息 */}
-            <div className="flex items-center justify-between mt-1">
-              <span className="text-xs text-gray-300">v{summary.version}</span>
-              <span className="text-xs text-gray-300">
+            <div className="flex items-center justify-between mt-2">
+              <span className="text-sm text-gray-400">v{summary.version}</span>
+              <span className="text-sm text-gray-400">
                 {new Date(summary.updated_at).toLocaleDateString("zh-CN", {
                   month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit"
                 })}

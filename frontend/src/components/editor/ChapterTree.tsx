@@ -149,12 +149,12 @@ function TreeNode({ node, documentId, depth, onReload, dragHandleProps }: TreeNo
       {/* 动态缩进：树形结构深度不可预测，使用内联 style 计算 paddingLeft */}
       <div
         className={cn(
-          "group flex items-center gap-1 py-1.5 pr-2 rounded-sm cursor-pointer select-none transition-colors border-l-4",
+          "group flex items-center gap-1.5 py-2 pr-2 rounded-md cursor-pointer select-none transition-colors border-l-4",
           isActive 
             ? "bg-blue-50 text-blue-700 border-blue-500 font-semibold" 
             : "text-gray-700 hover:bg-gray-100 border-transparent"
         )}
-        style={{ paddingLeft: `${8 + depth * 14}px` }}
+        style={{ paddingLeft: `${8 + depth * 16}px` }}
       >
         {/* 拖拽手柄 */}
         {dragHandleProps && (
@@ -164,7 +164,7 @@ function TreeNode({ node, documentId, depth, onReload, dragHandleProps }: TreeNo
             title="拖动排序"
             onClick={e => e.stopPropagation()}
           >
-            <GripVertical className="w-3.5 h-3.5 text-gray-300 hover:text-gray-500" />
+            <GripVertical className="w-4 h-4 text-gray-300 hover:text-gray-500" />
           </div>
         )}
 
@@ -200,16 +200,59 @@ function TreeNode({ node, documentId, depth, onReload, dragHandleProps }: TreeNo
             }}
             disabled={saving}
             onClick={e => e.stopPropagation()}
-            className="flex-1 text-xs bg-white border border-blue-300 rounded px-1 py-0.5 outline-none"
+            className="flex-1 text-base bg-white border border-blue-300 rounded px-2 py-0.5 outline-none"
           />
         ) : (
-          <span
-            className="flex-1 text-xs truncate"
-            onClick={handleClick}
-            onDoubleClick={() => setEditing(true)}
-          >
-            {node.title}
-          </span>
+          <div className="flex-1 min-w-0">
+            {/* 章节标题 - 可点击 */}
+            <div
+              className="text-base truncate font-medium cursor-pointer hover:text-blue-600 transition-colors"
+              onClick={handleClick}
+              onDoubleClick={() => setEditing(true)}
+            >
+              {node.title}
+            </div>
+            {/* 显示所有子标题（段落标题）- 可点击 */}
+            {node.paragraphs && node.paragraphs.length > 0 && (
+              <div className="mt-1 space-y-0.5">
+                {node.paragraphs
+                  .filter(p => p.para_type !== 'paragraph')
+                  .map((p, idx) => {
+                    // 清理内容：移除 HTML 标签和 Markdown 符号
+                    const cleanContent = p.content
+                      .replace(/<[^>]*>/g, '')  // 移除 HTML 标签
+                      .replace(/^#+\s*/g, '')    // 移除开头的 # 符号
+                      .trim()
+                    
+                    // 根据段落类型确定缩进
+                    const indent = p.para_type === 'heading1' ? 'pl-2' : 
+                                   p.para_type === 'heading2' ? 'pl-4' : 'pl-6'
+                    
+                    return (
+                      <div 
+                        key={idx} 
+                        className={cn(
+                          "flex items-start gap-1 text-sm text-gray-500 cursor-pointer hover:text-blue-600 transition-colors group/subtitle",
+                          indent
+                        )}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleClick()
+                          // 滚动到对应段落
+                          setTimeout(() => {
+                            const paragraphEl = document.querySelector(`[data-paragraph-id="${p.paragraph_id}"]`)
+                            paragraphEl?.scrollIntoView({ behavior: "smooth", block: "center" })
+                          }, 100)
+                        }}
+                      >
+                        <span className="text-gray-400 shrink-0 group-hover/subtitle:text-blue-400">·</span>
+                        <span className="line-clamp-2 leading-relaxed">{cleanContent}</span>
+                      </div>
+                    )
+                  })}
+              </div>
+            )}
+          </div>
         )}
 
         {/* 操作菜单触发 */}
@@ -398,12 +441,12 @@ export default function ChapterTree({ documentId, onReload, onRefreshContent }: 
   return (
     <div className="flex flex-col h-full">
       {/* 标题栏 */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 shrink-0">
-        <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">章节</span>
+      <div className="flex items-center justify-between px-3 py-3 border-b border-gray-100 shrink-0">
+        <span className="text-base font-semibold text-gray-700">章节目录</span>
         <button
           onClick={handleAddRoot}
           disabled={adding}
-          className="text-xs text-gray-400 hover:text-blue-500 transition disabled:opacity-50"
+          className="text-base text-gray-400 hover:text-blue-500 transition disabled:opacity-50 font-medium"
           title="添加章节"
         >
           +
@@ -411,7 +454,7 @@ export default function ChapterTree({ documentId, onReload, onRefreshContent }: 
       </div>
 
       {/* 树列表 */}
-      <div className="compact-scrollbar flex-1 overflow-y-auto py-1">
+      <div className="compact-scrollbar flex-1 overflow-y-auto overflow-x-hidden py-1">
         {localTree.length === 0 ? (
           <p className="text-xs text-gray-400 text-center py-6">暂无章节</p>
         ) : (

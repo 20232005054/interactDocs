@@ -1,4 +1,5 @@
 import { fetchStream } from "@/lib/request"
+import request from "@/lib/request"
 import type {
   AIChatAction,
   AIChatRequestPayload,
@@ -13,6 +14,25 @@ interface AIChatStreamResult {
   response: string
   actions?: AIChatAction[]
   suggestions?: any[] // 临时使用 any，后续可以定义具体类型
+}
+
+// 聊天历史记录类型
+export interface ChatHistoryItem {
+  chat_id: string
+  document_id: string
+  chapter_id: string | null
+  role: "user" | "assistant"
+  message: string
+  response: string | null
+  mode: string
+  created_at: string
+}
+
+export interface ChatHistoryResponse {
+  total: number
+  page: number
+  page_size: number
+  items: ChatHistoryItem[]
 }
 
 export const aiService = {
@@ -96,5 +116,15 @@ export const aiService = {
       response: finalResponse || accumulated,
       actions,
     }
+  },
+
+  // 获取聊天历史
+  getChatHistory: async (documentId: string, page: number = 1, pageSize: number = 50): Promise<ChatHistoryResponse> => {
+    return request<ChatHistoryResponse>(`/api/v1/documents/${documentId}/chat-history?page=${page}&page_size=${pageSize}`)
+  },
+
+  // 清空聊天历史
+  clearChatHistory: async (documentId: string): Promise<void> => {
+    await request(`/api/v1/documents/${documentId}/chat-history`, { method: "DELETE" })
   },
 }

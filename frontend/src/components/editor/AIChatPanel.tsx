@@ -28,8 +28,77 @@ export default function AIChatPanel({ documentId, onReload }: AIChatPanelProps) 
   const [input, setInput] = useState("")
   const [streaming, setStreaming] = useState(false)
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
+  const [loadingHistory, setLoadingHistory] = useState(true)
   const abortRef = useRef<AbortController | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+
+  // 加载历史记录
+  useEffect(() => {
+    const loadHistory = async () => {
+      setLoadingHistory(true)
+      try {
+        const history = await aiService.getChatHistory(documentId, 1, 50)
+        
+        // 将历史记录转换为消息格式
+        const historyMessages: ChatMessage[] = []
+        for (const item of history.items) {
+          // 用户消息
+          historyMessages.push({
+            id: `${item.chat_id}-user`,
+            role: "user",
+            content: item.message,
+          })
+          
+          // AI 回复
+          if (item.response) {
+            // 解析响应中的 [SUGGESTION] 格式
+            let cleanResponse = item.response
+            let suggestions: AISuggestion[] = []
+            
+            // 匹配 [SUGGESTION]{...} 格式
+            const suggestionRegex = /\[SUGGESTION\](\{[^}]+\})/g
+            const matches = [...item.response.matchAll(suggestionRegex)]
+            
+            if (matches.length > 0) {
+              // 移除原始 JSON，只保留文本部分
+              cleanResponse = item.response.replace(suggestionRegex, "").trim()
+              
+              // 解析每个建议
+              suggestions = matches.map((match, index) => {
+                try {
+                  const raw = JSON.parse(match[1]) as RawSuggestion
+                  return {
+                    ...raw,
+                    id: `${item.chat_id}-suggestion-${index}`,
+                    status: "pending" as const,
+                  } as AISuggestion
+                } catch (err) {
+                  console.error("解析建议失败:", err)
+                  return null
+                }
+              }).filter((s): s is AISuggestion => s !== null)
+            }
+            
+            historyMessages.push({
+              id: `${item.chat_id}-assistant`,
+              role: "assistant",
+              content: cleanResponse,
+              suggestions: suggestions.length > 0 ? suggestions : undefined,
+            })
+          }
+        }
+        
+        setMessages(historyMessages)
+      } catch (err) {
+        console.error("加载历史记录失败:", err)
+        // 静默失败，不影响用户使用
+      } finally {
+        setLoadingHistory(false)
+      }
+    }
+
+    loadHistory()
+  }, [documentId])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -307,45 +376,64 @@ export default function AIChatPanel({ documentId, onReload }: AIChatPanelProps) 
     setStreaming(false)
   }
 
-  const handleClearConversation = () => {
+  const handleClearConversation = async () => {
     if (streaming) handleStop()
-    setMessages([])
+    
+    try {
+      await aiService.clearChatHistory(documentId)
+      setMessages([])
+      toastSuccess("对话记录已清空")
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : "清空失败")
+    }
   }
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col">
       {/* 顶部工具栏 */}
-      <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-3 py-2">
-        <span className="text-xs text-gray-500">
+      <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-4 py-2.5">
+        <span className="text-sm text-gray-500">
           {activeChapterId ? "当前章节上下文已加载" : "全文档上下文"}
         </span>
         <button
           onClick={handleClearConversation}
-          className="text-xs text-gray-400 transition hover:text-gray-600"
+          className="text-sm text-gray-400 transition hover:text-gray-600"
         >
           清空对话
         </button>
       </div>
 
       {/* 消息列表区域 */}
-      <div className="compact-scrollbar flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-3">
-        <ChatMessageList
-          messages={messages}
-          streaming={streaming}
-          onCopy={handleCopy}
-          onRegenerate={handleRegenerate}
-          onQuote={handleQuote}
-          onApplySuggestion={applySuggestion}
-          onRejectSuggestion={rejectSuggestion}
-          onApplyAllSuggestions={applyAllSuggestions}
-          onRejectAllSuggestions={rejectAllSuggestions}
-          copiedMessageId={copiedMessageId}
-        />
-        <div ref={bottomRef} />
+      <div className="compact-scrollbar flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4">
+        {loadingHistory ? (
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-gray-400">
+            <div className="relative">
+              <div className="w-8 h-8 border-4 border-gray-200 rounded-full" />
+              <div className="absolute inset-0 w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+            <p className="text-sm">加载历史记录...</p>
+          </div>
+        ) : (
+          <>
+            <ChatMessageList
+              messages={messages}
+              streaming={streaming}
+              onCopy={handleCopy}
+              onRegenerate={handleRegenerate}
+              onQuote={handleQuote}
+              onApplySuggestion={applySuggestion}
+              onRejectSuggestion={rejectSuggestion}
+              onApplyAllSuggestions={applyAllSuggestions}
+              onRejectAllSuggestions={rejectAllSuggestions}
+              copiedMessageId={copiedMessageId}
+            />
+            <div ref={bottomRef} />
+          </>
+        )}
       </div>
 
       {/* 输入区域 */}
-      <div className="shrink-0 border-t border-gray-100 px-3 py-2">
+      <div className="shrink-0 border-t border-gray-100 px-4 py-3">
         <ChatContextBar
           contextItems={contextItems}
           onRemoveContext={removeContext}

@@ -40,7 +40,7 @@ export default function AISuggestionCard({
           icon: FileText,
           label: "创建章节",
           color: "blue",
-          bgColor: "bg-blue-50",
+          bgColor: "bg-blue-50/50",
           borderColor: "border-blue-200",
           textColor: "text-blue-700",
           iconColor: "text-blue-500",
@@ -50,7 +50,7 @@ export default function AISuggestionCard({
           icon: FileEdit,
           label: "创建段落",
           color: "blue",
-          bgColor: "bg-blue-50",
+          bgColor: "bg-blue-50/50",
           borderColor: "border-blue-200",
           textColor: "text-blue-700",
           iconColor: "text-blue-500",
@@ -60,7 +60,7 @@ export default function AISuggestionCard({
           icon: Edit3,
           label: "修改建议",
           color: "amber",
-          bgColor: "bg-amber-50",
+          bgColor: "bg-amber-50/50",
           borderColor: "border-amber-200",
           textColor: "text-amber-700",
           iconColor: "text-amber-500",
@@ -70,7 +70,7 @@ export default function AISuggestionCard({
           icon: Plus,
           label: "插入文本",
           color: "green",
-          bgColor: "bg-green-50",
+          bgColor: "bg-green-50/50",
           borderColor: "border-green-200",
           textColor: "text-green-700",
           iconColor: "text-green-500",
@@ -84,7 +84,7 @@ export default function AISuggestionCard({
   return (
     <div
       className={cn(
-        "rounded-lg border p-3 transition-all duration-200",
+        "rounded-lg border p-3.5 transition-all duration-200",
         isApplied && "bg-gray-50 border-gray-200 opacity-75",
         isRejected && "bg-gray-50 border-gray-200 opacity-50",
         showActions && config.bgColor,
@@ -93,16 +93,16 @@ export default function AISuggestionCard({
       )}
     >
       {/* 头部：类型标签 */}
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-2.5">
         <div className="flex items-center gap-2">
           <Icon className={cn("w-4 h-4", showActions ? config.iconColor : "text-gray-400")} />
-          <span className={cn("text-xs font-medium", showActions ? config.textColor : "text-gray-500")}>
+          <span className={cn("text-sm font-medium", showActions ? config.textColor : "text-gray-500")}>
             {config.label}
           </span>
         </div>
         {isApplied && (
           <span className="flex items-center gap-1 text-xs text-green-600">
-            <Check className="w-3 h-3" />
+            <Check className="w-3.5 h-3.5" />
             已应用
           </span>
         )}
@@ -134,18 +134,18 @@ export default function AISuggestionCard({
             onClick={handleApply}
             disabled={applying}
             className={cn(
-              "flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-all",
+              "flex-1 flex items-center justify-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-all",
               "bg-blue-500 text-white hover:bg-blue-600 hover:shadow-md disabled:opacity-50 active:scale-95"
             )}
           >
             {applying ? (
               <>
-                <Loader2 className="w-3 h-3 animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 应用中...
               </>
             ) : (
               <>
-                <Check className="w-3 h-3" />
+                <Check className="w-3.5 h-3.5" />
                 应用
               </>
             )}
@@ -153,7 +153,7 @@ export default function AISuggestionCard({
           <button
             onClick={() => onReject(suggestion)}
             disabled={applying}
-            className="px-3 py-1.5 rounded text-xs font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all disabled:opacity-50 active:scale-95"
+            className="px-4 py-2 rounded-md text-sm font-medium text-gray-600 hover:text-gray-700 hover:bg-gray-100 transition-all disabled:opacity-50 active:scale-95"
           >
             忽略
           </button>
@@ -166,15 +166,15 @@ export default function AISuggestionCard({
 // 创建章节内容
 function CreateChapterContent({ suggestion }: { suggestion: AISuggestion & { type: "create_chapter" } }) {
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-2">
       <div className="text-sm font-medium text-gray-800">
         标题：{suggestion.title}
       </div>
-      <div className="text-xs text-gray-600">
+      <div className="text-sm text-gray-600">
         位置：{suggestion.parent_id ? "子章节" : "根章节"}
       </div>
       {suggestion.description && (
-        <div className="text-xs text-gray-500 mt-1">
+        <div className="text-sm text-gray-500 mt-1.5">
           {suggestion.description}
         </div>
       )}
@@ -192,15 +192,15 @@ function CreateParagraphContent({ suggestion }: { suggestion: AISuggestion & { t
   }
 
   return (
-    <div className="space-y-1.5">
-      <div className="text-xs text-gray-600">
+    <div className="space-y-2">
+      <div className="text-sm text-gray-600">
         类型：{typeLabels[suggestion.para_type] || suggestion.para_type}
       </div>
-      <div className="text-xs text-gray-700 bg-white rounded p-2 border border-gray-100 max-h-32 overflow-y-auto">
+      <div className="text-sm text-gray-700 bg-white rounded-md p-2.5 border border-gray-100 max-h-32 overflow-y-auto">
         {suggestion.content}
       </div>
       {suggestion.description && (
-        <div className="text-xs text-gray-500">
+        <div className="text-sm text-gray-500">
           {suggestion.description}
         </div>
       )}
@@ -214,23 +214,23 @@ function EditContentContent({ suggestion }: { suggestion: AISuggestion & { type:
 
   return (
     <div className="space-y-2">
-      <div className="text-xs text-gray-600">
+      <div className="text-sm text-gray-600">
         目标：{suggestion.target_type === "paragraph" ? "段落" : "摘要"}
       </div>
 
       {suggestion.reason && (
-        <div className="text-xs text-gray-600 bg-white rounded p-2 border border-gray-100">
+        <div className="text-sm text-gray-600 bg-white rounded-md p-2.5 border border-gray-100">
           <span className="font-medium">修改理由：</span>
           {suggestion.reason}
         </div>
       )}
 
       {/* 修改前后对比 */}
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         <div>
-          <div className="text-xs font-medium text-gray-500 mb-1">修改前</div>
+          <div className="text-sm font-medium text-gray-500 mb-1">修改前</div>
           <div className={cn(
-            "text-xs text-gray-600 bg-red-50 rounded p-2 border border-red-100",
+            "text-sm text-gray-600 bg-red-50 rounded-md p-2.5 border border-red-100",
             !expanded && "line-clamp-2"
           )}>
             {suggestion.original_content}
@@ -238,9 +238,9 @@ function EditContentContent({ suggestion }: { suggestion: AISuggestion & { type:
         </div>
 
         <div>
-          <div className="text-xs font-medium text-gray-500 mb-1">修改后</div>
+          <div className="text-sm font-medium text-gray-500 mb-1">修改后</div>
           <div className={cn(
-            "text-xs text-gray-700 bg-green-50 rounded p-2 border border-green-100",
+            "text-sm text-gray-700 bg-green-50 rounded-md p-2.5 border border-green-100",
             !expanded && "line-clamp-2"
           )}>
             {suggestion.suggested_content}
@@ -252,7 +252,7 @@ function EditContentContent({ suggestion }: { suggestion: AISuggestion & { type:
       {(suggestion.original_content.length > 100 || suggestion.suggested_content.length > 100) && (
         <button
           onClick={() => setExpanded(!expanded)}
-          className="text-xs text-blue-500 hover:text-blue-600"
+          className="text-sm text-blue-500 hover:text-blue-600"
         >
           {expanded ? "收起" : "展开查看完整内容"}
         </button>
@@ -264,15 +264,15 @@ function EditContentContent({ suggestion }: { suggestion: AISuggestion & { type:
 // 插入文本内容
 function InsertTextContent({ suggestion }: { suggestion: AISuggestion & { type: "insert_text" } }) {
   return (
-    <div className="space-y-1.5">
-      <div className="text-xs text-gray-600">
+    <div className="space-y-2">
+      <div className="text-sm text-gray-600">
         位置：{suggestion.position === "start" ? "章节开头" : "章节末尾"}
       </div>
-      <div className="text-xs text-gray-700 bg-white rounded p-2 border border-gray-100 max-h-32 overflow-y-auto">
+      <div className="text-sm text-gray-700 bg-white rounded-md p-2.5 border border-gray-100 max-h-32 overflow-y-auto">
         {suggestion.content}
       </div>
       {suggestion.description && (
-        <div className="text-xs text-gray-500">
+        <div className="text-sm text-gray-500">
           {suggestion.description}
         </div>
       )}
