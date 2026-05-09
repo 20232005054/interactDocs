@@ -51,7 +51,7 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
   const [activeHandle, setActiveHandle] = useState<number | null>(null)
   const [savingTemplate, setSavingTemplate] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
-  const [collapsedPanels, setCollapsedPanels] = useState<Set<string>>(new Set())
+  const [collapsedPanels, setCollapsedPanels] = useState<Set<"core-info" | "summary" | "structure">>(new Set())
 
   const loadTemplate = useCallback(async (id: string) => {
     setLoading(true)
@@ -224,9 +224,9 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
 
   const panels = [
     {
-      key: "core-info",
+      key: "core-info" as const,
       title: "核心信息模板",
-      desc: "编辑模板的核心信息字段结构，并作为拖拽填充源。",
+      desc: "编辑模板的核心信息字段结构，并作为拖拽填充源",
       accentClass: "bg-template-accent",
       collapsible: true,
       children: (
@@ -238,9 +238,9 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
       ),
     },
     {
-      key: "summary",
+      key: "summary" as const,
       title: "摘要模板",
-      desc: "摘要卡片支持接收核心信息拖拽，快速填入来源、内容模板和提示词。",
+      desc: "摘要卡片支持接收核心信息拖拽，快速填入来源、内容模板和提示词",
       accentClass: "bg-template-summary",
       collapsible: true,
       children: (
@@ -251,9 +251,9 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
       ),
     },
     {
-      key: "structure",
+      key: "structure" as const,
       title: "章节结构模板",
-      desc: "桌面端保持更宽布局，方便横向拖拽核心信息到章节配置区。",
+      desc: "定义文档章节结构，支持拖拽核心信息和摘要到章节配置区",
       accentClass: "bg-template-structure",
       collapsible: true,
       children: (
