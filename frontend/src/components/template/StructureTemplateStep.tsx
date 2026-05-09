@@ -10,6 +10,7 @@ import type {
   SourceInfo,
   GenerationMode,
   StructureDependencyItem,
+  ParaType,
 } from "@/types/api"
 import RichTextEditor from "@/components/editor/RichTextEditor"
 import ReadonlySourceList from "@/components/template/ReadonlySourceList"
@@ -107,6 +108,7 @@ interface ParagraphEditorProps {
 
 function ParagraphEditor({ index, total, para, variables, variableLabelMap, onChange, onDelete }: ParagraphEditorProps) {
   const generationMode = (para.generation_mode ?? 2) as GenerationMode
+  const paraType = (para.para_type ?? "paragraph") as ParaType
   const sources = para.sources ?? []
   const contentTemplate = para.content_template ?? ""
   const defaultPrompt = para.default_prompt ?? ""
@@ -159,6 +161,21 @@ function ParagraphEditor({ index, total, para, variables, variableLabelMap, onCh
           {GENERATION_MODE_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
+        </select>
+      </div>
+
+      {/* 段落类型 */}
+      <div className="flex items-center gap-3">
+        <label className="w-20 shrink-0 text-sm text-gray-600">段落类型</label>
+        <select
+          value={paraType}
+          onChange={(event) => patch({ para_type: event.target.value as ParaType })}
+          className="h-8 w-28 rounded border border-gray-300 bg-white px-2 text-sm outline-none transition focus:border-green-400"
+        >
+          <option value="paragraph">正文</option>
+          <option value="heading1">一级标题</option>
+          <option value="heading2">二级标题</option>
+          <option value="heading3">三级标题</option>
         </select>
       </div>
 
@@ -385,7 +402,7 @@ function EditPanel({ node, variables, onDeleted, dependencyItem }: EditPanelProp
   const handleAddParagraph = useCallback(() => {
     setParagraphs((prev) => {
       const updated = [...prev, {
-        para_type: "paragraph" as const,
+        para_type: "paragraph" as ParaType,
         generation_mode: 2 as GenerationMode,
         content_template: "",
         sources: [],
