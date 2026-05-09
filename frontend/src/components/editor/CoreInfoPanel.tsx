@@ -75,11 +75,21 @@ function CoreInfoNode({ node, depth, onChangeContent, onDelete, dragHandleProps 
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [isComposing, setIsComposing] = useState(false)
   const [localValue, setLocalValue] = useState(node.content)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // 同步外部变更到本地状态
   useEffect(() => {
     setLocalValue(node.content)
   }, [node.content])
+
+  // 自动调整 textarea 高度
+  useEffect(() => {
+    const textarea = textareaRef.current
+    if (textarea && node.field_type === "text") {
+      textarea.style.height = "auto"
+      textarea.style.height = `${textarea.scrollHeight}px`
+    }
+  }, [localValue, node.field_type])
 
   const isGroup = node.field_type === "group"
   const hasChildren = node.children.length > 0
@@ -240,6 +250,7 @@ function CoreInfoNode({ node, depth, onChangeContent, onDelete, dragHandleProps 
           ) : (
             // 自适应高度：textarea 根据内容动态调整高度
             <textarea
+              ref={textareaRef}
               value={localValue}
               onChange={e => handleChange(e.target.value)}
               onCompositionStart={() => setIsComposing(true)}
@@ -247,16 +258,10 @@ function CoreInfoNode({ node, depth, onChangeContent, onDelete, dragHandleProps 
               disabled={node.is_locked}
               rows={1}
               className={cn(
-                "w-full resize-none rounded border border-gray-200 bg-white px-3 py-2 text-base outline-none focus:border-blue-300 transition leading-relaxed",
+                "w-full resize-none rounded border border-gray-200 bg-white px-3 py-2 text-base outline-none focus:border-blue-300 transition leading-relaxed overflow-hidden",
                 node.is_locked && "bg-gray-50 text-gray-400 cursor-not-allowed",
                 node.is_change === 1 && "border-orange-300 bg-orange-50/30"
               )}
-              style={{ height: "auto" }}
-              onInput={e => {
-                const el = e.currentTarget
-                el.style.height = "auto"
-                el.style.height = `${el.scrollHeight}px`
-              }}
               placeholder={node.is_locked ? "已锁定" : "请输入..."}
             />
           )}

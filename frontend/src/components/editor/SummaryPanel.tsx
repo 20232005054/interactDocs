@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core"
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
@@ -71,11 +71,21 @@ function SummaryCard({ summary, onChangeContent, onDelete, dragHandleProps }: Su
   const [isComposing, setIsComposing] = useState(false)
   const [localValue, setLocalValue] = useState(summary.content)
   const { updateSummary } = useDocumentStore()
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // 同步外部变更到本地状态
   useEffect(() => {
     setLocalValue(summary.content)
   }, [summary.content])
+
+  // 自动调整 textarea 高度
+  useEffect(() => {
+    const textarea = textareaRef.current
+    if (textarea && expanded) {
+      textarea.style.height = "auto"
+      textarea.style.height = `${textarea.scrollHeight}px`
+    }
+  }, [localValue, expanded])
 
   const handleChange = (val: string) => {
     // 始终更新本地状态（让输入框响应）
@@ -160,13 +170,14 @@ function SummaryCard({ summary, onChangeContent, onDelete, dragHandleProps }: Su
         {expanded && (
           <div className="px-3 pb-3">
             <textarea
+              ref={textareaRef}
               value={localValue}
               onChange={e => handleChange(e.target.value)}
               onCompositionStart={() => setIsComposing(true)}
               onCompositionEnd={handleCompositionEnd}
-              rows={4}
+              rows={1}
               className={cn(
-                "w-full resize-none rounded border px-3 py-2 text-base outline-none leading-relaxed transition",
+                "w-full resize-none rounded border px-3 py-2 text-base outline-none leading-relaxed transition overflow-hidden",
                 isChanged
                   ? "border-orange-200 bg-orange-50/50 focus:border-orange-300"
                   : "border-gray-200 bg-gray-50 focus:border-blue-300 focus:bg-white"
