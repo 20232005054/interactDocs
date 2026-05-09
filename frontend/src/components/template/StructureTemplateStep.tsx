@@ -130,6 +130,7 @@ function ParagraphEditor({ index, total, para, variables, variableLabelMap, onCh
 
   const showSources = generationMode !== 2
   const showPrompts = generationMode === 1 || generationMode === 3
+  const showContentTemplate = generationMode !== 1 // AI总结模式不显示内容模板
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-gray-50/50 p-4">
@@ -174,28 +175,36 @@ function ParagraphEditor({ index, total, para, variables, variableLabelMap, onCh
       )}
 
       {/* 内容模板 */}
-      <RichTextEditor
-        value={contentTemplate}
-        onChange={(value) => {
-          const usedKeys = collectVariableKeys([value, defaultPrompt, customPrompt])
-          const nextSources = pruneCoreInfoSourcesByKeys(sources, usedKeys, variableLabelMap)
-          patch({
-            content_template: value,
-            sources: JSON.stringify(nextSources) !== JSON.stringify(sources) ? nextSources : sources,
-          })
-        }}
-        onVariableDrop={syncDroppedSource}
-        variables={variables}
-        placeholder="这里是一大段模板文字，可插入 {{变量}} 占位符..."
-        minHeight="100px"
-      />
-      <p className="text-xs text-gray-400">
-        {generationMode === 2
-          ? "当前模式会直接使用这里的原文内容。"
-          : generationMode === 3
-            ? "这里的内容会作为草稿交给 AI 修改，支持拖入变量占位符。"
-            : "支持将核心信息字段拖入编辑区，自动插入变量占位符。"}
-      </p>
+      {showContentTemplate ? (
+        <>
+          <RichTextEditor
+            value={contentTemplate}
+            onChange={(value) => {
+              const usedKeys = collectVariableKeys([value, defaultPrompt, customPrompt])
+              const nextSources = pruneCoreInfoSourcesByKeys(sources, usedKeys, variableLabelMap)
+              patch({
+                content_template: value,
+                sources: JSON.stringify(nextSources) !== JSON.stringify(sources) ? nextSources : sources,
+              })
+            }}
+            onVariableDrop={syncDroppedSource}
+            variables={variables}
+            placeholder="这里是一大段模板文字，可插入 {{变量}} 占位符..."
+            minHeight="100px"
+          />
+          <p className="text-xs text-gray-400">
+            {generationMode === 2
+              ? "当前模式会直接使用这里的原文内容。"
+              : generationMode === 3
+                ? "这里的内容会作为草稿交给 AI 修改，支持拖入变量占位符。"
+                : "支持将核心信息字段拖入编辑区，自动插入变量占位符。"}
+          </p>
+        </>
+      ) : (
+        <div className="rounded-lg bg-gray-50 px-3 py-2.5 text-xs text-gray-500 border border-gray-200">
+          💡 AI总结模式：AI 将根据来源和提示词直接生成内容
+        </div>
+      )}
 
       {/* 提示词 */}
       {showPrompts && (

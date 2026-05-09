@@ -11,8 +11,10 @@ import {
   appendVariableText,
   collectVariableKeys,
   getCoreInfoDragData,
+  getSummaryDragData,
   pruneCoreInfoSourcesByKeys,
   upsertCoreInfoSource,
+  upsertSummarySource,
   setSummaryDragData,
   type SummaryDragItem,
 } from "@/lib/templateDrag"
@@ -157,10 +159,15 @@ function SummaryCard({
 
   const showSources = generationMode !== 2
   const showPrompts = generationMode === 1 || generationMode === 3
+  const showContentTemplate = generationMode !== 1 // AI总结模式不显示内容模板
   const generationModeLabel = GENERATION_MODE_OPTIONS.find((option) => option.value === generationMode)?.label ?? "未设置"
 
-  const syncDroppedSource = (dropped: { fieldKey: string; label: string }) => {
-    handleSourcesChange(upsertCoreInfoSource(sources, dropped))
+  const syncDroppedSource = (dropped: { fieldKey: string; label: string }, sourceType: "keyinfo" | "summary" = "keyinfo") => {
+    if (sourceType === "keyinfo") {
+      handleSourcesChange(upsertCoreInfoSource(sources, dropped))
+    } else {
+      handleSourcesChange(upsertSummarySource(sources, dropped))
+    }
   }
 
   const handleDelete = async () => {
@@ -287,6 +294,32 @@ function SummaryCard({
               <div className="flex flex-col gap-2">
                 <label className="text-sm text-gray-600">来源方式：</label>
                 <ReadonlySourceList sources={sources} />
+                {generationMode === 1 && (
+                  <div
+                    onDragOver={(event) => {
+                      const coreInfoDropped = getCoreInfoDragData(event)
+                      const summaryDropped = getSummaryDragData(event)
+                      if (coreInfoDropped || summaryDropped) {
+                        event.preventDefault()
+                      }
+                    }}
+                    onDrop={(event) => {
+                      const coreInfoDropped = getCoreInfoDragData(event)
+                      const summaryDropped = getSummaryDragData(event)
+                      
+                      if (coreInfoDropped) {
+                        event.preventDefault()
+                        syncDroppedSource(coreInfoDropped, "keyinfo")
+                      } else if (summaryDropped) {
+                        event.preventDefault()
+                        syncDroppedSource(summaryDropped, "summary")
+                      }
+                    }}
+                    className="rounded-lg border-2 border-dashed border-green-300 bg-green-50/30 px-3 py-2.5 text-xs text-gray-500 hover:border-green-400 hover:bg-green-50/50 transition-colors cursor-pointer"
+                  >
+                    💡 拖拽核心信息或摘要到此处添加来源
+                  </div>
+                )}
               </div>
             ) : (
               <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-3 text-sm text-gray-500">
@@ -294,23 +327,29 @@ function SummaryCard({
               </div>
             )}
 
-            <div className="relative">
-              <RichTextEditor
-                value={contentTemplate}
-                onChange={handleContentChange}
-                onVariableDrop={syncDroppedSource}
-                variables={variables}
-                placeholder="这里是一大段模板文字，可插入 {{变量}} 占位符..."
-                minHeight="120px"
-              />
-              <p className="mt-2 text-xs text-gray-400">
-                {generationMode === 2
-                  ? "当前模式会直接使用这里的原文内容。"
-                  : generationMode === 3
-                    ? "这里的内容会作为草稿交给 AI 修改，支持拖入变量占位符。"
-                    : "支持将核心信息字段拖入编辑区，自动插入变量占位符。"}
-              </p>
-            </div>
+            {showContentTemplate ? (
+              <div className="relative">
+                <RichTextEditor
+                  value={contentTemplate}
+                  onChange={handleContentChange}
+                  onVariableDrop={syncDroppedSource}
+                  variables={variables}
+                  placeholder="这里是一大段模板文字，可插入 {{变量}} 占位符..."
+                  minHeight="120px"
+                />
+                <p className="mt-2 text-xs text-gray-400">
+                  {generationMode === 2
+                    ? "当前模式会直接使用这里的原文内容。"
+                    : generationMode === 3
+                      ? "这里的内容会作为草稿交给 AI 修改，支持拖入变量占位符。"
+                      : "支持将核心信息字段拖入编辑区，自动插入变量占位符。"}
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-lg bg-gray-50 px-3 py-2.5 text-xs text-gray-500 border border-gray-200">
+                💡 AI总结模式：AI 将根据来源和提示词直接生成内容
+              </div>
+            )}
 
             {showPrompts && (
               <div className="flex flex-col gap-2">
