@@ -824,12 +824,17 @@ export default function StructureTemplateStep({
       setTree(nextTree)
       setCoreInfoOptions(flattenCoreInfo(coreRes.items ?? []))
       onCountChange?.(countTree(nextTree))
+      
+      // 默认选中第一个章节
+      if (nextTree.length > 0 && !selectedNodeId) {
+        setSelectedNodeId(nextTree[0].structure_template_id)
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "加载失败")
     } finally {
       setLoading(false)
     }
-  }, [templateId, onCountChange])
+  }, [templateId, onCountChange, selectedNodeId])
 
   useEffect(() => {
     load()

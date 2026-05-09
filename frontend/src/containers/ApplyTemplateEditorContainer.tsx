@@ -699,7 +699,7 @@ function BoardShell({
         >
           <span className={cn("h-5 w-5 rounded-full shadow-lg mb-4", accentColor)} />
           <div className="flex flex-col items-center gap-2">
-            <span className="text-3xl text-gray-500 group-hover:text-gray-800 transition-colors font-bold">»</span>
+            <span className="text-3xl text-gray-500 group-hover:text-gray-800 transition-colors font-bold">→</span>
             <span className="text-xs text-gray-400 group-hover:text-gray-600 transition-colors">展开</span>
           </div>
         </button>
@@ -720,7 +720,7 @@ function BoardShell({
                 className="ml-1 text-xs text-gray-400 hover:text-gray-600 transition px-2 py-1 rounded hover:bg-gray-100"
                 title="收起面板"
               >
-                ←
+                →
               </button>
             )}
           </div>
