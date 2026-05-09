@@ -51,6 +51,7 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
   const [activeHandle, setActiveHandle] = useState<number | null>(null)
   const [savingTemplate, setSavingTemplate] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
+  const [collapsedPanels, setCollapsedPanels] = useState<Set<string>>(new Set())
 
   const loadTemplate = useCallback(async (id: string) => {
     setLoading(true)
@@ -227,6 +228,7 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
       title: "核心信息模板",
       desc: "编辑模板的核心信息字段结构，并作为拖拽填充源。",
       accentClass: "bg-template-accent",
+      collapsible: true,
       children: (
         <CoreInfoTemplateStep
           templateId={currentTemplateId}
@@ -240,6 +242,7 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
       title: "摘要模板",
       desc: "摘要卡片支持接收核心信息拖拽，快速填入来源、内容模板和提示词。",
       accentClass: "bg-template-summary",
+      collapsible: true,
       children: (
         <SummaryTemplateStep
           templateId={currentTemplateId}
@@ -252,6 +255,7 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
       title: "章节结构模板",
       desc: "桌面端保持更宽布局，方便横向拖拽核心信息到章节配置区。",
       accentClass: "bg-template-structure",
+      collapsible: true,
       children: (
         <StructureTemplateStep
           templateId={currentTemplateId}
@@ -345,148 +349,226 @@ export default function TemplateEditorContainer({ templateId }: TemplateEditorCo
         )}
 
         {showLiterature && currentTemplateId && (
-          <section className="mb-3 rounded-2xl border border-template-border bg-white shadow-sm shrink-0">
-            <div className="border-b border-template-border-inner px-4 py-3 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700">文献绑定</h3>
-                <p className="mt-0.5 text-xs text-gray-400">绑定到此模板的文献将在 AI 生成时作为参考来源</p>
-              </div>
-              <span className="text-xs text-muted-foreground">{boundLiterature.length} 篇已绑定</span>
-            </div>
-            <div className="grid grid-cols-2 divide-x divide-template-border-inner">
-              {/* 左列：已绑定 */}
-              <div className="p-4">
-                <p className="mb-2 text-xs font-medium text-gray-500">已绑定文献</p>
-                {boundLiterature.length === 0 ? (
-                  <p className="text-xs text-gray-400 py-3 text-center">暂未绑定任何文献</p>
-                ) : (
-                  <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
-                    {boundLiterature.map(lit => (
-                      <div key={lit.literature_id} className="flex items-start justify-between gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-medium text-gray-700 truncate">{lit.title ?? "标题解析中..."}</p>
-                          {lit.authors && <p className="text-xs text-gray-400 truncate mt-0.5">{lit.authors}</p>}
-                          {lit.journal && <p className="text-xs text-gray-400 truncate">{lit.journal}</p>}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            try {
-                              await literatureService.unbind(currentTemplateId, lit.literature_id)
-                              setBoundLiterature(prev => prev.filter(l => l.literature_id !== lit.literature_id))
-                            } catch (err: unknown) {
-                              toastError(err instanceof Error ? err.message : "解绑失败")
-                            }
-                          }}
-                          className="shrink-0 text-xs text-gray-400 hover:text-red-500 transition"
-                        >
-                          解绑
-                        </button>
-                      </div>
-                    ))}
+          <>
+            {/* 遮罩层 */}
+            <div 
+              className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 animate-in fade-in duration-200"
+              onClick={() => setShowLiterature(false)}
+            />
+            
+            {/* 侧边抽屉 */}
+            <aside className="fixed right-0 top-0 bottom-0 w-[480px] bg-white shadow-2xl z-50 flex flex-col animate-in slide-in-from-right duration-300">
+              {/* 抽屉头部 */}
+              <div className="h-14 shrink-0 border-b border-gray-200 flex items-center justify-between px-6 bg-gradient-to-r from-blue-50 to-purple-50">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">📚</span>
+                  <div>
+                    <h3 className="text-base font-bold text-gray-800">文献管理</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">{boundLiterature.length} 篇已绑定</p>
                   </div>
-                )}
+                </div>
+                <button
+                  onClick={() => setShowLiterature(false)}
+                  className="w-8 h-8 rounded-lg hover:bg-white/80 transition flex items-center justify-center text-gray-400 hover:text-gray-600"
+                >
+                  <span className="text-xl">×</span>
+                </button>
               </div>
 
-              {/* 右列：知识库选择 */}
-              <div className="p-4">
-                <div className="mb-2 flex items-center gap-2">
-                  <p className="text-xs font-medium text-gray-500">知识库文献</p>
-                  <input
-                    type="text"
-                    value={litSearch}
-                    onChange={e => setLitSearch(e.target.value)}
-                    placeholder="搜索标题、作者..."
-                    className="ml-auto h-7 w-44 rounded border border-gray-200 px-2 text-xs outline-none focus:border-blue-300 transition"
-                  />
-                </div>
-                {litLoading ? (
-                  <p className="text-xs text-gray-400 py-3 text-center">加载中...</p>
-                ) : (
-                  <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
-                    {allLiterature
-                      .filter(lit => {
-                        if (!litSearch.trim()) return true
-                        const kw = litSearch.toLowerCase()
-                        return lit.title?.toLowerCase().includes(kw) || lit.authors?.toLowerCase().includes(kw)
-                      })
-                      .filter(lit => lit.upload_status === "ready")
-                      .map(lit => {
-                        const isBound = boundLiterature.some(b => b.literature_id === lit.literature_id)
-                        return (
-                          <div key={lit.literature_id} className="flex items-start justify-between gap-2 rounded-lg border border-gray-100 px-3 py-2 hover:bg-gray-50 transition">
-                            <div className="min-w-0 flex-1">
-                              <p className="text-xs font-medium text-gray-700 truncate">{lit.title ?? "—"}</p>
-                              {lit.authors && <p className="text-xs text-gray-400 truncate mt-0.5">{lit.authors}</p>}
-                              {lit.journal && <p className="text-xs text-gray-400 truncate">{lit.journal}</p>}
-                            </div>
-                            {isBound ? (
-                              <span className="shrink-0 text-xs text-green-600 font-medium">已绑定</span>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  try {
-                                    await literatureService.bind(currentTemplateId, lit.literature_id)
-                                    setBoundLiterature(prev => [...prev, lit])
-                                  } catch (err: unknown) {
-                                    toastError(err instanceof Error ? err.message : "绑定失败")
-                                  }
-                                }}
-                                className="shrink-0 text-xs text-primary hover:underline"
-                              >
-                                绑定
-                              </button>
-                            )}
-                          </div>
-                        )
-                      })}
-                    {allLiterature.filter(l => l.upload_status === "ready").length === 0 && !litLoading && (
-                      <p className="text-xs text-gray-400 py-3 text-center">知识库暂无就绪文献</p>
-                    )}
+              {/* 抽屉内容 */}
+              <div className="flex-1 overflow-y-auto">
+                {/* 已绑定文献区域 */}
+                <div className="p-6 border-b border-gray-100 bg-green-50/30">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                      <span className="w-1 h-4 bg-green-500 rounded-full" />
+                      已绑定文献
+                    </h4>
+                    <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded-full">{boundLiterature.length} 篇</span>
                   </div>
-                )}
+                  {boundLiterature.length === 0 ? (
+                    <div className="text-center py-8 text-gray-400">
+                      <div className="text-4xl mb-2">📭</div>
+                      <p className="text-sm">暂未绑定任何文献</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {boundLiterature.map(lit => (
+                        <div key={lit.literature_id} className="group bg-white rounded-lg border border-gray-200 p-3 hover:shadow-md transition">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-gray-800 line-clamp-2 leading-snug">{lit.title ?? "标题解析中..."}</p>
+                              {lit.authors && <p className="text-xs text-gray-500 mt-1 truncate">👤 {lit.authors}</p>}
+                              {lit.journal && <p className="text-xs text-gray-500 truncate">📖 {lit.journal}</p>}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  await literatureService.unbind(currentTemplateId, lit.literature_id)
+                                  setBoundLiterature(prev => prev.filter(l => l.literature_id !== lit.literature_id))
+                                } catch (err: unknown) {
+                                  toastError(err instanceof Error ? err.message : "解绑失败")
+                                }
+                              }}
+                              className="opacity-0 group-hover:opacity-100 shrink-0 text-xs text-gray-400 hover:text-red-500 transition px-2 py-1 rounded hover:bg-red-50"
+                            >
+                              解绑
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 知识库文献区域 */}
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                      <span className="w-1 h-4 bg-blue-500 rounded-full" />
+                      知识库文献
+                    </h4>
+                  </div>
+                  
+                  {/* 搜索框 */}
+                  <div className="mb-3">
+                    <input
+                      type="text"
+                      value={litSearch}
+                      onChange={e => setLitSearch(e.target.value)}
+                      placeholder="🔍 搜索标题、作者..."
+                      className="w-full h-9 rounded-lg border border-gray-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
+                    />
+                  </div>
+
+                  {litLoading ? (
+                    <div className="text-center py-8 text-gray-400">
+                      <div className="w-8 h-8 border-3 border-blue-200 border-t-blue-500 rounded-full animate-spin mx-auto mb-2" />
+                      <p className="text-sm">加载中...</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {allLiterature
+                        .filter(lit => {
+                          if (!litSearch.trim()) return true
+                          const kw = litSearch.toLowerCase()
+                          return lit.title?.toLowerCase().includes(kw) || lit.authors?.toLowerCase().includes(kw)
+                        })
+                        .filter(lit => lit.upload_status === "ready")
+                        .map(lit => {
+                          const isBound = boundLiterature.some(b => b.literature_id === lit.literature_id)
+                          return (
+                            <div key={lit.literature_id} className="group bg-gray-50 rounded-lg border border-gray-200 p-3 hover:bg-white hover:shadow-md transition">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-semibold text-gray-800 line-clamp-2 leading-snug">{lit.title ?? "—"}</p>
+                                  {lit.authors && <p className="text-xs text-gray-500 mt-1 truncate">👤 {lit.authors}</p>}
+                                  {lit.journal && <p className="text-xs text-gray-500 truncate">📖 {lit.journal}</p>}
+                                </div>
+                                {isBound ? (
+                                  <span className="shrink-0 text-xs text-green-600 font-bold bg-green-50 px-2 py-1 rounded">✓ 已绑定</span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      try {
+                                        await literatureService.bind(currentTemplateId, lit.literature_id)
+                                        setBoundLiterature(prev => [...prev, lit])
+                                      } catch (err: unknown) {
+                                        toastError(err instanceof Error ? err.message : "绑定失败")
+                                      }
+                                    }}
+                                    className="shrink-0 text-xs text-blue-500 hover:text-blue-700 font-medium hover:underline px-2 py-1 rounded hover:bg-blue-50 transition"
+                                  >
+                                    绑定
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      {allLiterature.filter(l => l.upload_status === "ready").length === 0 && !litLoading && (
+                        <div className="text-center py-8 text-gray-400">
+                          <div className="text-4xl mb-2">📚</div>
+                          <p className="text-sm">知识库暂无就绪文献</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          </section>
+            </aside>
+          </>
         )}
 
         <div
           ref={panelContainerRef}
           className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden xl:flex-row xl:gap-0"
         >
-          {panels.map((panel, index) => (
-            <Fragment key={panel.key}>
-              {/* CSS 变量：使用 flex-grow 实现可调整宽度的面板布局，通过 CSS 变量传递动态计算的比例值 */}
-              <div
-                className="min-w-0 xl:h-full xl:basis-0 xl:shrink-0 xl:[flex-grow:var(--panel-grow)]"
-                style={{ ["--panel-grow" as string]: panelWidths[index] }}
-              >
-                <BoardShell
-                  title={panel.title}
-                  desc={panel.desc}
-                  accentClass={panel.accentClass}
-                  className="xl:h-full"
+          {panels.map((panel, index) => {
+            const isCollapsed = collapsedPanels.has(panel.key)
+            
+            return (
+              <Fragment key={panel.key}>
+                {/* CSS 变量：使用 flex-grow 实现可调整宽度的面板布局，通过 CSS 变量传递动态计算的比例值 */}
+                <div
+                  className={cn(
+                    "min-w-0 shrink-0",
+                    isCollapsed 
+                      ? "w-16 xl:w-16" 
+                      : "flex-1 xl:basis-0 xl:[flex-grow:var(--panel-grow)]"
+                  )}
+                  style={isCollapsed ? {} : { ["--panel-grow" as string]: panelWidths[index] }}
                 >
-                  {panel.children}
-                </BoardShell>
-              </div>
+                  <BoardShell
+                    title={panel.title}
+                    desc={panel.desc}
+                    accentClass={panel.accentClass}
+                    className="xl:h-full"
+                    collapsed={isCollapsed}
+                    collapsible={panel.collapsible}
+                    onToggleCollapse={panel.collapsible ? () => {
+                      setCollapsedPanels(prev => {
+                        const next = new Set(prev)
+                        if (next.has(panel.key)) {
+                          // 展开面板
+                          next.delete(panel.key)
+                        } else {
+                          // 收起面板 - 检查是否会导致所有面板都收起
+                          const wouldCollapseAll = panels.filter(p => p.collapsible).every(p => 
+                            p.key === panel.key || next.has(p.key)
+                          )
+                          if (wouldCollapseAll) {
+                            // 不允许全部收起
+                            return prev
+                          }
+                          next.add(panel.key)
+                        }
+                        return next
+                      })
+                    } : undefined}
+                  >
+                    {panel.children}
+                  </BoardShell>
+                </div>
 
-              {index < panels.length - 1 && (
-                <ResizeHandle
-                  active={activeHandle === index}
-                  onPointerDown={(event) => {
-                    resizeStateRef.current = {
-                      handleIndex: index,
-                      startX: event.clientX,
-                      startWidths: panelWidths,
-                    }
-                    setActiveHandle(index)
-                  }}
-                />
-              )}
-            </Fragment>
-          ))}
+                {index < panels.length - 1 && !isCollapsed && !collapsedPanels.has(panels[index + 1].key) && (
+                  <ResizeHandle
+                    active={activeHandle === index}
+                    onPointerDown={(event) => {
+                      resizeStateRef.current = {
+                        handleIndex: index,
+                        startX: event.clientX,
+                        startWidths: panelWidths,
+                      }
+                      setActiveHandle(index)
+                    }}
+                  />
+                )}
+              </Fragment>
+            )
+          })}
         </div>
       </main>
     </div>
@@ -500,6 +582,9 @@ function BoardShell({
   className,
   contentClassName,
   children,
+  collapsed = false,
+  collapsible = false,
+  onToggleCollapse,
 }: {
   title: string
   desc: string
@@ -507,13 +592,46 @@ function BoardShell({
   className?: string
   contentClassName?: string
   children: ReactNode
+  collapsed?: boolean
+  collapsible?: boolean
+  onToggleCollapse?: () => void
 }) {
+  if (collapsed) {
+    return (
+      <section className={cn(
+        "flex h-full min-h-0 flex-col overflow-visible rounded-[20px] border border-template-border bg-white shadow-sm",
+        className
+      )}>
+        <button
+          onClick={onToggleCollapse}
+          className="h-full w-full flex flex-col items-center justify-center hover:bg-gray-50 transition-all group cursor-pointer py-8"
+          title={`展开${title}`}
+        >
+          <span className={cn("h-5 w-5 rounded-full shadow-lg mb-4", accentClass)} />
+          <div className="flex flex-col items-center gap-2">
+            <span className="text-3xl text-gray-500 group-hover:text-gray-800 transition-colors font-bold">→</span>
+            <span className="text-xs text-gray-400 group-hover:text-gray-600 transition-colors">展开</span>
+          </div>
+        </button>
+      </section>
+    )
+  }
+
   return (
     <section className={cn("flex h-full min-h-0 flex-col overflow-hidden rounded-[20px] border border-template-border bg-white shadow-sm", className)}>
       <div className="border-b border-template-border-inner px-4 py-3">
         <div className="flex items-center gap-3">
           <span className={cn("h-3 w-3 rounded-full", accentClass)} />
           <h2 className="text-lg font-semibold text-gray-800">{title}</h2>
+          {collapsible && (
+            <button
+              onClick={onToggleCollapse}
+              className="ml-auto text-xs text-gray-400 hover:text-gray-600 transition px-2 py-1 rounded hover:bg-gray-100"
+              title="收起面板"
+            >
+              →
+            </button>
+          )}
         </div>
         <p className="mt-1 text-sm text-gray-500">{desc}</p>
       </div>
