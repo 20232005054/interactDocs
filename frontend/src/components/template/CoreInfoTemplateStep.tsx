@@ -215,8 +215,10 @@ function TreeNode({
   const [addingChild, setAddingChild] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [addMenuOpen, setAddMenuOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(true) // 默认收起
   const addMenuRef = useRef<HTMLDivElement | null>(null)
   const editing = editingNodeId === node.core_template_id
+  const hasChildren = (node.children?.length ?? 0) > 0
   // 排序能力在模板编辑页和应用模板页都开启，支持整行拖拽。
   const rowSortEnabled = true
   const canDropSort = !!sortDragging
@@ -333,6 +335,19 @@ function TreeNode({
           }
         >
           <div className="flex items-center gap-2">
+            {/* 折叠箭头 */}
+            {hasChildren && (
+              <button
+                onClick={(event) => {
+                  event.stopPropagation()
+                  setCollapsed((prev) => !prev)
+                }}
+                className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground transition"
+                aria-label={collapsed ? "展开" : "折叠"}
+              >
+                <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", collapsed && "-rotate-90")} />
+              </button>
+            )}
             {node.is_required && (
               <span className="text-sm font-semibold leading-none text-destructive">*</span>
             )}
@@ -465,7 +480,7 @@ function TreeNode({
       )}
 
       {/* 子节点递归 */}
-      {node.children?.map(child => (
+      {!collapsed && node.children?.map(child => (
         <TreeNode
           key={child.core_template_id}
           node={child}
@@ -668,25 +683,6 @@ export default function CoreInfoTemplateStep({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-medium text-foreground">核心信息字段</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {enableDrag
-              ? "定义核心信息结构，并可将字段拖到摘要模板或章节结构模板中自动填入"
-              : "定义文档的核心信息结构，支持文本、下拉选择和分组类型"}
-          </p>
-        </div>
-        {items.length === 0 && (
-          <button
-            onClick={() => setAddingRoot(true)}
-            className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition"
-          >
-            + 添加字段
-          </button>
-        )}
-      </div>
-
       {/* 添加根节点表单 */}
       {addingRoot && (
         <RowForm
@@ -700,7 +696,7 @@ export default function CoreInfoTemplateStep({
       {/* 字段树 */}
       {items.length === 0 && !addingRoot ? (
         <div className="py-8 text-center text-sm text-muted-foreground border border-dashed border-border rounded-lg">
-          暂无字段，点击添加字段开始配置
+          暂无字段，点击下方按钮添加字段
         </div>
       ) : (
         <div className="flex flex-col gap-0.5">
@@ -741,6 +737,14 @@ export default function CoreInfoTemplateStep({
           ))}
         </div>
       )}
+
+      {/* 底部添加字段按钮 */}
+      <button
+        onClick={() => setAddingRoot(true)}
+        className="h-9 w-full rounded-md border-2 border-dashed border-primary/40 text-sm font-medium text-primary hover:bg-primary/5 transition"
+      >
+        + 添加字段
+      </button>
     </div>
   )
 }

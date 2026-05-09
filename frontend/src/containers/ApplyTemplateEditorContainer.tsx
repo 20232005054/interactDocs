@@ -316,7 +316,7 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
       bgColor: "bg-purple-50/30",
       borderColor: "border-purple-200",
       status: applyStatus.structure,
-      collapsible: false,
+      collapsible: true,
       children: (
         <StructureTemplateStep
           templateId={templateId}
@@ -594,8 +594,17 @@ export default function ApplyTemplateEditorContainer({ documentId }: ApplyTempla
                         setCollapsedPanels(prev => {
                           const next = new Set(prev)
                           if (next.has(panel.key)) {
+                            // 展开面板
                             next.delete(panel.key)
                           } else {
+                            // 收起面板 - 检查是否会导致所有面板都收起
+                            const wouldCollapseAll = panels.filter(p => p.collapsible).every(p => 
+                              p.key === panel.key || next.has(p.key)
+                            )
+                            if (wouldCollapseAll) {
+                              // 不允许全部收起，忽略此操作
+                              return prev
+                            }
                             next.add(panel.key)
                           }
                           return next
