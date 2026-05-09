@@ -291,33 +291,34 @@ function SummaryCard({
             </div>
 
             {showSources ? (
-              <div className="flex flex-col gap-2">
+              <div 
+                className={cn(
+                  "flex flex-col gap-2 rounded-lg p-3 transition-colors",
+                  generationMode === 1 && "border-2 border-dashed border-green-300 bg-green-50/20"
+                )}
+                onDragOver={(event) => {
+                  // 在 dragover 中无法读取自定义 MIME 数据（浏览器安全限制）
+                  // 所以无条件允许放置，在 drop 时再检查
+                  event.preventDefault()
+                }}
+                onDrop={(event) => {
+                  const coreInfoDropped = getCoreInfoDragData(event)
+                  const summaryDropped = getSummaryDragData(event)
+                  
+                  if (coreInfoDropped) {
+                    event.preventDefault()
+                    syncDroppedSource(coreInfoDropped, "keyinfo")
+                  } else if (summaryDropped) {
+                    event.preventDefault()
+                    syncDroppedSource(summaryDropped, "summary")
+                  }
+                }}
+              >
                 <label className="text-sm text-gray-600">来源方式：</label>
                 <ReadonlySourceList sources={sources} />
                 {generationMode === 1 && (
-                  <div
-                    onDragOver={(event) => {
-                      const coreInfoDropped = getCoreInfoDragData(event)
-                      const summaryDropped = getSummaryDragData(event)
-                      if (coreInfoDropped || summaryDropped) {
-                        event.preventDefault()
-                      }
-                    }}
-                    onDrop={(event) => {
-                      const coreInfoDropped = getCoreInfoDragData(event)
-                      const summaryDropped = getSummaryDragData(event)
-                      
-                      if (coreInfoDropped) {
-                        event.preventDefault()
-                        syncDroppedSource(coreInfoDropped, "keyinfo")
-                      } else if (summaryDropped) {
-                        event.preventDefault()
-                        syncDroppedSource(summaryDropped, "summary")
-                      }
-                    }}
-                    className="rounded-lg border-2 border-dashed border-green-300 bg-green-50/30 px-3 py-2.5 text-xs text-gray-500 hover:border-green-400 hover:bg-green-50/50 transition-colors cursor-pointer"
-                  >
-                    💡 拖拽核心信息或摘要到此处添加来源
+                  <div className="text-xs text-gray-500 text-center py-1">
+                    💡 拖拽核心信息或摘要到此区域添加来源
                   </div>
                 )}
               </div>
