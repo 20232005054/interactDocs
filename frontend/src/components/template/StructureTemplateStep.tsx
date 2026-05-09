@@ -205,7 +205,13 @@ function ParagraphEditor({ index, total, para, variables, variableLabelMap, onCh
           }}
         >
           <label className="text-sm text-gray-600">来源方式：</label>
-          <ReadonlySourceList sources={sources} />
+          <ReadonlySourceList 
+            sources={sources} 
+            editable
+            onRemove={(index) => {
+              handleSourcesChange(sources.filter((_, i) => i !== index))
+            }}
+          />
           {generationMode === 1 && (
             <div className="text-xs text-gray-500 text-center py-1">
               💡 拖拽核心信息或摘要到此区域添加来源

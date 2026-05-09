@@ -1,6 +1,7 @@
 "use client"
 
 import type { SourceInfo } from "@/types/api"
+import { X } from "lucide-react"
 
 const SOURCE_TYPE_LABELS: Record<string, string> = {
   keyinfo: "核心信息",
@@ -18,6 +19,8 @@ const MATCH_TYPE_LABELS: Record<string, string> = {
 interface ReadonlySourceListProps {
   sources: SourceInfo[]
   emptyHint?: string
+  onRemove?: (sourceIndex: number) => void
+  editable?: boolean
 }
 
 function isPlainKeyInfoSource(source: SourceInfo): boolean {
@@ -75,6 +78,8 @@ function mergeKeyInfoSourcesForDisplay(sources: SourceInfo[]): SourceInfo[] {
 export default function ReadonlySourceList({
   sources,
   emptyHint = "拖拽核心信息字段到编辑区后，这里的来源映射会自动更新。",
+  onRemove,
+  editable = false,
 }: ReadonlySourceListProps) {
   const displaySources = mergeKeyInfoSourcesForDisplay(sources)
 
@@ -91,6 +96,7 @@ export default function ReadonlySourceList({
     label: string
     tone: "keyinfo" | "group" | "other"
     children?: SourceInfo["match_keys"]
+    sourceIndex: number
   }> = []
 
   displaySources.forEach((source, sourceIndex) => {
@@ -101,6 +107,7 @@ export default function ReadonlySourceList({
         label: source.source.label || source.target_field || "分组",
         tone: "group",
         children: source.match_keys,
+        sourceIndex,
       })
       return
     }
@@ -111,6 +118,7 @@ export default function ReadonlySourceList({
           id: `${source.source.value}-${source.match_type}-${key.value}-${sourceIndex}-${keyIndex}`,
           label: key.label,
           tone: source.source.value === "keyinfo" ? "keyinfo" : "other",
+          sourceIndex,
         })
       })
       return
@@ -120,6 +128,7 @@ export default function ReadonlySourceList({
       id: `${source.source.value}-${source.match_type}-empty-${sourceIndex}`,
       label: "暂无匹配字段",
       tone: "other",
+      sourceIndex,
     })
   })
 
@@ -130,8 +139,21 @@ export default function ReadonlySourceList({
           if (token.tone === "group") {
             return (
               <div key={token.id} className="group/readonly-group relative inline-flex">
-                <span className="inline-flex items-center rounded bg-indigo-100 px-1.5 py-0.5 text-[11px] font-medium text-indigo-800">
+                <span className="inline-flex items-center gap-1 rounded bg-indigo-100 px-1.5 py-0.5 text-[11px] font-medium text-indigo-800">
                   {token.label}
+                  {editable && onRemove && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onRemove(token.sourceIndex)
+                      }}
+                      className="inline-flex h-3 w-3 items-center justify-center rounded-full hover:bg-indigo-200 transition"
+                      title="删除来源"
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  )}
                 </span>
                 <div className="absolute left-0 top-full z-20 hidden min-w-56 max-w-80 rounded-md border border-gray-200 bg-white p-2 shadow-md group-hover/readonly-group:block">
                   <div className="mb-1 text-[11px] font-medium text-gray-500">
@@ -160,9 +182,22 @@ export default function ReadonlySourceList({
             return (
               <span
                 key={token.id}
-                className="inline-flex items-center rounded bg-yellow-100 px-1.5 py-0.5 text-[11px] font-medium text-yellow-800"
+                className="inline-flex items-center gap-1 rounded bg-yellow-100 px-1.5 py-0.5 text-[11px] font-medium text-yellow-800"
               >
                 {token.label}
+                {editable && onRemove && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onRemove(token.sourceIndex)
+                    }}
+                    className="inline-flex h-3 w-3 items-center justify-center rounded-full hover:bg-yellow-200 transition"
+                    title="删除来源"
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                )}
               </span>
             )
           }
@@ -170,9 +205,22 @@ export default function ReadonlySourceList({
           return (
             <span
               key={token.id}
-              className="inline-flex items-center rounded bg-gray-200 px-1.5 py-0.5 text-[11px] font-medium text-gray-700"
+              className="inline-flex items-center gap-1 rounded bg-gray-200 px-1.5 py-0.5 text-[11px] font-medium text-gray-700"
             >
               {token.label}
+              {editable && onRemove && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onRemove(token.sourceIndex)
+                  }}
+                  className="inline-flex h-3 w-3 items-center justify-center rounded-full hover:bg-gray-300 transition"
+                  title="删除来源"
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              )}
             </span>
           )
         })}
